@@ -29,43 +29,49 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
+// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+//     return $request->user();
+// });
 
+// Public routes (no authentication required)
 Route::post('login', [AuthController::class, 'login']);
 Route::post('register', [AuthController::class, 'register']);
 
+// Test routes postman
+Route::get('kpi', [KpiController::class, 'index']);
+Route::get('user', [UserController::class, 'index']);
+
+// Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('logout', [AuthController::class, 'logout']);
-});
+    // Route::post('logout', [AuthController::class, 'logout']);
+    // Route::get('user', [AuthController::class, 'getUser']);
+    
+    // API Resources
+    Route::apiResource('form', FormController::class);
+    Route::apiResource('detail-form', DetailFormController::class);
+    Route::apiResource('jenis-workorder', JenisWorkorderController::class);
+    // Route::apiResource('kpi', KpiController::class);
 
+    Route::apiResource('jenis-lokasi', JenisLokasiController::class);
+    Route::apiResource('workorder', WorkorderController::class);
+    Route::apiResource('workorder-action', WorkorderActionController::class);
 
+    Route::apiResource('progress-workorder', ProgressWorkorderController::class);
+    Route::apiResource('detail-progress', DetailProgressController::class);
 
-Route::apiResource('form', FormController::class);
-Route::apiResource('detail-form', DetailFormController::class);
-Route::apiResource('jenis-workorder', JenisWorkorderController::class);
-Route::apiResource('kpi', KpiController::class);
+    Route::apiResource('lembur-spl', LemburSplController::class);
+    // Route::apiResource('user', UserController::class);
+    Route::apiResource('master-location', MasterLocationController::class);
 
-Route::apiResource('jenis-lokasi', JenisLokasiController::class);
-Route::apiResource('workorder', WorkorderController::class);
-Route::apiResource('workorder-action', WorkorderActionController::class);
+    Route::post('/progress-workorder/manual-run', function () {
+        $service = new ProgressWorkorderService();
 
-Route::apiResource('progress-workorder', ProgressWorkorderController::class);
-Route::apiResource('detail-progress', DetailProgressController::class);
+        $workorders = Workorder::where('status_id', 7)->get();
 
-Route::apiResource('lembur-spl', LemburSplController::class);
-Route::apiResource('user', UserController::class);
-Route::apiResource('master-location', MasterLocationController::class);
+        foreach ($workorders as $workorder) {
+            $service->addWorkorderProgress($workorder->id);
+        }
 
-Route::post('/progress-workorder/manual-run', function () {
-    $service = new ProgressWorkorderService();
-
-    $workorders = Workorder::where('status_id', 7)->get();
-
-    foreach ($workorders as $workorder) {
-        $service->addWorkorderProgress($workorder->id);
-    }
-
-    return response()->json(['message' => 'Progress ditambahkan untuk semua workorder aktif']);
+        return response()->json(['message' => 'Progress ditambahkan untuk semua workorder aktif']);
+    });
 });
