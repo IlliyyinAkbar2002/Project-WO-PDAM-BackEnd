@@ -37,9 +37,19 @@ use Illuminate\Support\Facades\Route;
 Route::post('login', [AuthController::class, 'login']);
 Route::post('register', [AuthController::class, 'register']);
 
-// Test routes postman
+// Test get routes postman
 Route::get('kpi', [KpiController::class, 'index']);
 Route::get('user', [UserController::class, 'index']);
+Route::get('workorder', [WorkorderController::class, 'index']);
+Route::get('jenis-workorder', [JenisWorkorderController::class, 'index']);
+Route::get('master-location', [MasterLocationController::class, 'index']);
+Route::get('form', [FormController::class, 'index']);
+Route::get('detail-form', [DetailFormController::class, 'index']);
+Route::get('jenis-lokasi', [JenisLokasiController::class, 'index']);
+Route::get('workorder-action', [WorkorderActionController::class, 'index']);
+Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
+Route::get('detail-progress', [DetailProgressController::class, 'index']);
+Route::get('lembur-spl', [LemburSplController::class, 'index']);
 
 // Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {
@@ -47,21 +57,21 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route::get('user', [AuthController::class, 'getUser']);
     
     // API Resources
-    Route::apiResource('form', FormController::class);
-    Route::apiResource('detail-form', DetailFormController::class);
-    Route::apiResource('jenis-workorder', JenisWorkorderController::class);
+    // Route::apiResource('form', FormController::class);
+    // Route::apiResource('detail-form', DetailFormController::class);
+    // Route::apiResource('jenis-workorder', JenisWorkorderController::class);
     // Route::apiResource('kpi', KpiController::class);
 
-    Route::apiResource('jenis-lokasi', JenisLokasiController::class);
-    Route::apiResource('workorder', WorkorderController::class);
-    Route::apiResource('workorder-action', WorkorderActionController::class);
+    // Route::apiResource('jenis-lokasi', JenisLokasiController::class);
+    //Route::apiResource('workorder', WorkorderController::class);
+    // Route::apiResource('workorder-action', WorkorderActionController::class);
 
-    Route::apiResource('progress-workorder', ProgressWorkorderController::class);
-    Route::apiResource('detail-progress', DetailProgressController::class);
+    // Route::apiResource('progress-workorder', ProgressWorkorderController::class);
+    // Route::apiResource('detail-progress', DetailProgressController::class);
 
-    Route::apiResource('lembur-spl', LemburSplController::class);
+    // Route::apiResource('lembur-spl', LemburSplController::class);
     // Route::apiResource('user', UserController::class);
-    Route::apiResource('master-location', MasterLocationController::class);
+    // Route::apiResource('master-location', MasterLocationController::class);
 
     Route::post('/progress-workorder/manual-run', function () {
         $service = new ProgressWorkorderService();
