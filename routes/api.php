@@ -29,20 +29,30 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+//     return $request->user();
+// });
+// Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
+// Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
+//     return $request->user();
+// });
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+    return response()->json([
+        'success' => true,
+        'user' => $request->user(),
+    ]);
 });
 
-Route::post('login', [AuthController::class, 'login']);
+Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
+Route::post('/login', [AuthController::class, 'login']);
+// Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
 Route::post('register', [AuthController::class, 'register']);
 
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('logout', [AuthController::class, 'logout']);
-});
 
 
-
-Route::apiResource('form', FormController::class);
+//Route::apiResource('form', FormController::class);
 Route::apiResource('detail-form', DetailFormController::class);
 Route::apiResource('jenis-workorder', JenisWorkorderController::class);
 Route::apiResource('kpi', KpiController::class);
@@ -69,3 +79,10 @@ Route::post('/progress-workorder/manual-run', function () {
 
     return response()->json(['message' => 'Progress ditambahkan untuk semua workorder aktif']);
 });
+
+Route::get('/ping', function () {
+    return response()->json([
+        'message' => 'API Laravel Connected!'
+    ]);
+});
+
