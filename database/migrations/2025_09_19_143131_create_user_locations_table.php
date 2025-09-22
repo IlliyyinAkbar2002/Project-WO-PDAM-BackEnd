@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateMasterLocationsTable extends Migration
+class CreateUserLocationsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,12 +13,12 @@ class CreateMasterLocationsTable extends Migration
      */
     public function up()
     {
-        Schema::create('m_location', function (Blueprint $table) {
+        Schema::create('user_locations', function (Blueprint $table) {
             $table->id();
-            $table->string('nama');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->decimal('latitude', 10, 7);
             $table->decimal('longitude', 10, 7);
-            $table->integer('radius_meter')->default(100);
+            $table->decimal('accuracy', 8, 2)->nullable();
             $table->timestamps();
         });
     }
@@ -30,6 +30,6 @@ class CreateMasterLocationsTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('m_location');
+        Schema::dropIfExists('user_locations');
     }
 }

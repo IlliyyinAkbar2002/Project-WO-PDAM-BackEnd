@@ -29,15 +29,11 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-//     return $request->user();
-// });
-
 // Public routes (no authentication required)
-Route::post('login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login']);
 Route::post('register', [AuthController::class, 'register']);
 
-// Test get routes postman
+// Open listing/test routes
 Route::get('kpi', [KpiController::class, 'index']);
 Route::get('user', [UserController::class, 'index']);
 Route::get('workorder', [WorkorderController::class, 'index']);
@@ -53,26 +49,17 @@ Route::get('lembur-spl', [LemburSplController::class, 'index']);
 
 // Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {
-    // Route::post('logout', [AuthController::class, 'logout']);
-    // Route::get('user', [AuthController::class, 'getUser']);
-    
-    // API Resources
-    // Route::apiResource('form', FormController::class);
-    // Route::apiResource('detail-form', DetailFormController::class);
-    // Route::apiResource('jenis-workorder', JenisWorkorderController::class);
-    // Route::apiResource('kpi', KpiController::class);
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
 
-    // Route::apiResource('jenis-lokasi', JenisLokasiController::class);
-    //Route::apiResource('workorder', WorkorderController::class);
-    // Route::apiResource('workorder-action', WorkorderActionController::class);
+    Route::get('/user', function (Request $request) {
+        return response()->json([
+            'success' => true,
+            'user' => $request->user(),
+        ]);
+    });
 
-    // Route::apiResource('progress-workorder', ProgressWorkorderController::class);
-    // Route::apiResource('detail-progress', DetailProgressController::class);
-
-    // Route::apiResource('lembur-spl', LemburSplController::class);
-    // Route::apiResource('user', UserController::class);
-    // Route::apiResource('master-location', MasterLocationController::class);
-
+    // Example protected utility
     Route::post('/progress-workorder/manual-run', function () {
         $service = new ProgressWorkorderService();
 
@@ -84,4 +71,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
         return response()->json(['message' => 'Progress ditambahkan untuk semua workorder aktif']);
     });
+
+    // If you later want to protect the resources, move them here
 });
+
+Route::get('/ping', function () {
+    return response()->json([
+        'message' => 'API Laravel Connected!'
+    ]);
+});
+

@@ -4,10 +4,44 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    // public function login(Request $request)
+    // {
+    //     $credentials = $request->validate([
+    //         'email' => 'required|email',
+    //         'password' => 'required|string',
+    //     ]);
+
+    // // Coba login pakai Auth::attempt()
+    // if (!Auth::attempt($credentials)) {
+    //     return response()->json([
+    //         'message' => 'Email atau password salah'
+    //     ], 401);
+    // }
+
+    // // Ambil user yang sedang login
+    // $user = Auth::user();
+
+    // dd(get_class(Auth::user()));
+
+
+    // $token = $user->createToken('auth_token')->plainTextToken;
+
+    // return response()->json([
+    //     'message' => 'Login berhasil',
+    //     'access_token' => $token,
+    //     'token_type' => 'Bearer',
+    //     'user' => [
+    //         'id' => $user->id,
+    //         'name' => $user->name,
+    //         'email' => $user->email,
+    //         'role_id' => $user->role_id,
+    //     ],
+    // ], 201);
     public function login(Request $request)
     {
         try {
@@ -102,6 +136,11 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
+    public function me(Request $request) {
+    return response()->json($request->user());
+    }
+
 
     public function logout(Request $request)
     {

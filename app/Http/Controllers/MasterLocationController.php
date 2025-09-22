@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterLocation;
+use App\Models\UserLocations;
 use Illuminate\Http\Request;
 
 class MasterLocationController extends Controller
@@ -12,17 +13,37 @@ class MasterLocationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        try {
-            $locations = MasterLocation::all();
-            return response()->json($locations, 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data lokasi',
-                'message' => $e->getMessage()
-            ], 500);
+        // try {
+        //     $locations = MasterLocation::all();
+        //     return response()->json($locations, 200);
+        // } catch (\Exception $e) {
+        //     return response()->json([
+        //         'error' => 'Terjadi kesalahan saat mengambil data lokasi',
+        //         'message' => $e->getMessage()
+        //     ], 500);
+        // }
+        $masters = MasterLocation::all();
+        $userLocation = null;
+    if ($request->user()) {
+        $userLocation = UserLocations::where('user_id', $request->user()->id)->latest()->first();
+    }
+
+    // tambahkan flag inside pada tiap master
+    $masters = $masters->map(function($m) use ($userLocation) {
+        $m->inside = false;
+        if ($userLocation) {
+            $meters = $this->haversineMeters($m->latitude, $m->longitude, $userLocation->latitude, $userLocation->longitude);
+            $m->inside = $meters <= $m->radius_meter;
         }
+        return $m;
+    });
+
+    return response()->json([
+        'master_locations' => $masters,
+        'user_location' => $userLocation
+    ]);
     }
 
     /**
@@ -85,5 +106,15 @@ class MasterLocationController extends Controller
     public function destroy($id)
     {
         //
+    }
+
+    // helper
+    private function haversineMeters($lat1, $lon1, $lat2, $lon2) {
+        $R = 6371000;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        $a = sin($dLat/2) * sin($dLat/2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon/2) * sin($dLon/2);
+        $c = 2 * atan2(sqrt($a), sqrt(1-$a));
+        return $R * $c;
     }
 }
