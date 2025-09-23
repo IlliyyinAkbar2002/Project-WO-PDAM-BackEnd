@@ -9,39 +9,6 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-    // public function login(Request $request)
-    // {
-    //     $credentials = $request->validate([
-    //         'email' => 'required|email',
-    //         'password' => 'required|string',
-    //     ]);
-
-    // // Coba login pakai Auth::attempt()
-    // if (!Auth::attempt($credentials)) {
-    //     return response()->json([
-    //         'message' => 'Email atau password salah'
-    //     ], 401);
-    // }
-
-    // // Ambil user yang sedang login
-    // $user = Auth::user();
-
-    // dd(get_class(Auth::user()));
-
-
-    // $token = $user->createToken('auth_token')->plainTextToken;
-
-    // return response()->json([
-    //     'message' => 'Login berhasil',
-    //     'access_token' => $token,
-    //     'token_type' => 'Bearer',
-    //     'user' => [
-    //         'id' => $user->id,
-    //         'name' => $user->name,
-    //         'email' => $user->email,
-    //         'role_id' => $user->role_id,
-    //     ],
-    // ], 201);
     public function login(Request $request)
     {
         try {
@@ -65,6 +32,7 @@ class AuthController extends Controller
 
             return response()->json([
                 'success' => true,
+                'type' => 'Bearer',
                 'message' => 'Login berhasil',
                 'user' => [
                     'id' => $user->id,
@@ -72,7 +40,7 @@ class AuthController extends Controller
                     'email' => $user->email,
                     'role_id' => $user->role_id,
                 ],
-                'token' => $token
+                'access_token' => $token
             ])->withCookie($cookie);
             
         } catch (\Illuminate\Validation\ValidationException $e) {
