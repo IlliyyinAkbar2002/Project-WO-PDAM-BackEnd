@@ -67,23 +67,27 @@ class JenisWorkorderController extends Controller
     public function store(Request $request)
     {
         try {
-            // For testing - let's make detail_form optional
             $validator = \Validator::make($request->all(), [
                 'nama' => 'required|string',
                 'kpi_id' => 'required|integer|exists:master_kpi,id',
-                'detail_form' => 'nullable|array',
-                'detail_form.*.id' => 'required|integer',
+                'detail_form' => 'required|array',
+                'detail_form.*.id' => 'nullable', // Make id optional for new records
                 'detail_form.*.nama_field' => 'required|string|max:255',
                 'detail_form.*.tipe_field' => 'required|string',
                 'detail_form.*.tipe_data' => 'nullable|string',
                 'detail_form.*.unit_satuan' => 'nullable|string',
                 'detail_form.*.sifat' => 'required|string',
-                'detail_form.*.parent' => 'required|integer',
+                'detail_form.*.parent' => 'nullable|integer', // Make parent nullable to accept 0 or dummy IDs
                 'detail_form.*.keterangan' => 'nullable|string',
                 'detail_form.*.hint_text' => 'required|string',
                 'detail_form.*.order' => 'required|integer',
                 'detail_form.*.min' => 'nullable|integer',
                 'detail_form.*.max' => 'nullable|integer',
+                'detail_form.*.option_form' => 'nullable|array',
+                'detail_form.*.option_form.*.id' => 'nullable', // Optional for new records
+                'detail_form.*.option_form.*.nama_opsi' => 'required|string',
+                'detail_form.*.option_form.*.parent' => 'nullable|integer',
+                'detail_form.*.option_form.*.order' => 'required|integer',
             ]);
 
             if ($validator->fails()) {
@@ -94,22 +98,6 @@ class JenisWorkorderController extends Controller
             }
 
             $data = $validator->validated();
-            
-            // If no detail_form provided, add a default one for testing
-            if (empty($data['detail_form'])) {
-                $data['detail_form'] = [
-                    [
-                        'id' => 1,
-                        'nama_field' => 'Default Field',
-                        'tipe_field' => 'text',
-                        'tipe_data' => 'string',
-                        'sifat' => 'required',
-                        'parent' => 0,
-                        'hint_text' => 'Default hint text',
-                        'order' => 1
-                    ]
-                ];
-            }
             
             $jenisWorkorder = $this->jenisWorkorderService->store($data);
             return response()->json([
@@ -123,18 +111,6 @@ class JenisWorkorderController extends Controller
             ], 500);
         }
     }
-
-
-    // public function store(StoreJenisWorkorderRequest $request)
-    // {
-    //     try {
-    //         $data = $request->validated();
-    //         $jenisWorkorder = $this->jenisWorkorderService->store($data);
-    //         return new JenisWorkorderResource($jenisWorkorder);
-    //     } catch (\Exception $e) {
-    //         return response()->json(['error' => 'Gagal menyimpan data: ' . $e->getMessage()], 500);
-    //     }
-    // }
 
     /**
      * Display the specified resource.
@@ -172,7 +148,6 @@ class JenisWorkorderController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            // For testing - let's make detail_form optional for updates
             $validator = \Validator::make($request->all(), [
                 'nama' => 'sometimes|required|string',
                 'kpi_id' => 'sometimes|required|integer|exists:master_kpi,id',
@@ -189,6 +164,11 @@ class JenisWorkorderController extends Controller
                 'detail_form.*.order' => 'required_with:detail_form|integer',
                 'detail_form.*.min' => 'nullable|integer',
                 'detail_form.*.max' => 'nullable|integer',
+                'detail_form.*.option_form' => 'nullable|array',
+                'detail_form.*.option_form.*.id' => 'nullable|integer', // Can be null for new options
+                'detail_form.*.option_form.*.nama_opsi' => 'required_with:detail_form.*.option_form|string',
+                'detail_form.*.option_form.*.parent' => 'nullable|integer',
+                'detail_form.*.option_form.*.order' => 'required_with:detail_form.*.option_form|integer',
             ]);
 
             if ($validator->fails()) {
