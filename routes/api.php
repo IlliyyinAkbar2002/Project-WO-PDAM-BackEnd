@@ -7,6 +7,7 @@ use App\Http\Controllers\JenisLokasiController;
 use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
 use App\Http\Controllers\LemburSplController;
+use App\Http\Controllers\LocationController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkorderActionController;
 use App\Http\Controllers\WorkorderController;
@@ -32,24 +33,35 @@ use Illuminate\Support\Facades\Route;
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
 // });
-// Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
-// Route::middleware('auth:sanctum')->get('/me', function (Request $request) {
-//     return $request->user();
-// });
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return response()->json([
-        'success' => true,
-        'user' => $request->user(),
-    ]);
+    //Bagian Auth
+Route::post('/register', [AuthController::class, 'register']);
+
+Route::post('/login', [AuthController::class, 'login']);
+
+// Protected (pakai sanctum)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+});
+    //batasan auth
+
+Route::middleware('auth:sanctum')->group(function() {
+    Route::post('/locations', [LocationController::class, 'store']);
+    Route::get('/master-locations', [MasterLocationController::class, 'index']);
+    Route::patch('/master-locations/{id}', [MasterLocationController::class, 'update']); // untuk admin edit
 });
 
-Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
-Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
-Route::post('/login', [AuthController::class, 'login']);
-// Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
-Route::post('register', [AuthController::class, 'register']);
-
+Route::middleware('auth:sanctum')->group(function () {
+    // simpan lokasi user
+    Route::post('locations', [LocationController::class, 'store']);
+    // lokasi terbaru user
+    Route::get('locations/latest', [LocationController::class, 'latest']);
+    // semua lokasi user (admin)
+    Route::get('locations/all', [LocationController::class, 'all']);
+    // cek posisi user terhadap master location
+    Route::get('locations/check', [LocationController::class, 'check']);
+});
 
 
 //Route::apiResource('form', FormController::class);

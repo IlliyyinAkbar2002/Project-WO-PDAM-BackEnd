@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\MasterLocation;
 use App\Models\UserLocations;
 use Illuminate\Http\Request;
+use function React\Promise\all;
 
 class MasterLocationController extends Controller
 {
@@ -13,38 +14,10 @@ class MasterLocationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request)
+    public function index()
     {
-        // try {
-        //     $locations = MasterLocation::all();
-        //     return response()->json($locations, 200);
-        // } catch (\Exception $e) {
-        //     return response()->json([
-        //         'error' => 'Terjadi kesalahan saat mengambil data lokasi',
-        //         'message' => $e->getMessage()
-        //     ], 500);
-        // }
-        $masters = MasterLocation::all();
-        $userLocation = null;
-    if ($request->user()) {
-        $userLocation = UserLocations::where('user_id', $request->user()->id)->latest()->first();
-    }
-
-    // tambahkan flag inside pada tiap master
-    $masters = $masters->map(function($m) use ($userLocation) {
-        $m->inside = false;
-        if ($userLocation) {
-            $meters = $this->haversineMeters($m->latitude, $m->longitude, $userLocation->latitude, $userLocation->longitude);
-            $m->inside = $meters <= $m->radius_meter;
-        }
-        return $m;
-    });
-
-    return response()->json([
-        'master_locations' => $masters,
-        'user_location' => $userLocation
-    ]);
-    }
+        return response()->json(MasterLocation::all());
+    }    
 
     /**
      * Store a newly created resource in storage.
@@ -54,7 +27,15 @@ class MasterLocationController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'nama' => 'required|string|max:255',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius_meter' => 'required|integer|min:1',
+        ]);
+        $location = MasterLocation::create($validated);
+
+        return response()->json($location, 201);
     }
 
     /**
@@ -65,7 +46,7 @@ class MasterLocationController extends Controller
      */
     public function show($id)
     {
-        //
+        return response()->json(MasterLocation::findOrFail($id));
     }
 
     /**
@@ -77,24 +58,17 @@ class MasterLocationController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $validatedData = $request->validate([
+        $validated = $request->validate([
             'nama' => 'nullable|string|max:255',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
             'radius_meter' => 'required|integer|min:1',
         ]);
 
-        try {
-            $location = MasterLocation::findOrFail($id);
-            $location->update($validatedData);
-            return response()->json([
-                'message' => 'Lokasi berhasil diperbarui',
-                'data' => $location,
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat memperbarui lokasi',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $location = MasterLocation::findOrFail($id);
+        $location->update($validated);
+
+        return response()->json($location, 200);
     }
 
     /**

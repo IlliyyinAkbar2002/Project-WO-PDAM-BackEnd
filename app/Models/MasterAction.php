@@ -10,6 +10,8 @@ class MasterAction extends Model
     use HasFactory;
     protected $table = 'm_action';
     protected $guarded = [];
+    protected $fillable = ['nama','latitude','longitude','radius_meter'];
+    protected $casts = ['latitude'=>'float','longitude'=>'float','radius_meter'=>'int'];
 
     public function workorderAction()
     {
