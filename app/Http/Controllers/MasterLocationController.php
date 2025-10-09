@@ -15,35 +15,41 @@ class MasterLocationController extends Controller
      */
     public function index(Request $request)
     {
-        // try {
-        //     $locations = MasterLocation::all();
-        //     return response()->json($locations, 200);
-        // } catch (\Exception $e) {
-        //     return response()->json([
-        //         'error' => 'Terjadi kesalahan saat mengambil data lokasi',
-        //         'message' => $e->getMessage()
-        //     ], 500);
-        // }
-        $masters = MasterLocation::all();
-        $userLocation = null;
-    if ($request->user()) {
-        $userLocation = UserLocations::where('user_id', $request->user()->id)->latest()->first();
-    }
+        try {
+            $masters = MasterLocation::all();
+            $userLocation = null;
+            
+            if ($request->user()) {
+                $userLocation = UserLocations::where('user_id', $request->user()->id)->latest()->first();
+            }
 
-    // tambahkan flag inside pada tiap master
-    $masters = $masters->map(function($m) use ($userLocation) {
-        $m->inside = false;
-        if ($userLocation) {
-            $meters = $this->haversineMeters($m->latitude, $m->longitude, $userLocation->latitude, $userLocation->longitude);
-            $m->inside = $meters <= $m->radius_meter;
+            // tambahkan flag inside pada tiap master
+            $masters = $masters->map(function($m) use ($userLocation) {
+                $m->inside = false;
+                if ($userLocation && $m->latitude && $m->longitude && $m->radius_meter) {
+                    $meters = $this->haversineMeters(
+                        $m->latitude, 
+                        $m->longitude, 
+                        $userLocation->latitude, 
+                        $userLocation->longitude
+                    );
+                    $m->inside = $meters <= $m->radius_meter;
+                }
+                return $m;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $masters,
+                'user_location' => $userLocation
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Terjadi kesalahan saat mengambil data lokasi',
+                'message' => $e->getMessage()
+            ], 500);
         }
-        return $m;
-    });
-
-    return response()->json([
-        'master_locations' => $masters,
-        'user_location' => $userLocation
-    ]);
     }
 
     /**
@@ -54,7 +60,27 @@ class MasterLocationController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validatedData = $request->validate([
+            'nama' => 'required|string|max:255',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius_meter' => 'required|integer|min:1',
+        ]);
+
+        try {
+            $location = MasterLocation::create($validatedData);
+            return response()->json([
+                'success' => true,
+                'message' => 'Lokasi berhasil ditambahkan',
+                'data' => $location,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Terjadi kesalahan saat menambahkan lokasi',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -65,7 +91,19 @@ class MasterLocationController extends Controller
      */
     public function show($id)
     {
-        //
+        try {
+            $location = MasterLocation::findOrFail($id);
+            return response()->json([
+                'success' => true,
+                'data' => $location,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Lokasi tidak ditemukan',
+                'message' => $e->getMessage()
+            ], 404);
+        }
     }
 
     /**
@@ -80,17 +118,21 @@ class MasterLocationController extends Controller
         $validatedData = $request->validate([
             'nama' => 'nullable|string|max:255',
             'radius_meter' => 'required|integer|min:1',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         try {
             $location = MasterLocation::findOrFail($id);
             $location->update($validatedData);
             return response()->json([
+                'success' => true,
                 'message' => 'Lokasi berhasil diperbarui',
                 'data' => $location,
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
+                'success' => false,
                 'error' => 'Terjadi kesalahan saat memperbarui lokasi',
                 'message' => $e->getMessage()
             ], 500);
@@ -105,7 +147,20 @@ class MasterLocationController extends Controller
      */
     public function destroy($id)
     {
-        //
+        try {
+            $location = MasterLocation::findOrFail($id);
+            $location->delete();
+            return response()->json([
+                'success' => true,
+                'message' => 'Lokasi berhasil dihapus',
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Terjadi kesalahan saat menghapus lokasi',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     // helper
