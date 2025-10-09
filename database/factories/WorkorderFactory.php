@@ -24,7 +24,7 @@ class WorkorderFactory extends Factory
             'longitude' => $this->faker->longitude(),
             'latitude' => $this->faker->latitude(),
             'petugas_id' => $this->faker->numberBetween(5, 7),
-            'pic_id' => $this->faker->numberBetween(1, 4),
+            'pic_id' => function () {return User::inRandomOrder()->value('id');},            
             'status_id' => $this->faker->numberBetween(1, 8),
             'jenis_workorder_id' => $this->faker->numberBetween(1, 5),
             'jenis_lokasi_id' => $this->faker->numberBetween(1, 2),

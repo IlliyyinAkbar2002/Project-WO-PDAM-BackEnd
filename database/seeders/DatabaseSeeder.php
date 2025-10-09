@@ -27,33 +27,40 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        MasterLocation::factory(1)->create([
-            'radius_meter' => 100,
-        ]);
+        MasterLocation::firstOrCreate(
+        ['nama' => 'Default'],
+        ['radius_meter' => 100]
+    );
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
         Role::factory(3)->create();
         Status::factory(8)->create();
         Pegawai::factory(20)->create();
 
-        User::factory()->create([
-            'pegawai_id' => 1,
-            'role_id' => 1,
-            'email' => 'superadmin@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::factory()->create([
-            'pegawai_id' => 2,
-            'role_id' => 2,
-            'email' => 'manager@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::factory()->create([
-            'pegawai_id' => 3,
-            'role_id' => 3,
-            'email' => 'employee@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
+        User::firstOrCreate(
+    ['email' => 'superadmin@gmail.com'],
+    [
+        'pegawai_id' => 1,
+        'role_id' => 1,
+        'password' => bcrypt('password'),
+    ]
+);
+User::firstOrCreate(
+    ['email' => 'manager@gmail.com'],
+    [
+        'pegawai_id' => 2,
+        'role_id' => 2,
+        'password' => bcrypt('password'),
+    ]
+);
+User::firstOrCreate(
+    ['email' => 'employee@gmail.com'],
+    [
+        'pegawai_id' => 3,
+        'role_id' => 3,
+        'password' => bcrypt('password'),
+    ]
+);
         User::factory(7)->create();
         MasterKpi::factory(10)->create();
         JenisLokasi::factory(2)->create();

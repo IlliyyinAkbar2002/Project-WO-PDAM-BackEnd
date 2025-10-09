@@ -40,8 +40,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
 });
 
-
-
 Route::apiResource('form', FormController::class);
 Route::apiResource('detail-form', DetailFormController::class);
 Route::apiResource('jenis-workorder', JenisWorkorderController::class);
