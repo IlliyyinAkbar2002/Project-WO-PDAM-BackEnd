@@ -21,8 +21,10 @@ return [
 
     'stateful' => [
     'localhost',
+    'localhost:3000',      // Next.js dev via localhost
     '127.0.0.1',
-    'localhost:3000', // untuk Next.js dev
+    '127.0.0.1:3000',     // Next.js dev via IP (add this!)
+    '::1',                // IPv6 localhost (optional but recommended)
     ],
 
 

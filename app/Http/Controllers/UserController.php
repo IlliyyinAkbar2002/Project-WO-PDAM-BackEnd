@@ -34,6 +34,19 @@ class UserController extends Controller
     public function store(Request $request)
     {
         //
+        $validatedData = $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|string|min:8',
+            'pegawai_id' => 'required|exists:m_pegawai,id',
+            'role_id' => 'required|exists:m_role,id',
+        ]);
+        $validatedData['password'] = bcrypt($validatedData['password']);
+        $user = User::create($validatedData);
+        return response()->json([
+            'message' => 'User berhasil dibuat',
+            'user' => $user
+        ], 201);
     }
 
     /**
