@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,6 +17,36 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+// Route SPA Sanctum
+Route::post('/login', [AuthController::class, 'spaLogin']);
+Route::post('/logout', [AuthController::class, 'spaLogout']);
+Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
+
+// Group route yang butuh login
+Route::middleware(['auth:sanctum'])->group(function () {
+    // Hanya admin
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/admin/dashboard', function () {
+            return response()->json([
+                'message' => 'Welcome Admin',
+                'user' => auth()->user()
+            ]);
+        });
+    });
+
+    // Hanya user biasa
+    Route::middleware('role:user')->group(function () {
+        Route::get('/user/dashboard', function () {
+            return response()->json([
+                'message' => 'Welcome User',
+                'user' => auth()->user()
+            ]);
+        });
+    });
+});
+
+
 
 // Route::get('/sanctum/csrf-cookie', function () {
 //     return response()->noContent();

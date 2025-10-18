@@ -31,35 +31,8 @@ use Illuminate\Support\Facades\Route;
 */
 
 // Public routes (no authentication required)
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'apiLogin']);
 Route::post('register', [AuthController::class, 'register']);
-
-// Open listing/test routes
-Route::get('kpi', [KpiController::class, 'index']);
-Route::get('user', [UserController::class, 'index']);
-Route::get('workorder', [WorkorderController::class, 'index']);
-Route::get('jenis-workorder', [JenisWorkorderController::class, 'index']);
-Route::get('master-location', [MasterLocationController::class, 'index']);
-// Route::get('form', [FormController::class, 'index']);
-Route::get('detail-form', [DetailFormController::class, 'index']);
-Route::get('jenis-lokasi', [JenisLokasiController::class, 'index']);
-Route::get('workorder-action', [WorkorderActionController::class, 'index']);
-Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
-Route::get('detail-progress', [DetailProgressController::class, 'index']);
-Route::get('lembur-spl', [LemburSplController::class, 'index']);
-// Open listing/post
-
-// Post listing/test routes
-Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
-
-// Destroy listing/test routes
-Route::delete('jenis-workorder/{id}', [JenisWorkorderController::class, 'destroy']);
-
-// Update listing/test routes
-Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
-
-// Show listing by id /test routes
-Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
 
 // Route::middleware('auth:sanctum')->group(function () {
 //     Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
@@ -70,6 +43,33 @@ Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
+
+        // Open listing/test routes
+    Route::get('kpi', [KpiController::class, 'index']);
+    Route::get('user', [UserController::class, 'index']);
+    Route::get('workorder', [WorkorderController::class, 'index']);
+    Route::get('jenis-workorder', [JenisWorkorderController::class, 'index']);
+    Route::get('master-location', [MasterLocationController::class, 'index']);
+    // Route::get('form', [FormController::class, 'index']);
+    Route::get('detail-form', [DetailFormController::class, 'index']);
+    Route::get('jenis-lokasi', [JenisLokasiController::class, 'index']);
+    Route::get('workorder-action', [WorkorderActionController::class, 'index']);
+    Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
+    Route::get('detail-progress', [DetailProgressController::class, 'index']);
+    Route::get('lembur-spl', [LemburSplController::class, 'index']);
+    // Open listing/post
+
+    // Post listing/test routes
+    Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
+
+    // Destroy listing/test routes
+    Route::delete('jenis-workorder/{id}', [JenisWorkorderController::class, 'destroy']);
+
+    // Update listing/test routes
+    Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
+
+    // Show listing by id /test routes
+    Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
 
     Route::get('/user', function (Request $request) {
         return response()->json([
