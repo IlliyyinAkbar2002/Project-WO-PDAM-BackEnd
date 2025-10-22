@@ -14,6 +14,7 @@ use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\DetailProgressController;
 use App\Http\Controllers\MasterLocationController;
+use App\Http\Controllers\Controller;
 use App\Models\Workorder;
 use App\Services\ProgressWorkorderService;
 use Illuminate\Http\Request;
@@ -98,4 +99,3 @@ Route::get('/ping', function () {
         'message' => 'API Laravel Connected!'
     ]);
 });
-
