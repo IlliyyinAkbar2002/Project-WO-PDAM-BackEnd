@@ -14,6 +14,7 @@ use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\DetailProgressController;
 use App\Http\Controllers\MasterLocationController;
+use App\Http\Controllers\PegawaiController;
 use App\Http\Controllers\Controller;
 use App\Models\Workorder;
 use App\Services\ProgressWorkorderService;
@@ -35,10 +36,6 @@ use Illuminate\Support\Facades\Route;
 Route::post('/login', [AuthController::class, 'apiLogin']);
 Route::post('register', [AuthController::class, 'register']);
 
-// Route::middleware('auth:sanctum')->group(function () {
-//     Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
-// });
-
 
 // Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {
@@ -50,7 +47,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('user', [UserController::class, 'index']);
     Route::get('workorder', [WorkorderController::class, 'index']);
     Route::get('jenis-workorder', [JenisWorkorderController::class, 'index']);
-    Route::get('master-location', [MasterLocationController::class, 'index']);
     // Route::get('form', [FormController::class, 'index']);
     Route::get('detail-form', [DetailFormController::class, 'index']);
     Route::get('jenis-lokasi', [JenisLokasiController::class, 'index']);
@@ -58,6 +54,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
     Route::get('detail-progress', [DetailProgressController::class, 'index']);
     Route::get('lembur-spl', [LemburSplController::class, 'index']);
+    
+    // Master location routes store and get
+    Route::get('master-location', [MasterLocationController::class, 'index']);
+    Route::post('master-location', [MasterLocationController::class, 'store']);
+    
+    // Pegawai route - returns users with nested employee data
+    Route::get('pegawai', [PegawaiController::class, 'index']);
+
     // Open listing/post
 
     // Post listing/test routes
@@ -71,13 +75,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Show listing by id /test routes
     Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
-
-    Route::get('/user', function (Request $request) {
-        return response()->json([
-            'success' => true,
-            'user' => $request->user(),
-        ]);
-    });
 
     // Example protected utility
     Route::post('/progress-workorder/manual-run', function () {

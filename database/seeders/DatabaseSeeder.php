@@ -45,13 +45,13 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'pegawai_id' => 2,
             'role_id' => 2,
-            'email' => 'manager@gmail.com',
+            'email' => 'david123@gmail.com',
             'password' => bcrypt('password'),
         ]);
         User::factory()->create([
             'pegawai_id' => 3,
             'role_id' => 3,
-            'email' => 'employee@gmail.com',
+            'email' => 'budi123@gmail.com',
             'password' => bcrypt('password'),
         ]);
         User::factory(7)->create();
