@@ -91,6 +91,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
 });
 
+Route::get('search_google_maps', [App\Http\Controllers\ScrapeDataGoogleMaps::class, '_invoke']);
+
 Route::get('/ping', function () {
     return response()->json([
         'message' => 'API Laravel Connected!'
