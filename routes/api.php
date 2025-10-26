@@ -45,7 +45,6 @@ Route::middleware('auth:sanctum')->group(function () {
         // Open listing/test routes
     Route::get('kpi', [KpiController::class, 'index']);
     Route::get('user', [UserController::class, 'index']);
-    Route::get('workorder', [WorkorderController::class, 'index']);
     Route::get('jenis-workorder', [JenisWorkorderController::class, 'index']);
     // Route::get('form', [FormController::class, 'index']);
     Route::get('detail-form', [DetailFormController::class, 'index']);
@@ -53,8 +52,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('workorder-action', [WorkorderActionController::class, 'index']);
     Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
     Route::get('detail-progress', [DetailProgressController::class, 'index']);
+
+    // Lembur SPL routes
     Route::get('lembur-spl', [LemburSplController::class, 'index']);
-    
+    Route::post('lembur-spl', [LemburSplController::class, 'store']);
+    Route::put('lembur-spl/{id}', [LemburSplController::class, 'update']);
+
+    // Workorder routes
+    Route::get('workorder', [WorkorderController::class, 'index']);
+    Route::post('workorder', [WorkorderController::class, 'store']);
     // Master location routes store and get
     Route::get('master-location', [MasterLocationController::class, 'index']);
     Route::post('master-location', [MasterLocationController::class, 'store']);
