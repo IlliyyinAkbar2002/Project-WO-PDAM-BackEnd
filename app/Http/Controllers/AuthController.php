@@ -55,8 +55,9 @@ class AuthController extends Controller
             ], 200);
         }
 
-        // Login untuk API Token
-        public function apiLogin(Request $request)
+
+        // Login untuk Mobile Client dengan Token Abilities
+        public function mobileLogin(Request $request)
         {
             $data = $request->validate([
                 'email' => 'required|email',
@@ -72,11 +73,15 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Hapus token lama
-            $user->tokens()->delete();
+            // Hapus token mobile lama
+            $user->tokens()->where('name', 'mobile-token')->delete();
             
-            // Buat token baru
-            $token = $user->createToken('api-token')->plainTextToken;
+            // Buat token baru dengan abilities untuk mobile
+            $token = $user->createToken('mobile-token', [
+                'mobile:access',
+                'workorder:read',
+                'workorder:write',
+            ])->plainTextToken;
             
             return response()->json([
                 'success' => true,
@@ -92,24 +97,139 @@ class AuthController extends Controller
             ], 200);
         }
 
-        // Logout untuk API Token
-        public function apiLogout(Request $request)
+        // Register untuk Mobile Client
+        public function mobileRegister(Request $request)
+        {
+            try {
+                $validatedData = $request->validate([
+                    'name' => 'required|string',
+                    'email' => 'required|email|unique:users',
+                    'password' => 'required|string|min:8',
+                    'role_id' => 'required|exists:m_role,id',
+                ]);
+                
+                $validatedData['password'] = bcrypt($validatedData['password']);
+                
+                $user = User::create([
+                    'name' => $validatedData['name'],
+                    'email' => $validatedData['email'],
+                    'password' => $validatedData['password'],
+                    'role_id' => $validatedData['role_id'],
+                ]);
+
+                // Buat token untuk mobile
+                $token = $user->createToken('mobile-token', [
+                    'mobile:access',
+                    'workorder:read',
+                    'workorder:write',
+                ])->plainTextToken;
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Registrasi berhasil',
+                    'access_token' => $token,
+                    'token_type' => 'Bearer',
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role_id' => $user->role_id,
+                    ]
+                ], 201);
+                
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data tidak valid',
+                    'errors' => $e->errors()
+                ], 422);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Terjadi kesalahan server',
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
+
+        // Logout untuk Mobile Client
+        public function mobileLogout(Request $request)
         {
             $user = $request->user();
             if ($user) {
-                // Hapus token yang digunakan untuk request ini
                 $user->currentAccessToken()->delete();
                 
                 return response()->json([
                     'success' => true,
                     'message' => 'Logout berhasil'
                 ], 200);
-            } else {
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'User tidak ditemukan'
+            ], 401);
+        }
+
+        // Login untuk Web Client dengan Token Abilities
+        public function webLogin(Request $request)
+        {
+            $data = $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string',
+            ]);
+            
+            $user = User::where('email', $data['email'])->first();
+            
+            if (!$user || !Hash::check($data['password'], $user->password)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User tidak ditemukan'
+                    'message' => 'Email atau password salah'
                 ], 401);
             }
+
+            // Hapus token web lama
+            $user->tokens()->where('name', 'web-token')->delete();
+            
+            // Buat token baru dengan abilities untuk web
+            $token = $user->createToken('web-token', [
+                'web:access',
+                'workorder:read',
+                'workorder:write',
+                'admin:access',
+            ])->plainTextToken;
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Login berhasil',
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role_id' => $user->role_id,
+                ],
+            ], 200);
+        }
+
+        // Logout untuk Web Client
+        public function webLogout(Request $request)
+        {
+            $user = $request->user();
+            if ($user) {
+                $user->currentAccessToken()->delete();
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Logout berhasil'
+                ], 200);
+            }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'User tidak ditemukan'
+            ], 401);
         }
 
 

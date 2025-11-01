@@ -169,4 +169,32 @@ class ProgressWorkorderController extends Controller
     {
         //
     }
+
+    /**
+     * Manual run to add progress for active workorders
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function manualRun()
+    {
+        try {
+            $service = new ProgressWorkorderService();
+            $workorders = \App\Models\Workorder::where('status_id', 7)->get();
+
+            foreach ($workorders as $workorder) {
+                $service->addWorkorderProgress($workorder->id);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Progress ditambahkan untuk semua workorder aktif'
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat menjalankan manual run',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
