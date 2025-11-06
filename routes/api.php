@@ -65,6 +65,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         // Workorder resources
         Route::apiResource('workorder', WorkorderController::class);
+        Route::post('workorder', [WorkorderController::class, 'store']);
         
         // KPI and reporting
         Route::get('kpi', [KpiController::class, 'index']);
@@ -86,6 +87,13 @@ Route::prefix('v1')->group(function () {
         
         // Lembur SPL
         Route::apiResource('lembur-spl', LemburSplController::class);
+        Route::post('lembur-spl', [LemburSplController::class, 'store']);
+        Route::put('lembur-spl/{id}', [LemburSplController::class, 'update']);
+
+        // Jenis Work Order
+        Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
+        Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
+        Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
         
         // Workorder actions
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
