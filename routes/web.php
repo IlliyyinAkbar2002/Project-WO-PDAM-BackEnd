@@ -19,12 +19,14 @@ Route::get('/', function () {
 });
 
 // Route SPA Sanctum
-Route::post('/login', [AuthController::class, 'spaLogin']);
-Route::post('/logout', [AuthController::class, 'spaLogout']);
-Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
+Route::middleware(['web', 'force.samesite'])->group(function () {
+    Route::post('/login', [AuthController::class, 'spaLogin']);
+    Route::post('/logout', [AuthController::class, 'spaLogout']);
+    Route::get('/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
+});
 
 // Group route yang butuh login
-Route::middleware(['auth:sanctum'])->group(function () {
+Route::middleware(['web', 'auth:sanctum', 'force.samesite'])->group(function () {
     // Hanya admin
     Route::middleware('role:admin')->group(function () {
         Route::get('/admin/dashboard', function () {
@@ -46,8 +48,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 });
 
-
-
 // Route::get('/sanctum/csrf-cookie', function () {
-//     return response()->noContent();
+//     return response()->json(['message' => 'Sanctum route active']);
 // });
+Route::get('/test-session', function () {
+    return config('session.same_site');
+});
+
+
+
+

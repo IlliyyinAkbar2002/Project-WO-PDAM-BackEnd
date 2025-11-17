@@ -13,9 +13,15 @@
     */
 
 return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout'],
+    'paths' => [
+        'api/*', 
+        'sanctum/csrf-cookie',
+        'login', 
+        'logout', 
+        'me'
+    ],
     'allowed_methods' => ['*'],
-    'allowed_origins' => ['https://project-wo-intern-pdam.test', 'http://localhost:3000'],
+    'allowed_origins' => [env('FRONTEND_URL', 'https://project-wo-intern-pdam.test')],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => [],

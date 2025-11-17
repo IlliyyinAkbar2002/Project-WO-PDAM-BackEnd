@@ -31,7 +31,9 @@ class Kernel extends HttpKernel
     protected $middlewareGroups = [
         'web' => [
             \App\Http\Middleware\EncryptCookies::class,
+            // \Fruitcake\Cors\HandleCors::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            // \App\Http\Middleware\ForceSessionSameSiteNone::class,
             \Illuminate\Session\Middleware\StartSession::class,
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             // \Illuminate\Session\Middleware\AuthenticateSession::class,
@@ -65,5 +67,6 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        'force.samesite' => \App\Http\Middleware\ForceSessionSameSiteNone::class,
     ];
 }

@@ -26,8 +26,10 @@ return [
     '127.0.0.1:3000',     // Next.js dev via IP (add this!)
     '::1',                // IPv6 localhost (optional but recommended)
     'project-wo-intern-pdam.test',
-    'project-wo-intern-pdam-backend.test',
+    'backend.project-wo-intern-pdam.test'
     ],
+
+    'domain' => env('SESSION_DOMAIN', null),
 
 
     /*
@@ -42,7 +44,7 @@ return [
     |
     */
 
-    'guard' => ['web', 'api'],
+    'guard' => ['web', 'sanctum'],
 
     /*
     |--------------------------------------------------------------------------
@@ -69,6 +71,7 @@ return [
     */
 
     'middleware' => [
+        'web',
         'verify_csrf_token' => App\Http\Middleware\VerifyCsrfToken::class,
         'encrypt_cookies' => App\Http\Middleware\EncryptCookies::class,
     ],
