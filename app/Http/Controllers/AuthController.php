@@ -59,6 +59,20 @@ class AuthController extends Controller
         // Login untuk Mobile Client dengan Token Abilities
         public function mobileLogin(Request $request)
         {
+            if (!$request->filled('email')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email wajib diisi'
+                ], 422);
+            }
+            
+            if (!$request->filled('password')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Password wajib diisi'
+                ], 422);
+            }
+
             $data = $request->validate([
                 'email' => 'required|email',
                 'password' => 'required|string',
@@ -66,10 +80,17 @@ class AuthController extends Controller
             
             $user = User::where('email', $data['email'])->first();
             
-            if (!$user || !Hash::check($data['password'], $user->password)) {
+            if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Email atau password salah'
+                    'message' => 'Email salah'
+                ], 401);
+            }
+            
+            if (!Hash::check($data['password'], $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Password salah'
                 ], 401);
             }
 
