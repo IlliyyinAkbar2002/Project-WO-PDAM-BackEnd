@@ -36,9 +36,27 @@ class LemburSplController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
-    {
-        //
-    }
+{
+$validated = $request->validate([
+'workorder_id' => 'required|exists:workorders,id',
+'user_id' => 'required|exists:users,id'
+]);
+
+try {
+    $lembur = LemburSpl::create([
+        'workorder_id' => $validated['workorder_id'],
+        'user_id' => $validated['user_id'],
+        'status_id' => 2, // langsung sedang berjalan
+        'waktu_verifikasi' => now()
+    ]);
+
+    return response()->json($lembur, 201);
+} catch (\Exception $e) {
+    return response()->json(['error' => $e->getMessage()], 500);
+}
+
+
+}
 
     /**
      * Display the specified resource.

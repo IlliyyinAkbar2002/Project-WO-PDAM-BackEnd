@@ -8,6 +8,8 @@ use App\Models\WorkorderAction;
 
 use App\Services\ProgressWorkorderService;
 use App\Services\WorkorderService;
+// Import WorkorderActionService untuk menangani aksi penolakan
+use App\Services\WorkorderActionService; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -232,4 +234,39 @@ class WorkorderController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+    
+    // --- METHOD BARU UNTUK REJECT/TOLAK ---
+    
+    /**
+     * Reject the specified workorder.
+     * Endpoint: PATCH /api/workorder/reject/{id}
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id
+     * @return \Illuminate\Http\Response
+     */
+    public function reject(Request $request, $id)
+{
+    // 1. Validasi Alasan Penolakan
+    $validatedData = $request->validate([
+        'keterangan' => 'required|string|max:500', 
+    ]);
+
+    try {
+        // Cek Workorder dan jalankan logika penolakan melalui WorkorderService
+        // Perubahan di baris ini!
+        (new WorkorderService())->rejectWorkorder($id, $validatedData['keterangan']); 
+        
+        return response()->json(['message' => 'Workorder berhasil ditolak'], 200);
+        
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json(['error' => 'Workorder tidak ditemukan'], 404);
+    } catch (\Exception $e) {
+        // Menangkap error jika service gagal (Penyebab 500)
+        return response()->json([
+            'error' => 'Gagal menolak Workorder. Cek WorkorderService.',
+            'message' => $e->getMessage()
+        ], 500);
+    }
+}
 }
