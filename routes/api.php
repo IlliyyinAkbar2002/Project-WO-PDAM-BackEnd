@@ -46,6 +46,7 @@ Route::apiResource('jenis-workorder', JenisWorkorderController::class);
 Route::apiResource('kpi', KpiController::class);
 
 Route::apiResource('jenis-lokasi', JenisLokasiController::class);
+Route::patch('/workorder/reject/{id}', [WorkorderController::class, 'reject']);
 Route::apiResource('workorder', WorkorderController::class);
 Route::apiResource('workorder-action', WorkorderActionController::class);
 

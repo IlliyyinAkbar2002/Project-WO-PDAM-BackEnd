@@ -245,27 +245,25 @@ class WorkorderController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function reject(Request $request, $id)
+   // app/Http/Controllers/WorkorderController.php
+public function reject(Request $request, $id)
 {
-    // 1. Validasi Alasan Penolakan
-    $validatedData = $request->validate([
-        'keterangan' => 'required|string|max:500', 
-    ]);
-
     try {
-        // Cek Workorder dan jalankan logika penolakan melalui WorkorderService
-        // Perubahan di baris ini!
-        (new WorkorderService())->rejectWorkorder($id, $validatedData['keterangan']); 
+        $workorder = Workorder::findOrFail($id);
         
-        return response()->json(['message' => 'Workorder berhasil ditolak'], 200);
+        // Cukup update status_id saja
+        $workorder->status_id = 3; // ID untuk status 'rejected'
+        $workorder->save();
         
-    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-        return response()->json(['error' => 'Workorder tidak ditemukan'], 404);
-    } catch (\Exception $e) {
-        // Menangkap error jika service gagal (Penyebab 500)
         return response()->json([
-            'error' => 'Gagal menolak Workorder. Cek WorkorderService.',
-            'message' => $e->getMessage()
+            'message' => 'Workorder berhasil ditolak',
+            'data' => $workorder
+        ], 200);    
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Terjadi kesalahan',
+            'error' => $e->getMessage()
         ], 500);
     }
 }
