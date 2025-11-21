@@ -252,7 +252,7 @@ public function reject(Request $request, $id)
         $workorder = Workorder::findOrFail($id);
         
         // Cukup update status_id saja
-        $workorder->status_id = 3; // ID untuk status 'rejected'
+        $workorder->status_id = 4; // ID untuk status 'rejected'
         $workorder->save();
         
         return response()->json([
