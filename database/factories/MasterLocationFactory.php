@@ -14,7 +14,9 @@ class MasterLocationFactory extends Factory
     public function definition()
     {
         return [
-            'nama' => "Default",
+            'nama' => $this->faker->unique()->city,
+            'latitude' => $this->faker->latitude,
+            'longitude' => $this->faker->longitude,
             'radius_meter' => 100,
         ];
     }

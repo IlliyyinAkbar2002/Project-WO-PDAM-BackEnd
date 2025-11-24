@@ -19,7 +19,7 @@ class Authenticate extends Middleware
         // }
             if (! $request->expectsJson()) {
             // jangan redirect ke route('login'), balikin response JSON saja
-            abort(response()->json([
+                return abort(response()->json([
                 'message' => 'Unauthenticated'
             ], 401));
         }

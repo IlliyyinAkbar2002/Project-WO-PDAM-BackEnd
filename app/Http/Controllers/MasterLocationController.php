@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\MasterLocation;
 use App\Models\UserLocations;
 use Illuminate\Http\Request;
+use function React\Promise\all;
 
 class MasterLocationController extends Controller
 {
@@ -13,7 +14,7 @@ class MasterLocationController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request)
+    public function index()
     {
         try {
             $masters = MasterLocation::all();
@@ -115,8 +116,10 @@ class MasterLocationController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $validatedData = $request->validate([
+        $validated = $request->validate([
             'nama' => 'nullable|string|max:255',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
             'radius_meter' => 'required|integer|min:1',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',

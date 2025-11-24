@@ -11,4 +11,9 @@ class UserLocations extends Model
 
     protected $fillable = ['user_id','latitude','longitude','accuracy'];
     protected $casts = ['latitude'=>'float','longitude'=>'float','accuracy'=>'float'];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

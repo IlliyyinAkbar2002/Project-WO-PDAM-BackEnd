@@ -25,6 +25,8 @@ return [
     '127.0.0.1',
     '127.0.0.1:3000',     // Next.js dev via IP (add this!)
     '::1',                // IPv6 localhost (optional but recommended)
+    'project-wo-intern-pdam.test',
+    'project-wo-intern-pdam-backend.test',
     ],
 
 
@@ -40,7 +42,7 @@ return [
     |
     */
 
-    'guard' => ['web'],
+    'guard' => ['web', 'api'],
 
     /*
     |--------------------------------------------------------------------------
@@ -53,7 +55,7 @@ return [
     |
     */
 
-    'expiration' => null,
+    'expiration' => 1440, // 1 day
 
     /*
     |--------------------------------------------------------------------------

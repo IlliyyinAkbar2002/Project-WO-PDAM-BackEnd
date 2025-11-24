@@ -18,7 +18,7 @@ class CreateUserLocationsTable extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->decimal('latitude', 10, 7);
             $table->decimal('longitude', 10, 7);
-            $table->decimal('accuracy', 8, 2)->nullable();
+            $table->float('accuracy')->nullable();
             $table->timestamps();
         });
     }
