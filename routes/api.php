@@ -34,10 +34,38 @@ use Illuminate\Support\Facades\Route;
 Route::post('/login', [AuthController::class, 'apiLogin']);
 Route::post('register', [AuthController::class, 'register']);
 
-// Route::middleware('auth:sanctum')->group(function () {
-//     Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
-// });
+// Open listing/test routes
+Route::get('kpi', [KpiController::class, 'index']);
+Route::get('user', [UserController::class, 'index']);
+Route::get('workorder', [WorkorderController::class, 'index']);
+Route::get('jenis-workorder', [JenisWorkorderController::class, 'index']);
+Route::get('master-location', [MasterLocationController::class, 'index']);
 
+// Route::get('form', [FormController::class, 'index']);
+Route::get('detail-form', [DetailFormController::class, 'index']);
+Route::get('jenis-lokasi', [JenisLokasiController::class, 'index']);
+Route::get('workorder-action', [WorkorderActionController::class, 'index']);
+Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
+Route::get('detail-progress', [DetailProgressController::class, 'index']);
+Route::get('lembur-spl', [LemburSplController::class, 'index']);
+
+// CRUD Master Location
+Route::get('master-location/{id}', [MasterLocationController::class, 'show']);
+Route::post('master-location', [MasterLocationController::class, 'store']);
+Route::put('master-location/{id}', [MasterLocationController::class, 'update']);
+Route::patch('master-location/{id}', [MasterLocationController::class, 'update']);
+Route::delete('master-location/{id}', [MasterLocationController::class, 'destroy']);
+
+// CRUD jenis WorkOrder
+// Open listing/post
+// Post listing/test routes
+Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
+// Destroy listing/test routes
+Route::delete('jenis-workorder/{id}', [JenisWorkorderController::class, 'destroy']);
+// Update listing/test routes
+Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
+// Show listing by id /test routes
+Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
 
 // Protected routes (authentication required)
 Route::middleware('auth:sanctum')->group(function () {
@@ -99,3 +127,6 @@ Route::get('/ping', function () {
     ]);
 });
 
+// Route::middleware('auth:sanctum')->group(function () {
+//     Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
+// });
