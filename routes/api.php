@@ -15,53 +15,24 @@ use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\PegawaiController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes - Multi-Client Architecture
-|--------------------------------------------------------------------------
-|
-| Structure: /api/{version}/{client}/{resource}
-| - Versioned from the start (v1)
-| - Client-specific authentication and configuration
-| - Shared business logic with client-aware responses
-|
-*/
 
 // ============================================
 // API Version 1
 // ============================================
 Route::prefix('v1')->group(function () {
-    
-    // ----------------------------------------
-    // Mobile Client Routes
-    // ----------------------------------------
-    Route::prefix('mobile')->group(function () {
-        // Public mobile auth
-        Route::post('login', [AuthController::class, 'mobileLogin']);
-        Route::post('register', [AuthController::class, 'mobileRegister']);
+    Route::prefix('auth')->group(function () {
+        // Public auth
+        Route::post('login', [AuthController::class, 'AuthLogin']);
+        Route::post('register', [AuthController::class, 'AuthRegister']);
         
-        // Protected mobile routes
-        Route::middleware(['auth:sanctum', 'client.mobile'])->group(function () {
-            Route::post('logout', [AuthController::class, 'mobileLogout']);
+        // Protected auth routes
+        Route::middleware(['auth:sanctum', 'client.valid'])->group(function () {
+            Route::post('logout', [AuthController::class, 'AuthLogout']);
             Route::get('me', [AuthController::class, 'me']);
         });
     });
     
-    // ----------------------------------------
-    // Web Client Routes (future)
-    // ----------------------------------------
-    Route::prefix('web')->group(function () {
-        Route::post('login', [AuthController::class, 'webLogin']);
-        
-        Route::middleware(['auth:sanctum', 'client.web'])->group(function () {
-            Route::post('logout', [AuthController::class, 'webLogout']);
-            Route::get('me', [AuthController::class, 'me']);
-        });
-    });
-    
-    // ----------------------------------------
-    // Shared Protected Routes
-    // ----------------------------------------
+
     Route::middleware('auth:sanctum')->group(function () {
         // Workorder resources
         Route::apiResource('workorder', WorkorderController::class);
