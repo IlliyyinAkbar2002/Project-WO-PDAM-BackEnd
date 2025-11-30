@@ -5,20 +5,19 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 
-class EnsureWebClient
+class EnsureValidClient
 {
     public function handle(Request $request, Closure $next)
     {
         $token = $request->user()->currentAccessToken();
         
-        if (!$token || !$token->can('web:access')) {
+        if (!$token || !($token->can('mobile:access') || $token->can('web:access'))) {
             return response()->json([
                 'success' => false,
-                'message' => 'This endpoint is only accessible to web clients.'
+                'message' => 'Access denied. Invalid client permissions.'
             ], 403);
         }
         
         return $next($request);
     }
 }
-
