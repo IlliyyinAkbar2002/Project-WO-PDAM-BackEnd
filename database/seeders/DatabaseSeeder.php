@@ -53,20 +53,38 @@ class DatabaseSeeder extends Seeder
         Status::factory(8)->create();
         Pegawai::factory(20)->create();
 
-        User::factory()->create([
+        User::updateOrCreate([
             'pegawai_id' => 1,
             'role_id' => 1,
             'email' => 'superadmin@gmail.com',
             'password' => bcrypt('password'),
         ]);
-        User::factory()->create([
+        User::updateOrCreate([
             'pegawai_id' => 2,
+            'role_id' => 1,
+            'email' => 'geo@gmail.com',
+            'password' => bcrypt('password'),
+        ]);
+        User::updateOrCreate([
+            'pegawai_id' => 3,
             'role_id' => 2,
+            'email' => 'manager@gmail.com',
+            'password' => bcrypt('password'),
+        ]);
+        User::updateOrCreate([
+            'pegawai_id' => 4,
+            'role_id' => 3,
+            'email' => 'employee@gmail.com',
+            'password' => bcrypt('password'),
+        ]);
+        User::updateOrCreate([
+            'pegawai_id' => 5,
+            'role_id' => 3,
             'email' => 'david123@gmail.com',
             'password' => bcrypt('password'),
         ]);
-        User::factory()->create([
-            'pegawai_id' => 3,
+        User::updateOrCreate([
+            'pegawai_id' => 6,
             'role_id' => 3,
             'email' => 'budi123@gmail.com',
             'password' => bcrypt('password'),
