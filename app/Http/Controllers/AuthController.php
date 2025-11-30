@@ -9,53 +9,6 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
-        // Login untuk SPA Sanctum
-        public function spaLogin(Request $request)
-        {
-            $credentials = $request->validate([
-                'email' => ['required', 'email'],
-                'password' => ['required', 'string'],
-            ]);
-            
-            if (!Auth::attempt($credentials)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Email atau password salah'
-                ], 401);
-            }
-
-            $request->session()->regenerate();
-
-            $user = Auth::user();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User tidak ditemukan ketika login'
-                ], 500);
-            }
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Login berhasil',
-                'user' => Auth::user()
-            ], 200);
-        }
-        
-        // Logout untuk SPA Sanctum
-        public function spaLogout(Request $request)
-        {
-            Auth::guard('web')->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Logout berhasil'
-            ], 200);
-        }
-
-
         // Login untuk Mobile Client dengan Token Abilities
         public function mobileLogin(Request $request)
         {
@@ -213,12 +166,7 @@ class AuthController extends Controller
             $user->tokens()->where('name', 'web-token')->delete();
             
             // Buat token baru dengan abilities untuk web
-            $token = $user->createToken('web-token', [
-                'web:access',
-                'workorder:read',
-                'workorder:write',
-                'admin:access',
-            ])->plainTextToken;
+            $token = $user->createToken('web-token')->plainTextToken;
             
             return response()->json([
                 'success' => true,

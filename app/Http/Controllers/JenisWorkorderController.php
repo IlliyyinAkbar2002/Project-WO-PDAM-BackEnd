@@ -8,6 +8,7 @@ use App\Http\Resources\JenisWorkorderResource;
 use App\Models\JenisWorkorder;
 use App\Services\JenisWorkorderService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class JenisWorkorderController extends Controller
 {
@@ -30,7 +31,17 @@ class JenisWorkorderController extends Controller
             $sort = $request->query('sort', 'desc');
             $all = $request->query('all', false);
 
-            $query = JenisWorkorder::with('detailForm', 'kpi', 'detailForm.optionForm');
+            // $query = JenisWorkorder::with('detailForm', 'kpi', 'detailForm.optionForm');
+            $query = JenisWorkorder::with([
+                'detailForm' => function ($q) {
+                    $q->orderByRaw('"order" ASC'); // quote kolom order
+                },
+                'detailForm.optionForm' => function ($q) {
+                    $q->orderByRaw('"order" ASC');
+                },
+                'kpi'
+            ]);
+
             if ($search) {
                 $query->where('nama', 'ILIKE', "%{$search}%");
             }
@@ -67,7 +78,7 @@ class JenisWorkorderController extends Controller
     public function store(Request $request)
     {
         try {
-            $validator = \Validator::make($request->all(), [
+            $validator = Validator::make($request->all(), [
                 'nama' => 'required|string',
                 'kpi_id' => 'required|integer|exists:master_kpi,id',
                 'detail_form' => 'required|array',
@@ -123,10 +134,10 @@ class JenisWorkorderController extends Controller
         try {
             $jenisWorkorder = JenisWorkorder::with([
                 'detailForm' => function ($query) {
-                    $query->orderBy('order');
+                    $query->orderByRaw('"order" ASC');
                 },
                 'detailForm.optionForm' => function ($query) {
-                    $query->orderBy('order');
+                    $query->orderByRaw('"order" ASC');
                 }
             ])->findOrFail($id);
             return response()->json($jenisWorkorder, 200);
@@ -148,7 +159,7 @@ class JenisWorkorderController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            $validator = \Validator::make($request->all(), [
+            $validator = Validator::make($request->all(), [
                 'nama' => 'sometimes|required|string',
                 'kpi_id' => 'sometimes|required|integer|exists:master_kpi,id',
                 'detail_form' => 'sometimes|required|array',
