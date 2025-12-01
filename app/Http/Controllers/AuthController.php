@@ -39,6 +39,7 @@ class AuthController extends Controller
                 'message' => 'Email salah'
             ], 401);
         }
+    }
 
         // Login untuk Web Client dengan Token Abilities
         public function webLogin(Request $request)
@@ -76,54 +77,6 @@ class AuthController extends Controller
                 ],
             ], 200);
         }
-
-        // Logout untuk Web Client
-        public function webLogout(Request $request)
-        {
-            $user = $request->user();
-            if ($user) {
-                $user->currentAccessToken()->delete();
-                
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Logout berhasil'
-                ], 200);
-            }
-            
-        if (!Hash::check($data['password'], $user->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Password salah'
-            ], 401);
-        }
-
-        $clientType = $request->input('client_type', 'mobile');
-        $tokenName = $clientType === 'web' ? 'web-token' : 'mobile-token';
-        $ability = $clientType === 'web' ? 'web:access' : 'mobile:access';
-
-        // Hapus token lama sesuai tipe client
-        $user->tokens()->where('name', $tokenName)->delete();
-        
-        // Buat token baru dengan abilities yang sesuai
-        $token = $user->createToken($tokenName, [
-            $ability,
-            'workorder:read',
-            'workorder:write',
-        ])->plainTextToken;
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Login berhasil',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role_id' => $user->role_id,
-            ],
-        ], 200);
-    }
 
     public function AuthLogout(Request $request)
     {
