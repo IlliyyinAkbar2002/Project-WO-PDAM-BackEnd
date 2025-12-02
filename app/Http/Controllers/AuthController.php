@@ -10,23 +10,23 @@ use Illuminate\Support\Facades\Hash;
 class AuthController extends Controller
 {
         // Login untuk Mobile Client dengan Token Abilities
-        public function mobileLogin(Request $request)
-        {
-            if (!$request->filled('email')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Email wajib diisi'
-                ], 422);
-            }
+    public function AuthLogin(Request $request)
+    {
+        if (!$request->filled('email')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Email wajib diisi'
+            ], 422);
+        }
             
-            if (!$request->filled('password')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Password wajib diisi'
-                ], 422);
-            }
+        if (!$request->filled('password')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password wajib diisi'
+            ], 422);
+        }
 
-            $data = $request->validate([
+        $data = $request->validate([
                 'email' => 'required|email',
                 'password' => 'required|string',
             ]);
@@ -39,44 +39,38 @@ class AuthController extends Controller
                 'message' => 'Email salah'
             ], 401);
         }
-    }
-
-        // Login untuk Web Client dengan Token Abilities
-        public function webLogin(Request $request)
-        {
-            $data = $request->validate([
-                'email' => 'required|email',
-                'password' => 'required|string',
-            ]);
             
-            $user = User::where('email', $data['email'])->first();
-            
-            if (!$user || !Hash::check($data['password'], $user->password)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Email atau password salah'
-                ], 401);
-            }
-
-            // Hapus token web lama
-            $user->tokens()->where('name', 'web-token')->delete();
-            
-            // Buat token baru dengan abilities untuk web
-            $token = $user->createToken('web-token')->plainTextToken;
-            
+        if (!Hash::check($data['password'], $user->password)) {
             return response()->json([
-                'success' => true,
-                'message' => 'Login berhasil',
-                'access_token' => $token,
-                'token_type' => 'Bearer',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role_id' => $user->role_id,
-                ],
-            ], 200);
+                'success' => false,
+                'message' => 'Password salah'
+            ], 401);
         }
+
+        $tokenName = 'access_token';
+        $ability = 'access';
+
+        // Hapus token lama
+        $user->tokens()->where('name', $tokenName)->delete();
+        
+        // Buat token baru dengan abilities yang sesuai
+        $token = $user->createToken($tokenName, [
+            $ability,
+        ])->plainTextToken;
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Login berhasil',
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role_id' => $user->role_id,
+            ],
+        ], 200);
+    }
 
     public function AuthLogout(Request $request)
     {

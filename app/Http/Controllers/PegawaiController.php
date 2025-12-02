@@ -14,11 +14,27 @@ class PegawaiController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
+            $query = Pegawai::with([
+                'user:id,pegawai_id,email,role_id',
+                'departemen:id,nama',
+                'jabatan:id,nama'
+            ]);
+
+            // Filter berdasarkan departemen
+            if ($request->has('departemen_id')) {
+                $query->where('departemen_id', $request->departemen_id);
+            }
+
+            // Filter berdasarkan jabatan
+            if ($request->has('jabatan_id')) {
+                $query->where('jabatan_id', $request->jabatan_id);
+            }
+
             // Eager load user relationship to avoid N+1 queries
-            $pegawaiList = Pegawai::with('user:id,pegawai_id,email,role_id')->get();
+            $pegawaiList = $query->get();
             
             // Transform pegawai data to User format with nested employee data
             $transformedData = $pegawaiList->map(function ($pegawai) {
@@ -34,11 +50,14 @@ class PegawaiController extends Controller
                         'id' => $pegawai->id,
                         'nama' => $pegawai->nama,
                         'nip' => $pegawai->nip,
+                        'departemen' => $pegawai->departemen->nama ?? null,
+                        'jabatan' => $pegawai->jabatan->nama ?? null,
                     ]
                 ];
             });
             
-            return response()->json($transformedData);
+            return response()->json([
+                'data' => $transformedData]);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Terjadi kesalahan saat mengambil data pegawai',

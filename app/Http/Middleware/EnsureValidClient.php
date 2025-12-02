@@ -11,7 +11,7 @@ class EnsureValidClient
     {
         $token = $request->user()->currentAccessToken();
         
-        if (!$token || !($token->can('mobile:access') || $token->can('web:access'))) {
+        if (!$token || !$token->can('access')) {
             return response()->json([
                 'success' => false,
                 'message' => 'Access denied. Invalid client permissions.'

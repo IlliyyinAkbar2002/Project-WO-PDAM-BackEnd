@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\MasterLocation;
 use App\Models\UserLocations;
 use Illuminate\Http\Request;
-use function React\Promise\all;
+// use function React\Promise\all;
 
 class MasterLocationController extends Controller
 {
