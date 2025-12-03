@@ -46,6 +46,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('jenis-lokasi', JenisLokasiController::class);
         Route::get('user', [UserController::class, 'index']);
         Route::get('pegawai', [PegawaiController::class, 'index']);
+        Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
         
         // Location management
         Route::get('master-location', [MasterLocationController::class, 'index']);
