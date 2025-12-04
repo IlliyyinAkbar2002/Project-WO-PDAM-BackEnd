@@ -15,4 +15,9 @@ class OptionForm extends Model
     {
         return $this->belongsTo(DetailForm::class, 'detail_form_id');
     }
+
+    public function workorder()
+    {
+        return $this->belongsTo(Workorder::class, 'workorder_id');
+    }
 }

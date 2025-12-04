@@ -46,6 +46,11 @@ class Workorder extends Model
         return $this->belongsTo(JenisLokasi::class, 'jenis_lokasi_id');
     }
 
+    public function location()
+    {
+        return $this->belongsTo(MasterLocation::class, 'location_id');
+    }
+
     public function workorderAction()
     {
         return $this->hasMany(WorkorderAction::class, 'workorder_id');

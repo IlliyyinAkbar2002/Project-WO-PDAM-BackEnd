@@ -60,4 +60,17 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Pegawai::class, 'pegawai_id');
     }
+
+    /**
+     * Get the user's personal access token (One-to-One).
+     * Returns the latest token if multiple exist.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     */
+    public function personalAccessToken()
+    {
+        return $this->hasOne(PersonalAccessToken::class, 'tokenable_id')
+            ->where('tokenable_type', self::class)
+            ->latest();
+    }
 }

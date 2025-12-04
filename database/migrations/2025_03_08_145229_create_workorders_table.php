@@ -29,6 +29,7 @@ class CreateWorkordersTable extends Migration
             $table->foreignId('jenis_workorder_id')->constrained('m_jenis_workorder');
             $table->foreignId('jenis_lokasi_id')->constrained('m_jenis_lokasi');
             $table->foreignId('tipe_workorder_id')->constrained('m_tipe_workorder');
+            $table->foreignId('option_form_id')->nullable()->constrained('option_form');
             $table->timestamps();
         });
     }
