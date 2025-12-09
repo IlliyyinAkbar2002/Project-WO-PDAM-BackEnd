@@ -51,45 +51,146 @@ class DatabaseSeeder extends Seeder
         Jabatan::factory(6)->create();
         Role::factory(3)->create();
         Status::factory(8)->create();
-        Pegawai::factory(20)->create();
+        // Pegawai::factory(20)->create();
 
-        User::updateOrCreate([
-            'pegawai_id' => 1,
-            'role_id' => 1,
-            'email' => 'superadmin@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::updateOrCreate([
-            'pegawai_id' => 2,
-            'role_id' => 1,
-            'email' => 'geo@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::updateOrCreate([
-            'pegawai_id' => 3,
-            'role_id' => 2,
-            'email' => 'manager@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::updateOrCreate([
-            'pegawai_id' => 4,
-            'role_id' => 3,
-            'email' => 'employee@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::updateOrCreate([
-            'pegawai_id' => 5,
-            'role_id' => 3,
-            'email' => 'david123@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::updateOrCreate([
-            'pegawai_id' => 6,
-            'role_id' => 3,
-            'email' => 'budi123@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::factory(7)->create();
+        // Pegawai 1: Super Admin
+        Pegawai::updateOrCreate(
+            [
+                'nama' => 'Super Admin',
+                'nip' => '1234567891',
+                'tanggal_lahir' => '1985-01-01',
+                'jenis_kelamin' => 'Laki-laki',
+                'alamat' => 'Jl. Admin No. 1',
+                'telepon' => '081234567891',
+                'departemen_id' => 2,
+                'jabatan_id' => 1,
+            ]
+        );
+
+        // Pegawai 2: Satoshi (Manager)
+        Pegawai::updateOrCreate(
+            [
+                'nama' => 'Satoshi',
+                'nip' => '1234567892',
+                'tanggal_lahir' => '1990-01-01',
+                'jenis_kelamin' => 'Laki-laki',
+                'alamat' => 'Jl. Geo No. 1',
+                'telepon' => '081234567892',
+                'departemen_id' => 2,
+                'jabatan_id' => 3,
+            ]
+        );
+
+        // Pegawai 3: Illiyyin (Employee as jabatan SPV)
+        Pegawai::updateOrCreate(
+            [
+                'nama' => 'Illiyyin',
+                'nip' => '1234567892',
+                'tanggal_lahir' => '1990-01-01',
+                'jenis_kelamin' => 'Laki-laki',
+                'alamat' => 'Jl. Geo No. 1',
+                'telepon' => '081234567892',
+                'departemen_id' => 2,
+                'jabatan_id' => 4,
+            ]
+        );
+
+        // Pegawai 4: Aulya (Employee as jabatan SPV)
+        Pegawai::updateOrCreate(
+            [
+                'nama' => 'Aulya',
+                'nip' => '1234567893',
+                'tanggal_lahir' => '1990-01-01',
+                'jenis_kelamin' => 'Laki-laki',
+                'alamat' => 'Jl. Manager No. 1',
+                'telepon' => '081234567893',
+                'departemen_id' => 2,
+                'jabatan_id' => 4,
+            ]
+        );
+
+        // Pegawai 5: David (Employee as jabatan Staff)
+        Pegawai::updateOrCreate(
+            [
+                'nama' => 'David',
+                'nip' => '1234567894',
+                'tanggal_lahir' => '1990-01-01',
+                'jenis_kelamin' => 'Laki-laki',
+                'alamat' => 'Jl. David No. 1',
+                'telepon' => '081234567894',
+                'departemen_id' => 2,
+                'jabatan_id' => 5,
+            ]
+        );
+
+        // Pegawai 6: Budi (Employee as jabatan Staff)
+        Pegawai::updateOrCreate(
+            [
+                'nama' => 'Budi',
+                'nip' => '1234567895',
+                'tanggal_lahir' => '1990-01-01',
+                'jenis_kelamin' => 'Laki-laki',
+                'alamat' => 'Jl. Budi No. 1',
+                'telepon' => '081234567895',
+                'departemen_id' => 2,
+                'jabatan_id' => 6,
+            ]
+        );
+
+        // Buat User untuk setiap Pegawai (role_id ada di tabel users, bukan pegawai)
+        User::updateOrCreate(
+            ['email' => 'superadmin@gmail.com'],
+            [
+                'pegawai_id' => Pegawai::where('nip', '1234567891')->first()->id,
+                'role_id' => 1, // Super Admin
+                'password' => bcrypt('password'),
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'satoshi@gmail.com'],
+            [
+                'pegawai_id' => Pegawai::where('nip', '1234567893')->first()->id,
+                'role_id' => 2, // Manager as jabatan Manager
+                'password' => bcrypt('password'),
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'iyyin@gmail.com'],
+            [
+                'pegawai_id' => Pegawai::where('nip', '1234567892')->first()->id,
+                'role_id' => 3, // Employee as jabatan SPV
+                'password' => bcrypt('password'),
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'aulya@gmail.com'],
+            [
+                'pegawai_id' => Pegawai::where('nip', '1234567893')->first()->id,
+                'role_id' => 3, // Employee as jabatan SPV
+                'password' => bcrypt('password'),
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'david123@gmail.com'],
+            [
+                'pegawai_id' => Pegawai::where('nip', '1234567894')->first()->id,
+                'role_id' => 3, // Employee as jabatan Staff
+                'password' => bcrypt('password'),
+            ]
+        );
+
+        User::updateOrCreate(
+            ['email' => 'budi123@gmail.com'],
+            [
+                'pegawai_id' => Pegawai::where('nip', '1234567895')->first()->id,
+                'role_id' => 3, // Employee as jabatan Staff
+                'password' => bcrypt('password'),
+            ]
+        );
         MasterKpi::factory(10)->create();
         JenisLokasi::factory(2)->create();
         TipeWorkorder::factory(2)->create();

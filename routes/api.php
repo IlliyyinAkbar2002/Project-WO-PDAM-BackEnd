@@ -25,6 +25,7 @@ Route::prefix('v1')->group(function () {
         Route::post('login', [AuthController::class, 'AuthLogin']);
         Route::post('register', [AuthController::class, 'AuthRegister']);
         
+        
         // Protected auth routes
         Route::middleware(['auth:sanctum', 'client.valid'])->group(function () {
             Route::post('logout', [AuthController::class, 'AuthLogout']);

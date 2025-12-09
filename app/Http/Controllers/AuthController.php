@@ -58,6 +58,9 @@ class AuthController extends Controller
             $ability,
         ])->plainTextToken;
         
+        // Load relasi pegawai untuk mendapatkan nama
+        $user->load('pegawai');
+        
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil',
@@ -65,7 +68,6 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name,
                 'email' => $user->email,
                 'role_id' => $user->role_id,
             ],
@@ -129,8 +131,16 @@ class AuthController extends Controller
     }
 
     public function me(Request $request) {
-        return response()->json($request->user(), 200);
-
+        $user = $request->user();
+        $user->load('pegawai');
+        
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->pegawai->nama ?? null,
+            'email' => $user->email,
+            'role_id' => $user->role_id,
+            'pegawai' => $user->pegawai,
+        ], 200);
     }
 
     public function getUser(Request $request)
@@ -145,12 +155,15 @@ class AuthController extends Controller
                 ], 401);
             }
             
+            // Load relasi pegawai untuk mendapatkan nama
+            $user->load('pegawai');
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Data user berhasil diambil',
                 'user' => [
                     'id' => $user->id,
-                    'name' => $user->name,
+                    'name' => $user->pegawai->nama ?? null,
                     'email' => $user->email,
                     'role_id' => $user->role_id,
                     'created_at' => $user->created_at,

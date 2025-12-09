@@ -23,8 +23,8 @@ class WorkorderFactory extends Factory
             'estimasi_selesai' => $this->faker->dateTimeThisMonth(),
             'longitude' => $this->faker->longitude(),
             'latitude' => $this->faker->latitude(),
-            'petugas_id' => $this->faker->numberBetween(5, 7),
-            'pic_id' => $this->faker->numberBetween(1, 4),
+            'petugas_id' => $this->faker->numberBetween(4, 5), // Users 4 (David) and 5 (Budi) are employees
+            'pic_id' => $this->faker->numberBetween(1, 3),   // Users 1-3 are Admin/Managers
             'status_id' => $this->faker->numberBetween(1, 8),
             'jenis_workorder_id' => $this->faker->numberBetween(1, 5),
             'jenis_lokasi_id' => $this->faker->numberBetween(1, 2),
