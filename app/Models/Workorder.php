@@ -11,6 +11,12 @@ class Workorder extends Model
     protected $table = 'workorder';
     protected $guarded = [];
 
+    protected $casts = [
+        'latitude' => 'float',
+        'longitude' => 'float',
+        'location_id' => 'integer',
+    ];
+
     public function pic()
     {
         return $this->belongsTo(User::class, 'pic_id')->with(['pegawai:id,nama,nip']);

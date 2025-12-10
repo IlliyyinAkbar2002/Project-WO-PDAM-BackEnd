@@ -47,6 +47,14 @@ class DatabaseSeeder extends Seeder
             'longitude' => 112.728915,
             'radius_meter' => 200,
         ]);
+
+        MasterLocation::factory(1)->create([
+            'nama' => 'Perum Lestari Indah No.6 Blok D, Kecipik, Boteng, Kec. Menganti, Kabupaten Gresik',
+            'latitude' => -7.3482089,
+            'longitude' => 112.5987654,
+            'radius_meter' => 100,
+        ]);
+
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
         Role::factory(3)->create();
@@ -195,7 +203,7 @@ class DatabaseSeeder extends Seeder
         JenisLokasi::factory(2)->create();
         TipeWorkorder::factory(2)->create();
         JenisWorkorder::factory(10)->create();
-        Workorder::factory(40)->create();
+        // Workorder::factory(10)->create(); 
         MasterAction::factory(4)->create();
     }
 }

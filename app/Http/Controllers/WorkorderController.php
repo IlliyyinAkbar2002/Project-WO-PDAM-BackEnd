@@ -36,7 +36,20 @@ class WorkorderController extends Controller
             $sort = $request->query('sort', 'desc');
             $all = $request->query('all', false);
 
-            $query = Workorder::with('petugas', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl');
+            $query = Workorder::with('petugas', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'location');
+            
+            // Filter berdasarkan role authenticated user
+            $user = $request->user();
+            
+            // role_id = 1 adalah Admin, bisa melihat semua workorder
+            // Selain Admin: hanya bisa melihat workorder yang dia buat (pic) atau ditugaskan padanya (petugas)
+            if ($user->role_id != 1) {
+                $query->where(function ($q) use ($user) {
+                    $q->where('pic_id', $user->id)           // Workorder yang dibuat oleh user (sebagai supervisor)
+                      ->orWhere('petugas_id', $user->id);    // Workorder yang ditugaskan ke user (sebagai petugas)
+                });
+            }
+            
             if ($type) {
                 $query->where('tipe_workorder_id', $type);
             }
@@ -157,13 +170,17 @@ class WorkorderController extends Controller
             'estimasi_selesai' => 'required|date',
             'longitude' => 'nullable|numeric',
             'latitude' => 'nullable|numeric',
-            'pic_id' => 'required|exists:users,id',
+            'location_id' => 'nullable|exists:m_location,id',
             'jenis_workorder_id' => 'required|exists:m_jenis_workorder,id',
             'jenis_lokasi_id' => 'required|exists:m_jenis_lokasi,id',
             'tipe_workorder_id' => 'required|exists:m_tipe_workorder,id',
             'petugas_id' => 'required|array|min:1',
             'petugas_id.*' => 'exists:users,id',
         ]);
+        
+        // Set pic_id dari authenticated user (bukan dari request untuk keamanan)
+        $validatedData['pic_id'] = $request->user()->id;
+        
         try {
             $workorder = (new WorkorderService())->createWorkorders($validatedData);
 
@@ -187,7 +204,7 @@ class WorkorderController extends Controller
     public function show($id)
     {
         try {
-            $workorder = Workorder::with('petugas', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'latestFreeze')->findOrFail($id);
+            $workorder = Workorder::with('petugas', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'latestFreeze', 'location')->findOrFail($id);
             return response()->json($workorder, 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
