@@ -85,7 +85,7 @@ class DatabaseSeeder extends Seeder
         Pegawai::updateOrCreate(
             [
                 'nama' => 'Illiyyin',
-                'nip' => '1234567892',
+                'nip' => '1234567832',
                 'tanggal_lahir' => '1990-01-01',
                 'jenis_kelamin' => 'Laki-laki',
                 'alamat' => 'Jl. Geo No. 1',
@@ -150,7 +150,7 @@ class DatabaseSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'satoshi@gmail.com'],
             [
-                'pegawai_id' => Pegawai::where('nip', '1234567893')->first()->id,
+                'pegawai_id' => Pegawai::where('nip', '1234567892')->first()->id,
                 'role_id' => 2, // Manager as jabatan Manager
                 'password' => bcrypt('password'),
             ]
@@ -159,7 +159,7 @@ class DatabaseSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'iyyin@gmail.com'],
             [
-                'pegawai_id' => Pegawai::where('nip', '1234567892')->first()->id,
+                'pegawai_id' => Pegawai::where('nip', '1234567832')->first()->id,
                 'role_id' => 3, // Employee as jabatan SPV
                 'password' => bcrypt('password'),
             ]
