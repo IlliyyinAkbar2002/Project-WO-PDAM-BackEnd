@@ -49,7 +49,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         MasterLocation::factory(1)->create([
-            'nama' => 'Perum Lestari Indah No.6 Blok D, Kecipik, Boteng, Kec. Menganti, Kabupaten Gresik',
+            'nama' => 'Perum Lestari Indah',
             'latitude' => -7.3482089,
             'longitude' => 112.5987654,
             'radius_meter' => 100,
@@ -205,5 +205,8 @@ class DatabaseSeeder extends Seeder
         JenisWorkorder::factory(10)->create();
         // Workorder::factory(10)->create(); 
         MasterAction::factory(4)->create();
+
+        // Seed detail_form dan option_form untuk setiap jenis workorder
+        // $this->call(DetailFormSeeder::class);
     }
 }

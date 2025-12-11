@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Models\DetailForm;
+use App\Models\OptionForm;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class JenisWorkorderFactory extends Factory
@@ -31,5 +33,58 @@ class JenisWorkorderFactory extends Factory
             'nama' => $nama,
             'kpi_id' => $this->faker->numberBetween(1, 10),
         ];
+    }
+
+    /**
+     * Configure the model factory.
+     * Auto-create minimal detail_form setelah JenisWorkorder dibuat
+     * untuk memastikan data valid (tidak kosong).
+     */
+    public function configure()
+    {
+        return $this->afterCreating(function ($jenisWorkorder) {
+            // Create default detail_form dengan dropdown "Hasil Pengerjaan"
+            $detailForm = DetailForm::create([
+                'jenis_workorder_id' => $jenisWorkorder->id,
+                'nama_field' => 'Hasil Pengerjaan',
+                'tipe_field' => 'dropdown',
+                'tipe_data' => 'string',
+                'sifat' => 'required',
+                'hint_text' => 'Pilih status hasil pengerjaan',
+                'order' => 0,
+                'parent' => 0,
+                'keterangan' => null,
+                'unit_satuan' => null,
+                'min' => null,
+                'max' => null,
+            ]);
+
+            // Create options untuk dropdown
+            $options = ['Berhasil', 'Sebagian Berhasil', 'Gagal', 'Perlu Tindak Lanjut'];
+            foreach ($options as $order => $optionName) {
+                OptionForm::create([
+                    'detail_form_id' => $detailForm->id,
+                    'nama_opsi' => $optionName,
+                    'parent' => 0,
+                    'order' => $order,
+                ]);
+            }
+
+            // Create detail_form untuk catatan (optional)
+            DetailForm::create([
+                'jenis_workorder_id' => $jenisWorkorder->id,
+                'nama_field' => 'Catatan',
+                'tipe_field' => 'textarea',
+                'tipe_data' => 'string',
+                'sifat' => 'optional',
+                'hint_text' => 'Catatan tambahan (opsional)',
+                'order' => 1,
+                'parent' => 0,
+                'keterangan' => null,
+                'unit_satuan' => null,
+                'min' => null,
+                'max' => null,
+            ]);
+        });
     }
 }
