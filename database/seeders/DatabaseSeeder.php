@@ -51,6 +51,29 @@ class DatabaseSeeder extends Seeder
         Jabatan::factory(6)->create();
         Role::factory(3)->create();
         Status::factory(8)->create();
+
+        Pegawai::updateOrCreate(['id' => 1], [
+        'nama' => 'Super Admin',
+        'nip' => '1.23.45678',
+        'tanggal_lahir' => '1980-01-01',
+        'jenis_kelamin' => 'Laki-laki',
+        'alamat' => 'Jl. Surabaya No.1',
+        'telepon' => '081234567890',
+        'departemen_id' => 1,
+        'jabatan_id' => 1,
+        ]);
+
+        Pegawai::updateOrCreate(['id' => 2], [
+        'nama' => 'Geo Anak baik',
+        'nip' => '4.99.70756',
+        'tanggal_lahir' => '1985-02-02',
+        'jenis_kelamin' => 'Perempuan',
+        'alamat' => 'Jl. Surabaya No.2',
+        'telepon' => '081234567891',
+        'departemen_id' => 2,
+        'jabatan_id' => 2,
+        ]);
+
         Pegawai::factory(20)->create();
 
         User::updateOrCreate([

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DetailForm;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class DetailFormController extends Controller
 {
@@ -41,7 +42,42 @@ class DetailFormController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        try {
+            $validator = Validator::make($request->all(), [
+                'jenis_workorder_id' => 'required|integer|exists:jenis_workorders,id',
+                'nama_field' => 'required|string|max:255',
+                'tipe_field' => 'required|string',
+                'tipe_data' => 'nullable|string',
+                'unit_satuan' => 'nullable|string',
+                'sifat' => 'required|string',
+                'min' => 'nullable|integer',
+                'max' => 'nullable|integer',
+                'parent' => 'nullable|integer',
+                'keterangan' => 'nullable|string',
+                'hint_text' => 'required|string',
+                'order' => 'required|integer',
+            ]);
+    
+            if ($validator->fails()) {
+                return response()->json([
+                    'error' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+    
+            $detailForm = DetailForm::create($validator->validated());
+    
+            return response()->json([
+                'message' => 'Data detail form berhasil dibuat',
+                'data' => $detailForm
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat menyimpan data detail form',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -52,7 +88,16 @@ class DetailFormController extends Controller
      */
     public function show($id)
     {
-        //
+        try {
+            $detailForm = DetailForm::with('optionForm')->findOrFail($id);
+            return response()->json($detailForm, 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat mengambil data detail form',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -64,7 +109,43 @@ class DetailFormController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        try {
+            $validator = Validator::make($request->all(), [
+                'jenis_workorder_id' => 'required|integer|exists:jenis_workorders,id',
+                'nama_field' => 'required|string|max:255',
+                'tipe_field' => 'required|string',
+                'tipe_data' => 'nullable|string',
+                'unit_satuan' => 'nullable|string',
+                'sifat' => 'required|string',
+                'min' => 'nullable|integer',
+                'max' => 'nullable|integer',
+                'parent' => 'nullable|integer',
+                'keterangan' => 'nullable|string',
+                'hint_text' => 'required|string',
+                'order' => 'required|integer',
+            ]);
+    
+            if ($validator->fails()) {
+                return response()->json([
+                    'error' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+    
+            $detailForm = DetailForm::findOrFail($id);
+            $detailForm->update($validator->validated());
+    
+            return response()->json([
+                'message' => 'Data detail form berhasil diperbarui',
+                'data' => $detailForm
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat memperbarui data detail form',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -75,6 +156,19 @@ class DetailFormController extends Controller
      */
     public function destroy($id)
     {
-        //
+        try {
+            $detailForm = DetailForm::findOrFail($id);
+            $detailForm->delete();
+
+            return response()->json([
+                'message' => 'Data detail form berhasil dihapus'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat menghapus data detail form',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }

@@ -12,6 +12,7 @@ use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\DetailProgressController;
 use App\Http\Controllers\MasterLocationController;
+use App\Http\Controllers\OptionFormController;
 use App\Http\Controllers\PegawaiController;
 use Illuminate\Support\Facades\Route;
 
@@ -67,11 +68,23 @@ Route::prefix('v1')->group(function () {
         Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
         Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
         
+        // Detail form
+        Route::get('jenis-workorder/{id}/detail-form', [DetailFormController::class, 'index']);
+        Route::post('jenis-workorder/{id}/detail-form', [DetailFormController::class, 'store']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);
+        Route::put('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'update']);
+        Route::delete('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'destroy']);
+
+        // Option form
+        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form/{detail_form_id}/option-form', [OptionFormController::class, 'index']);
+        Route::post('jenis-workorder/{jenis_workorder_id}/detail-form/{detail_form_id}/option-form', [OptionFormController::class, 'store']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form/{detail_form_id}/option-form/{id}', [OptionFormController::class, 'show']);
+        Route::put('jenis-workorder/{jenis_workorder_id}/detail-form/{detail_form_id}/option-form/{id}', [OptionFormController::class, 'update']);
+        Route::delete('jenis-workorder/{jenis_workorder_id}/detail-form/{detail_form_id}/option-form/{id}', [OptionFormController::class, 'destroy']);
+
         // Workorder actions
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
         
-        // Detail form
-        Route::get('detail-form', [DetailFormController::class, 'index']);
     });
 });
 
