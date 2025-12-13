@@ -18,6 +18,17 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Route untuk serve storage files (bypass symlink issue di Windows PHP built-in server)
+Route::get('/storage/{path}', function ($path) {
+    $filePath = storage_path('app/public/' . $path);
+    
+    if (!file_exists($filePath)) {
+        abort(404);
+    }
+    
+    return response()->file($filePath);
+})->where('path', '.*');
+
 // Route SPA Sanctum
 Route::post('/login', [AuthController::class, 'spaLogin']);
 Route::post('/logout', [AuthController::class, 'spaLogout']);
