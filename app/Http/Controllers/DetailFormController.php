@@ -44,7 +44,7 @@ class DetailFormController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'jenis_workorder_id' => 'required|integer|exists:jenis_workorders,id',
+                'jenis_workorder_id' => 'required|integer|exists:m_jenis_workorder,id',
                 'nama_field' => 'required|string|max:255',
                 'tipe_field' => 'required|string',
                 'tipe_data' => 'nullable|string',
@@ -111,7 +111,7 @@ class DetailFormController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'jenis_workorder_id' => 'required|integer|exists:jenis_workorders,id',
+                'jenis_workorder_id' => 'required|integer|exists:m_jenis_workorder,id',
                 'nama_field' => 'required|string|max:255',
                 'tipe_field' => 'required|string',
                 'tipe_data' => 'nullable|string',

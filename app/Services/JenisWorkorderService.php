@@ -17,13 +17,19 @@ class JenisWorkorderService
         'kpi_id' => $data['kpi_id'],
       ]);
 
+      // Jika detail_form tidak dikirim, return langsung
+      $detailForms = $data['detail_form'] ?? [];
+      if (empty($detailForms)) {
+        return $jenisWorkorder->load('detailForm.optionForm');
+      }
+
       // Mapping untuk ID dummy -> ID asli
       $idMap = [];
       $detailFormsToUpdate = [];
       $optionFormsToUpdate = [];
 
       // Tahap 1: Simpan DetailForm dan map ID dummy
-      foreach ($data['detail_form'] as $index => $detail) {
+      foreach ($detailForms as $index => $detail) {
         $dummyId = $detail['id'] ?? 'temp_' . $index;
         $detailForm = $jenisWorkorder->detailForm()->create([
           'nama_field' => $detail['nama_field'],
@@ -94,13 +100,27 @@ class JenisWorkorderService
   {
     return DB::transaction(function () use ($id, $data) {
       $jenisWorkorder = JenisWorkorder::findOrFail($id);
-      $jenisWorkorder->update([
-        'nama' => $data['nama'],
-        'kpi_id' => $data['kpi_id'],
-      ]);
+      
+      // Update hanya field yang dikirim
+      $updateData = [];
+      if (isset($data['nama'])) {
+        $updateData['nama'] = $data['nama'];
+      }
+      if (isset($data['kpi_id'])) {
+        $updateData['kpi_id'] = $data['kpi_id'];
+      }
+      if (!empty($updateData)) {
+        $jenisWorkorder->update($updateData);
+      }
+
+      // Jika detail_form tidak dikirim, return langsung tanpa modifikasi detail
+      $detailForms = $data['detail_form'] ?? null;
+      if ($detailForms === null) {
+        return $jenisWorkorder->load('detailForm.optionForm');
+      }
 
       $detailIds = [];
-      foreach ($data['detail_form'] as $detailData) {
+      foreach ($detailForms as $detailData) {
         if ($detailData['id'] > 0) {
           $detail = DetailForm::where('jenis_workorder_id', $jenisWorkorder->id)
             ->where('id', $detailData['id'])

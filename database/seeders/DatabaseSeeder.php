@@ -16,6 +16,7 @@ use App\Models\Status;
 use App\Models\TipeWorkorder;
 use App\Models\User;
 use App\Models\Workorder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -73,6 +74,9 @@ class DatabaseSeeder extends Seeder
         'departemen_id' => 2,
         'jabatan_id' => 2,
         ]);
+
+        // Pastikan sequence id m_pegawai mengikuti nilai maksimum saat ini
+        DB::statement("SELECT setval(pg_get_serial_sequence('m_pegawai', 'id'), (SELECT COALESCE(MAX(id), 0) FROM m_pegawai))");
 
         Pegawai::factory(20)->create();
 
