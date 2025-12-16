@@ -16,7 +16,6 @@ class CreateJenisWorkordersTable extends Migration
         Schema::create('m_jenis_workorder', function (Blueprint $table) {
             $table->id();
             $table->string('nama');
-            $table->foreignId('kpi_id')->constrained('master_kpi');
             $table->timestamps();
         });
     }

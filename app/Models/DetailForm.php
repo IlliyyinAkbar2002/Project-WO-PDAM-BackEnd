@@ -11,18 +11,8 @@ class DetailForm extends Model
     protected $table = 'detail_form';
     protected $guarded = [];
 
-    // public function form()
-    // {
-    //     return $this->belongsTo(Form::class, 'form_id');
-    // }
-
-    public function jenisWorkorder()
+    public function formWorkorder()
     {
-        return $this->belongsTo(JenisWorkorder::class, 'jenis_workorder_id');
-    }
-
-    public function optionForm()
-    {
-        return $this->hasMany(OptionForm::class, 'detail_form_id');
+        return $this->belongsTo(FormWorkorder::class, 'form_workorder_id');
     }
 }

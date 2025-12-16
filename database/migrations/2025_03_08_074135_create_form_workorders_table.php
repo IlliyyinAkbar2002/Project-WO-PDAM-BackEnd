@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateDetailFormsTable extends Migration
+class CreateFormWorkordersTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,9 +13,10 @@ class CreateDetailFormsTable extends Migration
      */
     public function up()
     {
-        Schema::create('detail_form', function (Blueprint $table) {
+        Schema::create('form_workorder', function (Blueprint $table) {
             $table->id();
             $table->foreignId('jenis_workorder_id')->constrained('m_jenis_workorder')->onDelete('cascade');
+            $table->foreignId('kpi_id')->constrained('master_kpi')->onDelete('cascade');
             $table->string('nama_field');
             $table->string('tipe_field');
             $table->string('tipe_data')->nullable();
@@ -38,6 +39,6 @@ class CreateDetailFormsTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('detail_form');
+        Schema::dropIfExists('form_workorder');
     }
 }

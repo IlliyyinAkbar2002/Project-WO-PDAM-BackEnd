@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateOptionFormsTable extends Migration
+class CreateDetailFormsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,9 +13,9 @@ class CreateOptionFormsTable extends Migration
      */
     public function up()
     {
-        Schema::create('option_form', function (Blueprint $table) {
+        Schema::create('detail_form', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('detail_form_id')->constrained('detail_form')->onDelete('cascade');
+            $table->foreignId('form_workorder_id')->constrained('form_workorder')->onDelete('cascade');
             $table->string('nama_opsi');
             $table->integer('parent');
             $table->integer('order');
@@ -30,6 +30,6 @@ class CreateOptionFormsTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('option_form');
+        Schema::dropIfExists('detail_form');
     }
 }

@@ -31,15 +31,14 @@ class JenisWorkorderController extends Controller
             $sort = $request->query('sort', 'desc');
             $all = $request->query('all', false);
 
-            // $query = JenisWorkorder::with('detailForm', 'kpi', 'detailForm.optionForm');
             $query = JenisWorkorder::with([
-                'detailForm' => function ($q) {
-                    $q->orderByRaw('"order" ASC'); // quote kolom order
-                },
-                'detailForm.optionForm' => function ($q) {
+                'formWorkorder' => function ($q) {
                     $q->orderByRaw('"order" ASC');
                 },
-                'kpi'
+                'formWorkorder.detailForm' => function ($q) {
+                    $q->orderByRaw('"order" ASC');
+                },
+                'formWorkorder.kpi'
             ]);
 
             if ($search) {
@@ -80,7 +79,6 @@ class JenisWorkorderController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'nama' => 'required|string',
-                'kpi_id' => 'required|integer|exists:master_kpi,id',
             ]);
 
             if ($validator->fails()) {
@@ -90,7 +88,7 @@ class JenisWorkorderController extends Controller
                 ], 422);
             }
 
-            $data = $validator->validated();
+            $data = $request->all();
             $jenisWorkorder = $this->jenisWorkorderService->store($data);
 
             return response()->json([
@@ -116,12 +114,13 @@ class JenisWorkorderController extends Controller
     {
         try {
             $jenisWorkorder = JenisWorkorder::with([
-                'detailForm' => function ($query) {
+                'formWorkorder' => function ($query) {
                     $query->orderByRaw('"order" ASC');
                 },
-                'detailForm.optionForm' => function ($query) {
+                'formWorkorder.detailForm' => function ($query) {
                     $query->orderByRaw('"order" ASC');
-                }
+                },
+                'formWorkorder.kpi'
             ])->findOrFail($id);
             return response()->json($jenisWorkorder, 200);
         } catch (\Exception $e) {
@@ -145,7 +144,6 @@ class JenisWorkorderController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'nama' => 'sometimes|required|string',
-                'kpi_id' => 'sometimes|required|integer|exists:master_kpi,id',
             ]);
 
             if ($validator->fails()) {
@@ -155,7 +153,7 @@ class JenisWorkorderController extends Controller
                 ], 422);
             }
 
-            $data = $validator->validated();
+            $data = $request->all();
             $jenisWorkorder = $this->jenisWorkorderService->update($id, $data);
 
             return response()->json([

@@ -11,19 +11,9 @@ class JenisWorkorder extends Model
     protected $table = 'm_jenis_workorder';
     protected $guarded = [];
 
-    public function kpi()
+    public function formWorkorder()
     {
-        return $this->belongsTo(MasterKpi::class, 'kpi_id');
-    }
-
-    // public function form()
-    // {
-    //     return $this->hasMany(Form::class, 'jenis_workorder_id');
-    // }
-
-    public function detailForm()
-    {
-        return $this->hasMany(DetailForm::class, 'jenis_workorder_id');
+        return $this->hasMany(FormWorkorder::class, 'jenis_workorder_id');
     }
 
     public function workorder()

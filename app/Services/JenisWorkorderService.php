@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\JenisWorkorder;
+use App\Models\FormWorkorder;
 use App\Models\DetailForm;
-use App\Models\OptionForm;
 use Illuminate\Support\Facades\DB;
 
 class JenisWorkorderService
@@ -14,67 +14,76 @@ class JenisWorkorderService
     return DB::transaction(function () use ($data) {
       $jenisWorkorder = JenisWorkorder::create([
         'nama' => $data['nama'],
-        'kpi_id' => $data['kpi_id'],
       ]);
 
-      // Jika detail_form tidak dikirim, return langsung
-      $detailForms = $data['detail_form'] ?? [];
-      if (empty($detailForms)) {
-        return $jenisWorkorder->load('detailForm.optionForm');
+      // Jika form_workorder tidak dikirim, return langsung
+      $formWorkorders = $data['form_workorder'] ?? [];
+      if (empty($formWorkorders)) {
+        return $jenisWorkorder->load('formWorkorder.detailForm');
       }
 
       // Mapping untuk ID dummy -> ID asli
       $idMap = [];
+      $formWorkordersToUpdate = [];
       $detailFormsToUpdate = [];
-      $optionFormsToUpdate = [];
 
-      // Tahap 1: Simpan DetailForm dan map ID dummy
-      foreach ($detailForms as $index => $detail) {
-        $dummyId = $detail['id'] ?? 'temp_' . $index;
-        $detailForm = $jenisWorkorder->detailForm()->create([
-          'nama_field' => $detail['nama_field'],
-          'tipe_field' => $detail['tipe_field'],
-          'tipe_data' => $detail['tipe_data'] ?? null,
-          'unit_satuan' => $detail['unit_satuan'] ?? null,
-          'min' => $detail['min'] ?? null,
-          'max' => $detail['max'] ?? null,
-          'sifat' => $detail['sifat'],
+      // Tahap 1: Simpan FormWorkorder dan map ID dummy
+      foreach ($formWorkorders as $index => $form) {
+        $dummyId = $form['id'] ?? 'temp_' . $index;
+        $formWorkorder = $jenisWorkorder->formWorkorder()->create([
+          'kpi_id' => $form['kpi_id'],
+          'nama_field' => $form['nama_field'],
+          'tipe_field' => $form['tipe_field'],
+          'tipe_data' => $form['tipe_data'] ?? null,
+          'unit_satuan' => $form['unit_satuan'] ?? null,
+          'min' => $form['min'] ?? null,
+          'max' => $form['max'] ?? null,
+          'sifat' => $form['sifat'],
           'parent' => 0,
-          'keterangan' => $detail['keterangan'] ?? null,
-          'hint_text' => $detail['hint_text'],
-          'order' => $detail['order'],
+          'keterangan' => $form['keterangan'] ?? null,
+          'hint_text' => $form['hint_text'],
+          'order' => $form['order'],
         ]);
 
         // Simpan mapping
-        $idMap[$dummyId] = $detailForm->id;
-        $detailFormsToUpdate[] = [
-          'instance' => $detailForm,
-          'dummy_parent' => $detail['parent'] ?? 0,
-          'option_form_raw' => $detail['tipe_field'] === 'dropdown' ? ($detail['option_form'] ?? []) : [],
+        $idMap[$dummyId] = $formWorkorder->id;
+        $formWorkordersToUpdate[] = [
+          'instance' => $formWorkorder,
+          'dummy_parent' => $form['parent'] ?? 0,
+          'detail_form_raw' => $form['tipe_field'] === 'dropdown' ? ($form['detail_form'] ?? []) : [],
         ];
       }
 
-      // Tahap 2: Simpan OptionForm dan map ID dummy
-      foreach ($detailFormsToUpdate as $item) {
-        $detailForm = $item['instance'];
-        foreach ($item['option_form_raw'] as $optIndex => $option) {
-          $dummyOptionId = $option['id'] ?? 'temp_opt_' . $optIndex;
-          $dummyOptionParent = $option['parent'] ?? 0;
-          $optionForm = $detailForm->optionForm()->create([
-            'nama_opsi' => $option['nama_opsi'],
+      // Tahap 2: Simpan DetailForm dan map ID dummy
+      foreach ($formWorkordersToUpdate as $item) {
+        $formWorkorder = $item['instance'];
+        foreach ($item['detail_form_raw'] as $optIndex => $detail) {
+          $dummyDetailId = $detail['id'] ?? 'temp_opt_' . $optIndex;
+          $dummyDetailParent = $detail['parent'] ?? 0;
+          $detailForm = $formWorkorder->detailForm()->create([
+            'nama_opsi' => $detail['nama_opsi'],
             'parent' => 0,
-            'order' => $option['order'],
+            'order' => $detail['order'],
           ]);
           // Simpan mapping
-          $idMap[$dummyOptionId] = $optionForm->id;
-          $optionFormsToUpdate[] = [
-            'instance' => $optionForm,
-            'dummy_parent' => $dummyOptionParent,
+          $idMap[$dummyDetailId] = $detailForm->id;
+          $detailFormsToUpdate[] = [
+            'instance' => $detailForm,
+            'dummy_parent' => $dummyDetailParent,
           ];
         }
       }
 
-      // Tahap 3: Update parent DetailForm
+      // Tahap 3: Update parent FormWorkorder
+      foreach ($formWorkordersToUpdate as $item) {
+        $dummyParent = $item['dummy_parent'];
+        if ($dummyParent !== 0 && !isset($idMap[$dummyParent])) {
+        }
+        $realParent = $dummyParent !== 0 && isset($idMap[$dummyParent]) ? $idMap[$dummyParent] : 0;
+        $item['instance']->update(['parent' => $realParent]);
+      }
+
+      // Tahap 4: Update parent DetailForm
       foreach ($detailFormsToUpdate as $item) {
         $dummyParent = $item['dummy_parent'];
         if ($dummyParent !== 0 && !isset($idMap[$dummyParent])) {
@@ -83,16 +92,7 @@ class JenisWorkorderService
         $item['instance']->update(['parent' => $realParent]);
       }
 
-      // Tahap 4: Update parent OptionForm
-      foreach ($optionFormsToUpdate as $item) {
-        $dummyParent = $item['dummy_parent'];
-        if ($dummyParent !== 0 && !isset($idMap[$dummyParent])) {
-        }
-        $realParent = $dummyParent !== 0 && isset($idMap[$dummyParent]) ? $idMap[$dummyParent] : 0;
-        $item['instance']->update(['parent' => $realParent]);
-      }
-
-      return $jenisWorkorder->load('detailForm.optionForm');
+      return $jenisWorkorder->load('formWorkorder.detailForm');
     });
   }
 
@@ -106,86 +106,85 @@ class JenisWorkorderService
       if (isset($data['nama'])) {
         $updateData['nama'] = $data['nama'];
       }
-      if (isset($data['kpi_id'])) {
-        $updateData['kpi_id'] = $data['kpi_id'];
-      }
       if (!empty($updateData)) {
         $jenisWorkorder->update($updateData);
       }
 
-      // Jika detail_form tidak dikirim, return langsung tanpa modifikasi detail
-      $detailForms = $data['detail_form'] ?? null;
-      if ($detailForms === null) {
-        return $jenisWorkorder->load('detailForm.optionForm');
+      // Jika form_workorder tidak dikirim, return langsung tanpa modifikasi
+      $formWorkorders = $data['form_workorder'] ?? null;
+      if ($formWorkorders === null) {
+        return $jenisWorkorder->load('formWorkorder.detailForm');
       }
 
-      $detailIds = [];
-      foreach ($detailForms as $detailData) {
-        if ($detailData['id'] > 0) {
-          $detail = DetailForm::where('jenis_workorder_id', $jenisWorkorder->id)
-            ->where('id', $detailData['id'])
+      $formIds = [];
+      foreach ($formWorkorders as $formData) {
+        if ($formData['id'] > 0) {
+          $form = FormWorkorder::where('jenis_workorder_id', $jenisWorkorder->id)
+            ->where('id', $formData['id'])
             ->firstOrFail();
-          $detail->update([
-            'nama_field' => $detailData['nama_field'],
-            'tipe_field' => $detailData['tipe_field'],
-            'tipe_data' => $detailData['tipe_data'] ?? null,
-            'unit_satuan' => $detailData['unit_satuan'] ?? null,
-            'sifat' => $detailData['sifat'],
-            'min' => $detailData['min'] ?? null,
-            'max' => $detailData['max'] ?? null,
-            'parent' => $detailData['parent'],
-            'keterangan' => $detailData['keterangan'] ?? null,
-            'hint_text' => $detailData['hint_text'],
-            'order' => $detailData['order'],
+          $form->update([
+            'kpi_id' => $formData['kpi_id'],
+            'nama_field' => $formData['nama_field'],
+            'tipe_field' => $formData['tipe_field'],
+            'tipe_data' => $formData['tipe_data'] ?? null,
+            'unit_satuan' => $formData['unit_satuan'] ?? null,
+            'sifat' => $formData['sifat'],
+            'min' => $formData['min'] ?? null,
+            'max' => $formData['max'] ?? null,
+            'parent' => $formData['parent'],
+            'keterangan' => $formData['keterangan'] ?? null,
+            'hint_text' => $formData['hint_text'],
+            'order' => $formData['order'],
           ]);
         } else {
-          $detail = $jenisWorkorder->detailForm()->create([
-            'nama_field' => $detailData['nama_field'],
-            'tipe_field' => $detailData['tipe_field'],
-            'tipe_data' => $detailData['tipe_data'],
-            'unit_satuan' => $detailData['unit_satuan'] ?? null,
-            'sifat' => $detailData['sifat'],
-            'min' => $detailData['min'] ?? null,
-            'max' => $detailData['max'] ?? null,
-            'parent' => $detailData['parent'],
-            'keterangan' => $detailData['keterangan'] ?? null,
-            'hint_text' => $detailData['hint_text'],
-            'order' => $detailData['order'],
+          $form = $jenisWorkorder->formWorkorder()->create([
+            'kpi_id' => $formData['kpi_id'],
+            'nama_field' => $formData['nama_field'],
+            'tipe_field' => $formData['tipe_field'],
+            'tipe_data' => $formData['tipe_data'],
+            'unit_satuan' => $formData['unit_satuan'] ?? null,
+            'sifat' => $formData['sifat'],
+            'min' => $formData['min'] ?? null,
+            'max' => $formData['max'] ?? null,
+            'parent' => $formData['parent'],
+            'keterangan' => $formData['keterangan'] ?? null,
+            'hint_text' => $formData['hint_text'],
+            'order' => $formData['order'],
           ]);
         }
-        $detailIds[] = $detail->id;
-        $optionIds = [];
-        if ($detailData['tipe_field'] === 'dropdown' && !empty($detailData['option_form'])) {
-          foreach ($detailData['option_form'] as $optionData) {
-            if ($optionData['id'] > 0) {
-              $option = OptionForm::where('detail_form_id', $detail->id)
-                ->where('id', $optionData['id'])
+        $formIds[] = $form->id;
+        $detailIds = [];
+        if ($formData['tipe_field'] === 'dropdown' && !empty($formData['detail_form'])) {
+          foreach ($formData['detail_form'] as $detailData) {
+            if ($detailData['id'] > 0) {
+              $detail = DetailForm::where('form_workorder_id', $form->id)
+                ->where('id', $detailData['id'])
                 ->firstOrFail();
-              $option->update([
-                'nama_opsi' => $optionData['nama_opsi'],
-                'parent' => $optionData['parent'],
-                'order' => $optionData['order'],
+              $detail->update([
+                'nama_opsi' => $detailData['nama_opsi'],
+                'parent' => $detailData['parent'],
+                'order' => $detailData['order'],
               ]);
             } else {
-              $option = $detail->optionForm()->create([
-                'nama_opsi' => $optionData['nama_opsi'],
-                'parent' => $optionData['parent'],
-                'order' => $optionData['order'],
+              $detail = $form->detailForm()->create([
+                'nama_opsi' => $detailData['nama_opsi'],
+                'parent' => $detailData['parent'],
+                'order' => $detailData['order'],
               ]);
             }
-            $optionIds[] = $option->id;
+            $detailIds[] = $detail->id;
           }
-          OptionForm::where('detail_form_id', $detail->id)
-            ->whereNotIn('id', $optionIds)
+          DetailForm::where('form_workorder_id', $form->id)
+            ->whereNotIn('id', $detailIds)
             ->delete();
         } else {
-          OptionForm::where('detail_form_id', $detail->id)->delete();
+          DetailForm::where('form_workorder_id', $form->id)->delete();
         }
       }
-      DetailForm::where('jenis_workorder_id', $jenisWorkorder->id)
-        ->whereNotIn('id', $detailIds)
+      FormWorkorder::where('jenis_workorder_id', $jenisWorkorder->id)
+        ->whereNotIn('id', $formIds)
         ->delete();
-      return $jenisWorkorder->load('detailForm.optionForm');
+      return $jenisWorkorder->load('formWorkorder.detailForm');
     });
   }
 }

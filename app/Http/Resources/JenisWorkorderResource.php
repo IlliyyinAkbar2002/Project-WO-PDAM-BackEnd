@@ -17,18 +17,18 @@ class JenisWorkorderResource extends JsonResource
         return [
             'id' => $this->id,
             'nama' => $this->nama,
-            'kpi_id' => $this->kpi_id,
-            'detail_form' => DetailFormResource::collection($this->detailForm),
+            'form_workorder' => FormWorkorderResource::collection($this->formWorkorder),
         ];
     }
 }
 
-class DetailFormResource extends JsonResource
+class FormWorkorderResource extends JsonResource
 {
     public function toArray($request)
     {
         return [
             'id' => $this->id,
+            'kpi_id' => $this->kpi_id,
             'nama_field' => $this->nama_field,
             'tipe_data' => $this->tipe_data,
             'unit_satuan' => $this->unit_satuan,
@@ -37,14 +37,15 @@ class DetailFormResource extends JsonResource
             'tipe_field' => $this->tipe_field,
             'sifat' => $this->sifat,
             'keterangan' => $this->keterangan,
+            'hint_text' => $this->hint_text,
             'parent' => $this->parent,
             'order' => $this->order,
-            'option_form' => OptionFormResource::collection($this->optionForm),
+            'detail_form' => DetailFormResource::collection($this->detailForm),
         ];
     }
 }
 
-class OptionFormResource extends JsonResource
+class DetailFormResource extends JsonResource
 {
     public function toArray($request)
     {
