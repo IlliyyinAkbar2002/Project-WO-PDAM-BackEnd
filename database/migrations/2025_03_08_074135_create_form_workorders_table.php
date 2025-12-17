@@ -20,7 +20,7 @@ class CreateFormWorkordersTable extends Migration
             $table->string('nama_field');
             $table->string('tipe_field');
             $table->string('tipe_data')->nullable();
-            $table->string('unit_satuan')->nullable();
+            // $table->string('unit_satuan')->nullable();
             $table->string('sifat');
             $table->integer('min')->nullable();
             $table->integer('max')->nullable();
