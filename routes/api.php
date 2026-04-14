@@ -13,6 +13,7 @@ use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\DetailProgressController;
 use App\Http\Controllers\MasterLocationController;
+use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
 use Illuminate\Support\Facades\Route;
 
@@ -84,7 +85,12 @@ Route::prefix('v1')->group(function () {
 
         // Workorder actions
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
-        
+
+        // Master Material
+        Route::apiResource('material', MaterialController::class);
+        Route::post('material', [MaterialController::class, 'store']);
+        Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
+        Route::put('material/{kode_material}/edit', [MaterialController::class, 'edit']);
     });
 });
 
