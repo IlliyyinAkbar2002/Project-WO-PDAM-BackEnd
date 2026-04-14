@@ -1,9 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\DetailProgress;
-
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 
@@ -17,7 +15,7 @@ class DetailProgressController extends Controller
     public function index()
     {
         try {
-            $query = DetailProgress::with('progressWorkorder', 'detailForm.optionForm');
+            $query = DetailProgress::with('progressWorkorder.dokumentasiProgress', 'detailForm.optionForm');
             if (request()->has('progress_workorder_id')) {
                 $query->where('progress_workorder_id', request()->query('progress_workorder_id'));
                 $item = $query->get();
