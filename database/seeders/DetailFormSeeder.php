@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\DetailForm;
-use App\Models\OptionForm;
 use App\Models\JenisWorkorder;
 use Illuminate\Database\Seeder;
 
@@ -23,7 +22,7 @@ class DetailFormSeeder extends Seeder
             $this->createDetailFormsForJenis($jenisWorkorder);
         }
 
-        $this->command->info('DetailForm dan OptionForm berhasil di-seed untuk semua jenis workorder!');
+        $this->command->info('DetailForm berhasil di-seed untuk semua jenis workorder!');
     }
 
     /**
@@ -52,18 +51,6 @@ class DetailFormSeeder extends Seeder
                 'order' => $order,
             ]);
 
-            // Buat option_form jika tipe_field adalah select/dropdown/radio
-            if (in_array($form['tipe_field'], ['select', 'dropdown', 'radio']) && isset($form['options'])) {
-                foreach ($form['options'] as $optionOrder => $optionName) {
-                    OptionForm::create([
-                        'detail_form_id' => $detailForm->id,
-                        'workorder_id' => null,
-                        'nama_opsi' => $optionName,
-                        'parent' => 0,
-                        'order' => $optionOrder,
-                    ]);
-                }
-            }
         }
     }
 

@@ -233,7 +233,6 @@ class DatabaseSeeder extends Seeder
         // Workorder::factory(10)->create(); 
         MasterAction::factory(4)->create();
 
-        // Seed detail_form dan option_form untuk setiap jenis workorder
         // $this->call(DetailFormSeeder::class);
     }
 }

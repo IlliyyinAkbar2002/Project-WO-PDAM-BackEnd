@@ -3,7 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\DetailForm;
-use App\Models\OptionForm;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class JenisWorkorderFactory extends Factory
@@ -57,17 +56,6 @@ class JenisWorkorderFactory extends Factory
                 'min' => null,
                 'max' => null,
             ]);
-
-            // Create options untuk dropdown
-            $options = ['Berhasil', 'Sebagian Berhasil', 'Gagal', 'Perlu Tindak Lanjut'];
-            foreach ($options as $order => $optionName) {
-                OptionForm::create([
-                    'detail_form_id' => $detailForm->id,
-                    'nama_opsi' => $optionName,
-                    'parent' => 0,
-                    'order' => $order,
-                ]);
-            }
 
             // Create detail_form untuk catatan (optional)
             DetailForm::create([
