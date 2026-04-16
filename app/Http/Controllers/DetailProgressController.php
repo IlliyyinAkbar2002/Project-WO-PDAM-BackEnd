@@ -15,7 +15,7 @@ class DetailProgressController extends Controller
     public function index()
     {
         try {
-            $query = DetailProgress::with('progressWorkorder.dokumentasiProgress', 'detailForm.optionForm');
+            $query = DetailProgress::with('progressWorkorder.dokumentasiProgress', 'detailForm.formWorkorder');
             if (request()->has('progress_workorder_id')) {
                 $query->where('progress_workorder_id', request()->query('progress_workorder_id'));
                 $item = $query->get();

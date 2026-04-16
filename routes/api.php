@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DetailFormController;
+use App\Http\Controllers\FormWorkorderController;
 use App\Http\Controllers\JenisLokasiController;
 use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\DetailProgressController;
 use App\Http\Controllers\MasterLocationController;
+use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
 use Illuminate\Support\Facades\Route;
 
@@ -68,11 +70,28 @@ Route::prefix('v1')->group(function () {
         Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
         Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
         
+        // Form Workorder
+        Route::get('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'index']);
+        Route::post('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'store']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'show']);
+        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'update']);
+        Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'destroy']);
+
+        // Detail form (opsi dropdown)
+        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'index']);
+        Route::post('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'store']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);
+        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'update']);
+        Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'destroy']);
+
         // Workorder actions
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
-        
-        // Detail form
-        Route::get('detail-form', [DetailFormController::class, 'index']);
+
+        // Master Material
+        Route::apiResource('material', MaterialController::class);
+        Route::post('material', [MaterialController::class, 'store']);
+        Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
+        Route::put('material/{kode_material}/edit', [MaterialController::class, 'edit']);
     });
 });
 

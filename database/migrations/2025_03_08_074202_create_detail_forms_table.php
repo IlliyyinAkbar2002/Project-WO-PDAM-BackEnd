@@ -15,17 +15,9 @@ class CreateDetailFormsTable extends Migration
     {
         Schema::create('detail_form', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('jenis_workorder_id')->constrained('m_jenis_workorder')->onDelete('cascade');
-            $table->string('nama_field');
-            $table->string('tipe_field');
-            $table->string('tipe_data')->nullable();
-            $table->string('unit_satuan')->nullable();
-            $table->string('sifat');
-            $table->integer('min')->nullable();
-            $table->integer('max')->nullable();
+            $table->foreignId('form_workorder_id')->constrained('form_workorder')->onDelete('cascade');
+            $table->string('nama_opsi');
             $table->integer('parent');
-            $table->string('keterangan')->nullable();
-            $table->string('hint_text');
             $table->integer('order');
             $table->timestamps();
         });

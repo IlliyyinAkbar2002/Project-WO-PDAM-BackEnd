@@ -31,7 +31,6 @@ class JenisWorkorderFactory extends Factory
 
         return [
             'nama' => $nama,
-            'kpi_id' => $this->faker->numberBetween(1, 10),
         ];
     }
 

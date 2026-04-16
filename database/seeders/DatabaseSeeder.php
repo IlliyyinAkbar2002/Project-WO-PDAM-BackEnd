@@ -16,6 +16,7 @@ use App\Models\Status;
 use App\Models\TipeWorkorder;
 use App\Models\User;
 use App\Models\Workorder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -59,7 +60,33 @@ class DatabaseSeeder extends Seeder
         Jabatan::factory(6)->create();
         Role::factory(3)->create();
         Status::factory(8)->create();
-        // Pegawai::factory(20)->create();
+
+        Pegawai::updateOrCreate(['id' => 1], [
+        'nama' => 'Super Admin',
+        'nip' => '1.23.45678',
+        'tanggal_lahir' => '1980-01-01',
+        'jenis_kelamin' => 'Laki-laki',
+        'alamat' => 'Jl. Surabaya No.1',
+        'telepon' => '081234567890',
+        'departemen_id' => 1,
+        'jabatan_id' => 1,
+        ]);
+
+        Pegawai::updateOrCreate(['id' => 2], [
+        'nama' => 'Geo Anak baik',
+        'nip' => '4.99.70756',
+        'tanggal_lahir' => '1985-02-02',
+        'jenis_kelamin' => 'Perempuan',
+        'alamat' => 'Jl. Surabaya No.2',
+        'telepon' => '081234567891',
+        'departemen_id' => 2,
+        'jabatan_id' => 2,
+        ]);
+
+        // Pastikan sequence id m_pegawai mengikuti nilai maksimum saat ini
+        DB::statement("SELECT setval(pg_get_serial_sequence('m_pegawai', 'id'), (SELECT COALESCE(MAX(id), 0) FROM m_pegawai))");
+
+        Pegawai::factory(20)->create();
 
         // Pegawai 1: Super Admin
         Pegawai::updateOrCreate(

@@ -25,4 +25,9 @@ class Pegawai extends Model
     {
         return $this->belongsTo(Departemen::class, 'departemen_id');
     }
+
+    public function material()
+    {
+        return $this->hasMany(Material::class, 'pegawai_id');
+    }
 }

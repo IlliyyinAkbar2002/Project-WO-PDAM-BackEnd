@@ -12,25 +12,10 @@ class DetailFormController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index(Request $request)
+    public function index($form_workorder_id)
     {
-        try {
-            $query = DetailForm::with('optionForm');
-
-            if ($request->has('jenis_workorder_id')) {
-                $query->where('jenis_workorder_id', $request->query('jenis_workorder_id'));
-                $item = $query->get();
-                return response()->json($item, 200);
-            }
-
-            $list = $query->get();
-            return response()->json($list, 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data progress workorder',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $detailForms = DetailForm::where('form_workorder_id', $form_workorder_id)->orderBy('order')->get();
+        return response()->json($detailForms, 200);
     }
 
     /**
@@ -39,9 +24,22 @@ class DetailFormController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request, $form_workorder_id)
     {
-        //
+        $validated = $request->validate([
+            'nama_opsi' => 'required|string|max:255',
+            'parent'    => 'nullable|integer',
+            'order'     => 'required|integer',
+        ]);
+
+        $detailForm = DetailForm::create([
+            'form_workorder_id' => $form_workorder_id,
+            'nama_opsi'         => $validated['nama_opsi'],
+            'parent'            => $validated['parent'] ?? 0,
+            'order'             => $validated['order'],
+        ]);
+
+        return response()->json($detailForm, 201);
     }
 
     /**
@@ -50,9 +48,10 @@ class DetailFormController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show($form_workorder_id, $id)
     {
-        //
+        $detailForm = DetailForm::where('form_workorder_id', $form_workorder_id)->findOrFail($id);
+        return response()->json($detailForm, 200);
     }
 
     /**
@@ -62,9 +61,19 @@ class DetailFormController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $form_workorder_id, $id)
     {
-        //
+        $detailForm = DetailForm::where('form_workorder_id', $form_workorder_id)->findOrFail($id);
+
+        $validated = $request->validate([
+            'nama_opsi' => 'required|string|max:255',
+            'parent'    => 'nullable|integer',
+            'order'     => 'required|integer',
+        ]);
+
+        $detailForm->update($validated);
+
+        return response()->json($detailForm, 200);
     }
 
     /**
@@ -73,8 +82,13 @@ class DetailFormController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy($form_workorder_id, $id)
     {
-        //
+        $detailForm = DetailForm::where('form_workorder_id', $form_workorder_id)->findOrFail($id);
+        $detailForm->delete();
+
+        return response()->json([
+            'message' => 'Detail form deleted successfully'
+        ]);
     }
 }

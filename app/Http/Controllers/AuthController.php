@@ -136,7 +136,7 @@ class AuthController extends Controller
         
         return response()->json([
             'id' => $user->id,
-            'name' => $user->pegawai->nama ?? null,
+            'name' => $user->pegawai?->nama,
             'email' => $user->email,
             'role_id' => $user->role_id,
             'pegawai' => $user->pegawai,
@@ -163,7 +163,7 @@ class AuthController extends Controller
                 'message' => 'Data user berhasil diambil',
                 'user' => [
                     'id' => $user->id,
-                    'name' => $user->pegawai->nama ?? null,
+                    'name' => $user->pegawai?->nama,
                     'email' => $user->email,
                     'role_id' => $user->role_id,
                     'created_at' => $user->created_at,
