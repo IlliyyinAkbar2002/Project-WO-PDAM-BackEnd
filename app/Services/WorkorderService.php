@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\LemburSpl;
+use App\Models\MasterAction;
 use App\Models\Workorder;
 use Illuminate\Support\Facades\DB;
 
@@ -11,6 +12,12 @@ class WorkorderService
   public function createWorkorders(array $data)
   {
     return DB::transaction(function () use ($data) {
+      // Pastikan master action "Penugasan" (id=1) selalu ada. Jika seeder
+      // sempat gagal di tengah jalan, m_action bisa kosong sehingga insert
+      // workorder_action akan lempar FK violation dan transaksi ini rollback
+      // (gejala: WO seolah "berhasil" di FE tapi list tetap kosong).
+      $penugasanActionId = $this->ensureDefaultActionExists();
+
       $createdWorkorders = [];
       foreach ($data['petugas_id'] as $petugasId) {
         $lemburSplId = null;
@@ -46,7 +53,7 @@ class WorkorderService
           (new ProgressWorkorderService())->createInitialProgress($workorder->id);
           (new WorkorderActionService())->createAction([
             'workorder_id'      => $workorder->id,
-            'action_id'         => 1,
+            'action_id'         => $penugasanActionId,
             'keterangan'        => 'Penugasan awal',
             'waktu_mulai'       => $data['waktu_penugasan'],
             'estimasi_selesai'  => $data['estimasi_selesai'],
@@ -57,5 +64,19 @@ class WorkorderService
 
       return $createdWorkorders;
     });
+  }
+
+  /**
+   * Memastikan record master action "Penugasan" selalu tersedia dan
+   * mengembalikan id-nya untuk dipakai saat membuat workorder_action awal.
+   */
+  private function ensureDefaultActionExists(): int
+  {
+    $action = MasterAction::firstOrCreate(
+      ['nama' => 'Penugasan'],
+      ['keterangan' => 'Penugasan kepada pegawai']
+    );
+
+    return (int) $action->id;
   }
 }

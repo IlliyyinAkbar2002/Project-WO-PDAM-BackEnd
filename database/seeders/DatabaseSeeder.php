@@ -229,9 +229,13 @@ class DatabaseSeeder extends Seeder
         MasterKpi::factory(10)->create();
         JenisLokasi::factory(2)->create();
         TipeWorkorder::factory(2)->create();
+        // Master data aksi wajib diseed SEBELUM JenisWorkorder:
+        // WorkorderService::createWorkorders() selalu insert workorder_action
+        // dengan action_id = 1 saat membuat WO, sehingga m_action harus
+        // sudah terisi walaupun seeder JenisWorkorder gagal di tengah jalan.
+        MasterAction::factory(4)->create();
         JenisWorkorder::factory(10)->create();
         // Workorder::factory(10)->create(); 
-        MasterAction::factory(4)->create();
 
         // $this->call(DetailFormSeeder::class);
     }

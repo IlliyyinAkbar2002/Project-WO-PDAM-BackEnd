@@ -50,6 +50,12 @@ Route::prefix('v1')->group(function () {
         Route::get('user', [UserController::class, 'index']);
         Route::get('pegawai', [PegawaiController::class, 'index']);
         Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
+
+        // Admin-only: lengkapi data pegawai hasil self-register (nip,
+        // alamat, departemen_id, jabatan_id). Hanya role `superadmin`.
+        Route::middleware('role:superadmin')->group(function () {
+            Route::patch('admin/pegawai/{id}/assign', [PegawaiController::class, 'assign']);
+        });
         
         // Location management
         Route::get('master-location', [MasterLocationController::class, 'index']);
@@ -77,7 +83,18 @@ Route::prefix('v1')->group(function () {
         Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'update']);
         Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'destroy']);
 
-        // Detail form (opsi dropdown)
+        // Detail form (definisi field per jenis workorder)
+        // detail_form adalah child dari m_jenis_workorder (lihat migration
+        // 2025_03_08_074202_create_detail_forms_table). Route flat di bawah
+        // disarankan; versi nested di bawah form-workorder tetap disediakan
+        // agar client lama tidak broken (form_workorder_id diabaikan).
+        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form', [DetailFormController::class, 'index']);
+        Route::post('jenis-workorder/{jenis_workorder_id}/detail-form', [DetailFormController::class, 'store']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);
+        Route::put('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'update']);
+        Route::delete('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'destroy']);
+
+        // Legacy nested route (form_workorder_id diabaikan di controller)
         Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'index']);
         Route::post('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'store']);
         Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);

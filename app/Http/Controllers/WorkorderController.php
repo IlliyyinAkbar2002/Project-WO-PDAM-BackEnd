@@ -11,6 +11,7 @@ use App\Services\WorkorderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WorkorderController extends Controller
 {
@@ -189,6 +190,16 @@ class WorkorderController extends Controller
                 'data' => $workorder,
             ], 201);
         } catch (\Exception $e) {
+            // Tanpa log ini, FK violation (mis. action_id tidak ada di m_action)
+            // hanya muncul di body HTTP response dan tidak pernah tercatat di
+            // laravel.log, sehingga debug di sisi backend jadi "buta".
+            Log::error('Work Order store failed', [
+                'user_id' => optional($request->user())->id,
+                'payload' => $request->except(['password', 'password_confirmation']),
+                'error'   => $e->getMessage(),
+                'trace'   => collect($e->getTrace())->take(5)->all(),
+            ]);
+
             return response()->json([
                 'error' => $e->getMessage()
             ], 500);

@@ -16,13 +16,16 @@ class CreatePegawaisTable extends Migration
         Schema::create('m_pegawai', function (Blueprint $table) {
             $table->id();
             $table->string('nama');
-            $table->string('nip');
+            // nip, alamat, departemen_id, jabatan_id dibiarkan nullable karena
+            // diisi oleh Super Admin setelah karyawan melakukan self-register
+            // via aplikasi mobile (endpoint POST /v1/auth/register).
+            $table->string('nip')->nullable();
             $table->date('tanggal_lahir');
             $table->enum('jenis_kelamin', ['Laki-laki', 'Perempuan']);
-            $table->string('alamat');
+            $table->string('alamat')->nullable();
             $table->string('telepon');
-            $table->foreignId('departemen_id')->constrained('m_departemen');
-            $table->foreignId('jabatan_id')->constrained('m_jabatan');
+            $table->foreignId('departemen_id')->nullable()->constrained('m_departemen');
+            $table->foreignId('jabatan_id')->nullable()->constrained('m_jabatan');
             $table->timestamps();
         });
     }

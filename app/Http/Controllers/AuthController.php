@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Pegawai;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
@@ -83,49 +86,90 @@ class AuthController extends Controller
         ], 200);
     }
 
+    /**
+     * Self-register untuk aplikasi mobile karyawan PDAM.
+     *
+     * Registrasi membuat dua entitas dalam satu transaksi:
+     *   1. m_pegawai  → identitas karyawan (nip/alamat/departemen/jabatan kosong,
+     *                   dilengkapi kemudian oleh Super Admin).
+     *   2. users      → kredensial login, role default = employee.
+     *
+     * role_id TIDAK pernah diterima dari request untuk mencegah privilege
+     * escalation — selalu dipaksa ke role "employee" di sisi server.
+     */
     public function AuthRegister(Request $request)
     {
         try {
-            $validatedData = $request->validate([
-                'name' => 'required|string',
-                'email' => 'required|email|unique:users',
-                'password' => 'required|string|min:8',
-                // 'pegawai_id' => 'required|exists:m_pegawai,id',
-                'role_id' => 'required|exists:m_role,id',
+            $validated = $request->validate([
+                'name'          => 'required|string|max:255',
+                'email'         => 'required|email|unique:users,email',
+                'password'      => 'required|string|min:8',
+                'telepon'       => 'required|string|max:20',
+                'jenis_kelamin' => 'required|in:Laki-laki,Perempuan',
+                'tanggal_lahir' => 'required|date',
             ]);
-            
-            $validatedData['password'] = bcrypt($validatedData['password']);
-            
-            $user = User::create([
-                'name' => $validatedData['name'],
-                'email' => $validatedData['email'],
-                'password' => $validatedData['password'],
-                // 'pegawai_id' => $validatedData['pegawai_id'],
-                'role_id' => $validatedData['role_id'],
-            ]);
-            
+
+            $roleEmployee = Role::where('nama', 'employee')->first();
+            if (!$roleEmployee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Role default "employee" belum tersedia. Hubungi admin.',
+                ], 500);
+            }
+
+            $user = DB::transaction(function () use ($validated, $roleEmployee) {
+                $pegawai = Pegawai::create([
+                    'nama'          => $validated['name'],
+                    'telepon'       => $validated['telepon'],
+                    'jenis_kelamin' => $validated['jenis_kelamin'],
+                    'tanggal_lahir' => $validated['tanggal_lahir'],
+                    // nip, alamat, departemen_id, jabatan_id sengaja dikosongkan;
+                    // diisi oleh Super Admin lewat endpoint assign.
+                ]);
+
+                return User::create([
+                    'pegawai_id' => $pegawai->id,
+                    'role_id'    => $roleEmployee->id,
+                    'email'      => $validated['email'],
+                    'password'   => Hash::make($validated['password']),
+                ]);
+            });
+
+            $user->load('pegawai', 'role');
+
             return response()->json([
                 'success' => true,
-                'message' => 'Registrasi berhasil',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
+                'message' => 'Registrasi berhasil. Menunggu penugasan departemen & jabatan oleh Super Admin.',
+                'user'    => [
+                    'id'      => $user->id,
+                    'email'   => $user->email,
                     'role_id' => $user->role_id,
-                ]
+                    'role'    => $user->role->nama ?? null,
+                    'pegawai' => [
+                        'id'            => $user->pegawai->id,
+                        'nama'          => $user->pegawai->nama,
+                        'telepon'       => $user->pegawai->telepon,
+                        'jenis_kelamin' => $user->pegawai->jenis_kelamin,
+                        'tanggal_lahir' => $user->pegawai->tanggal_lahir,
+                        'nip'           => $user->pegawai->nip,
+                        'alamat'        => $user->pegawai->alamat,
+                        'departemen_id' => $user->pegawai->departemen_id,
+                        'jabatan_id'    => $user->pegawai->jabatan_id,
+                    ],
+                ],
             ], 201);
-            
+
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Data tidak valid',
-                'errors' => $e->errors()
+                'errors'  => $e->errors(),
             ], 422);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan server',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }

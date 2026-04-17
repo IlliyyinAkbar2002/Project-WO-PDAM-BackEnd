@@ -165,6 +165,62 @@ class PegawaiController extends Controller
     }
 
     /**
+     * Lengkapi data pegawai (nip, alamat, departemen, jabatan) setelah
+     * karyawan melakukan self-register via mobile. Hanya boleh dipanggil
+     * oleh Super Admin (proteksi via middleware role:superadmin).
+     */
+    public function assign(Request $request, $id)
+    {
+        try {
+            $pegawai = Pegawai::findOrFail($id);
+
+            $validated = $request->validate([
+                'nip'           => 'sometimes|nullable|string|max:50|unique:m_pegawai,nip,' . $pegawai->id,
+                'alamat'        => 'sometimes|nullable|string|max:255',
+                'departemen_id' => 'sometimes|nullable|exists:m_departemen,id',
+                'jabatan_id'    => 'sometimes|nullable|exists:m_jabatan,id',
+            ]);
+
+            $pegawai->fill($validated)->save();
+            $pegawai->load('departemen:id,nama', 'jabatan:id,nama', 'user:id,pegawai_id,email,role_id');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data pegawai berhasil dilengkapi',
+                'data'    => [
+                    'id'            => $pegawai->id,
+                    'nama'          => $pegawai->nama,
+                    'nip'           => $pegawai->nip,
+                    'alamat'        => $pegawai->alamat,
+                    'telepon'       => $pegawai->telepon,
+                    'jenis_kelamin' => $pegawai->jenis_kelamin,
+                    'tanggal_lahir' => $pegawai->tanggal_lahir,
+                    'departemen'    => $pegawai->departemen->nama ?? null,
+                    'jabatan'       => $pegawai->jabatan->nama ?? null,
+                    'user'          => $pegawai->user,
+                ],
+            ], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pegawai tidak ditemukan',
+            ], 404);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data tidak valid',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat menyimpan data pegawai',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Remove the specified resource from storage.
      *
      * @param  int  $id
