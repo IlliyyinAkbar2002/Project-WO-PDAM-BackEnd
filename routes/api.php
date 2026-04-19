@@ -17,108 +17,109 @@ use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
 use Illuminate\Support\Facades\Route;
 
+/*
+|--------------------------------------------------------------------------
+| API Routes (v1)
+|--------------------------------------------------------------------------
+|
+| Semua route API di bawah adalah versi `v1`. Konsumen:
+|
+|   [M] Mobile (Flutter)  — aplikasi petugas lapangan
+|   [W] Web (Next.js)     — dashboard admin / SPV
+|   [S] Shared            — dipakai keduanya
+|
+| Tanda [M]/[W]/[S] di komentar hanya hint untuk developer. Authorization
+| sebenarnya (role_id, kepemilikan data, dll.) diterapkan di sisi controller.
+|
+| Catatan refactor pasca TKT-01..07:
+|   - `POST /workorder-action` ditambahkan (TKT-06). Sebelumnya hanya
+|     `GET /workorder-action` yang terdaftar, padahal controller `store()`
+|     sudah di-refactor untuk menginject `actor_id` dari auth user.
+|   - Duplikasi route yang sudah tercover `apiResource` dihapus (supaya
+|     `php artisan route:list` tidak menampilkan entri ganda). Tidak ada
+|     perubahan perilaku untuk kedua FE.
+|
+*/
 
-// ============================================
-// API Version 1
-// ============================================
 Route::prefix('v1')->group(function () {
+
+    // =========================================================
+    // [S] AUTH — login/register publik, logout/me privat
+    // =========================================================
     Route::prefix('auth')->group(function () {
-        // Public auth
-        Route::post('login', [AuthController::class, 'AuthLogin']);
+        Route::post('login',    [AuthController::class, 'AuthLogin']);
         Route::post('register', [AuthController::class, 'AuthRegister']);
-        
-        
-        // Protected auth routes
+
         Route::middleware(['auth:sanctum', 'client.valid'])->group(function () {
             Route::post('logout', [AuthController::class, 'AuthLogout']);
-            Route::get('me', [AuthController::class, 'me']);
+            Route::get('me',      [AuthController::class, 'me']);
         });
     });
-    
 
+    // =========================================================
+    // Protected API — wajib Bearer token (Sanctum)
+    // =========================================================
     Route::middleware('auth:sanctum')->group(function () {
-        // Workorder resources
-        Route::apiResource('workorder', WorkorderController::class);
-        Route::post('workorder', [WorkorderController::class, 'store']);
-        
-        // KPI and reporting
-        Route::get('kpi', [KpiController::class, 'index']);
-        
-        // Master data
-        Route::apiResource('jenis-workorder', JenisWorkorderController::class);
-        Route::apiResource('jenis-lokasi', JenisLokasiController::class);
-        Route::get('user', [UserController::class, 'index']);
-        Route::get('pegawai', [PegawaiController::class, 'index']);
-        Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
 
-        // Admin-only: lengkapi data pegawai hasil self-register (nip,
-        // alamat, departemen_id, jabatan_id). Hanya role `superadmin`.
+        Route::apiResource('workorder', WorkorderController::class);
+
+
+        Route::get('workorder-action',  [WorkorderActionController::class, 'index']);
+        Route::post('workorder-action', [WorkorderActionController::class, 'store']);
+
+        Route::apiResource('progress-workorder', ProgressWorkorderController::class);
+        Route::apiResource('detail-progress',    DetailProgressController::class);
+        Route::post('progress-workorder/manual-run', [ProgressWorkorderController::class, 'manualRun']);
+
+        Route::apiResource('lembur-spl', LemburSplController::class);
+        Route::apiResource('jenis-workorder', JenisWorkorderController::class);
+        Route::apiResource('jenis-lokasi',    JenisLokasiController::class);
+
+        Route::get('user',            [UserController::class, 'index']);
+        Route::get('pegawai',         [PegawaiController::class, 'index']);
+        Route::get('pegawai/filter',  [PegawaiController::class, 'getPegawaiByFilter']);
+
+        Route::get('master-location',  [MasterLocationController::class, 'index']);
+        Route::post('master-location', [MasterLocationController::class, 'store']);
+
         Route::middleware('role:superadmin')->group(function () {
             Route::patch('admin/pegawai/{id}/assign', [PegawaiController::class, 'assign']);
         });
-        
-        // Location management
-        Route::get('master-location', [MasterLocationController::class, 'index']);
-        Route::post('master-location', [MasterLocationController::class, 'store']);
-        
-        // Progress tracking
-        Route::apiResource('progress-workorder', ProgressWorkorderController::class);
-        Route::apiResource('detail-progress', DetailProgressController::class);
-        Route::post('progress-workorder/manual-run', [ProgressWorkorderController::class, 'manualRun']);
-        
-        // Lembur SPL
-        Route::apiResource('lembur-spl', LemburSplController::class);
-        Route::post('lembur-spl', [LemburSplController::class, 'store']);
-        Route::put('lembur-spl/{id}', [LemburSplController::class, 'update']);
 
-        // Jenis Work Order
-        Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
-        Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
-        Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
-        
-        // Form Workorder
-        Route::get('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'index']);
-        Route::post('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'store']);
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'show']);
-        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'update']);
+        Route::get('jenis-workorder/{id}/form-workorder',           [FormWorkorderController::class, 'index']);
+        Route::post('jenis-workorder/{id}/form-workorder',          [FormWorkorderController::class, 'store']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}',    [FormWorkorderController::class, 'show']);
+        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}',    [FormWorkorderController::class, 'update']);
         Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'destroy']);
 
-        // Detail form (definisi field per jenis workorder)
-        // detail_form adalah child dari m_jenis_workorder (lihat migration
-        // 2025_03_08_074202_create_detail_forms_table). Route flat di bawah
-        // disarankan; versi nested di bawah form-workorder tetap disediakan
-        // agar client lama tidak broken (form_workorder_id diabaikan).
-        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form', [DetailFormController::class, 'index']);
-        Route::post('jenis-workorder/{jenis_workorder_id}/detail-form', [DetailFormController::class, 'store']);
-        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);
-        Route::put('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'update']);
-        Route::delete('jenis-workorder/{jenis_workorder_id}/detail-form/{id}', [DetailFormController::class, 'destroy']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form',           [DetailFormController::class, 'index']);
+        Route::post('jenis-workorder/{jenis_workorder_id}/detail-form',          [DetailFormController::class, 'store']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form/{id}',      [DetailFormController::class, 'show']);
+        Route::put('jenis-workorder/{jenis_workorder_id}/detail-form/{id}',      [DetailFormController::class, 'update']);
+        Route::delete('jenis-workorder/{jenis_workorder_id}/detail-form/{id}',   [DetailFormController::class, 'destroy']);
 
-        // Legacy nested route (form_workorder_id diabaikan di controller)
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'index']);
-        Route::post('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'store']);
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);
-        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'update']);
-        Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'destroy']);
 
-        // Workorder actions
-        Route::get('workorder-action', [WorkorderActionController::class, 'index']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form',           [DetailFormController::class, 'index']);
+        Route::post('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form',          [DetailFormController::class, 'store']);
+        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}',      [DetailFormController::class, 'show']);
+        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}',      [DetailFormController::class, 'update']);
+        Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}',   [DetailFormController::class, 'destroy']);
 
-        // Master Material
+        Route::get('kpi', [KpiController::class, 'index']);
+
         Route::apiResource('material', MaterialController::class);
-        Route::post('material', [MaterialController::class, 'store']);
         Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
-        Route::put('material/{kode_material}/edit', [MaterialController::class, 'edit']);
+        Route::put('material/{kode_material}/edit',    [MaterialController::class, 'edit']);
     });
 });
 
-// ============================================
-// Health Check (unversioned)
-// ============================================
+// =========================================================
+// [S] Health Check (unversioned — di luar prefix v1)
+// =========================================================
 Route::get('ping', function () {
     return response()->json([
-        'message' => 'API Laravel Connected!',
-        'version' => 'v1',
-        'timestamp' => now()->toISOString()
+        'message'   => 'API Laravel Connected!',
+        'version'   => 'v1',
+        'timestamp' => now()->toISOString(),
     ]);
 });

@@ -33,6 +33,15 @@ class WorkorderActionController extends Controller
             'sisa_durasi_menit' => 'nullable|integer',
             'estimasi_selesai' => 'nullable|date',
         ]);
+
+        // TKT-06: `actor_id` selalu di-inject dari auth user, bukan dari
+        // payload client — supaya audit trail tidak bisa dipalsukan dari
+        // sisi mobile/web. Endpoint ini berada di belakang auth middleware
+        // sehingga `$request->user()` semestinya tidak null, tapi tetap
+        // defensif pakai optional() untuk tooling/test yang memanggil tanpa
+        // user (kolom nullable di DB).
+        $validatedData['actor_id'] = optional($request->user())->id;
+
         try {
             $action = (new WorkorderActionService())->createAction($validatedData);
             return response()->json([

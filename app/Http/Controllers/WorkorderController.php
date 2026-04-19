@@ -37,17 +37,21 @@ class WorkorderController extends Controller
             $sort = $request->query('sort', 'desc');
             $all = $request->query('all', false);
 
-            $query = Workorder::with('petugas', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'location');
-            
-            // Filter berdasarkan role authenticated user
+            // TKT-07: `petugas` (1-to-1) diganti `petugasList` (many-to-many
+            // via pivot `workorder_petugas`). Semua eager-load, filter, dan
+            // search petugas sekarang berjalan lewat relasi baru.
+            $query = Workorder::with('petugasList', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'location');
+
+            // Filter berdasarkan role authenticated user.
             $user = $request->user();
-            
-            // role_id = 1 adalah Admin, bisa melihat semua workorder
-            // Selain Admin: hanya bisa melihat workorder yang dia buat (pic) atau ditugaskan padanya (petugas)
+
+            // role_id = 1 adalah Admin, bisa melihat semua workorder.
+            // Selain Admin: hanya bisa melihat workorder yang dia buat (pic)
+            // atau ditugaskan padanya (salah satu dari petugas di pivot).
             if ($user->role_id != 1) {
                 $query->where(function ($q) use ($user) {
-                    $q->where('pic_id', $user->id)           // Workorder yang dibuat oleh user (sebagai supervisor)
-                      ->orWhere('petugas_id', $user->id);    // Workorder yang ditugaskan ke user (sebagai petugas)
+                    $q->where('pic_id', $user->id)
+                      ->orWhereHas('petugasList', fn ($qq) => $qq->where('users.id', $user->id));
                 });
             }
             
@@ -72,7 +76,7 @@ class WorkorderController extends Controller
                         ->orWhere('estimasi_durasi', 'ILIKE', "%{$search}%")
                         ->orWhere('unit_waktu', 'ILIKE', "%{$search}%")
                         ->orWhereHas(
-                            'petugas.pegawai',
+                            'petugasList.pegawai',
                             fn($q) =>
                             $q->where('nama', 'ILIKE', "%{$search}%")
                                 ->orWhere('nip', 'ILIKE', "%{$search}%")
@@ -94,7 +98,9 @@ class WorkorderController extends Controller
                 $query->where('pic_id', $picId);
             }
             if ($userId) {
-                $query->where('petugas_id', $userId);
+                // TKT-07: filter "WO yang ditugaskan ke user X" sekarang
+                // lewat pivot `workorder_petugas` (many-to-many).
+                $query->whereHas('petugasList', fn ($q) => $q->where('users.id', $userId));
             }
             if ($dateRange) {
                 switch ($dateRange) {
@@ -215,7 +221,7 @@ class WorkorderController extends Controller
     public function show($id)
     {
         try {
-            $workorder = Workorder::with('petugas', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'latestFreeze', 'location')->findOrFail($id);
+            $workorder = Workorder::with('petugasList', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'latestFreeze', 'location')->findOrFail($id);
             return response()->json($workorder, 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);

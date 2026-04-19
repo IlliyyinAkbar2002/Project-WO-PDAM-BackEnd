@@ -9,6 +9,7 @@ class Status extends Model
 {
     use HasFactory;
     protected $table = 'm_status';
+    protected $guarded = [];
 
     public function workorder()
     {

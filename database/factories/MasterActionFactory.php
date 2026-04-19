@@ -13,14 +13,19 @@ class MasterActionFactory extends Factory
      */
     public function definition()
     {
-        static $names = ['Penugasan', 'Ditunda', 'Dilanjut', 'Perpanjangan'];
-        static $desc = ['Penugasan kepada pegawai', 'Pekerjaan ditunda sementara', 'Pekerjaan dilanjutkan', 'Perpanjangan waktu tugas'];
-        $nama = array_shift($names);
-        $keterangan = array_shift($desc);
+        static $rows = [
+            ['kode' => 'PENUGASAN', 'nama' => 'Penugasan',    'keterangan' => 'Penugasan kepada pegawai'],
+            ['kode' => 'FREEZE',    'nama' => 'Ditunda',      'keterangan' => 'Pekerjaan ditunda sementara'],
+            ['kode' => 'RESUME',    'nama' => 'Dilanjut',     'keterangan' => 'Pekerjaan dilanjutkan'],
+            ['kode' => 'EXTEND',    'nama' => 'Perpanjangan', 'keterangan' => 'Perpanjangan waktu tugas'],
+        ];
+
+        $row = array_shift($rows);
 
         return [
-            'nama' => $nama,
-            'keterangan' => $keterangan,
+            'kode'       => $row['kode'],
+            'nama'       => $row['nama'],
+            'keterangan' => $row['keterangan'],
         ];
     }
 }

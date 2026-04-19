@@ -25,14 +25,17 @@ class WorkorderActionService
 
       $workorder = Workorder::findOrFail($data['workorder_id']);
       $action = WorkorderAction::create($data);
-      switch ((int) $action->action_id) {
-        case 2:
+
+      // Branching pakai slug `kode` (PENUGASAN / FREEZE / RESUME / EXTEND)
+      // bukan id numerik — id bisa berubah kalau master data di-re-seed.
+      switch ($action->action->kode ?? null) {
+        case 'FREEZE':
           $this->handleFreeze($action, $workorder, $data);
           break;
-        case 3:
+        case 'RESUME':
           $this->handleResume($action, $workorder, $data);
           break;
-        case 4:
+        case 'EXTEND':
           $this->handleExtend($action, $workorder, $data);
           break;
       }
@@ -59,7 +62,7 @@ class WorkorderActionService
   public function handleResume($action, $workorder, $data): void
   {
     $freezeAction = WorkorderAction::where('workorder_id', $workorder->id)
-      ->where('action_id', 2)
+      ->whereHas('action', fn ($q) => $q->where('kode', 'FREEZE'))
       ->latest('waktu_mulai')
       ->first();
 

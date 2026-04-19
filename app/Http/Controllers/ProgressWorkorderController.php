@@ -85,8 +85,12 @@ class ProgressWorkorderController extends Controller
         Log::info('FILES data:', $_FILES);
         Log::info('Method:', [$request->method()]);
 
-        $progressWorkorder = ProgressWorkorder::findOrFail($id);
-        $tipeProgress = $progressWorkorder->tipe_progress;
+        // TKT-05: `tipe_progress` (string) sudah diganti jadi FK
+        // `tipe_progress_id` → `m_tipe_progress`. Pembandingan sekarang pakai
+        // kolom `kode` master (MULAI/PROGRESS/SELESAI), bukan string literal.
+        // Eager-load relasi supaya tidak ada query tambahan saat akses kode.
+        $progressWorkorder = ProgressWorkorder::with('tipeProgress')->findOrFail($id);
+        $kodeTipe = optional($progressWorkorder->tipeProgress)->kode;
 
         $rules = [
             'hasil_pengerjaan' => 'required|string|max:255',
@@ -95,7 +99,7 @@ class ProgressWorkorderController extends Controller
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
         ];
 
-        if ($tipeProgress === 'Selesai') {
+        if ($kodeTipe === 'SELESAI') {
             $rules['detail_progress'] = 'nullable|array';
             $rules['detail_progress.*.detail_form_id'] = 'required_if:detail_progress,array|integer|exists:detail_form,id';
             $rules['detail_progress.*.value'] = 'nullable';
@@ -106,10 +110,15 @@ class ProgressWorkorderController extends Controller
 
         DB::beginTransaction();
         try {
-            // Update progress_workorder
+            // `submitted_by_user_id` (TKT-04) selalu diambil dari auth user
+            // — bukan dari payload — supaya audit trail tidak bisa dipalsukan
+            // dari sisi client. Pakai optional() untuk kompatibilitas PHP 7.x
+            // (project support ^7.3|^8.0). Endpoint ini biasanya di belakang
+            // auth middleware sehingga user() tidak null, tapi tetap defensif.
             $progressWorkorder->update([
-                'waktu_submit' => now(),
-                'hasil_pengerjaan' => $validatedData['hasil_pengerjaan'],
+                'waktu_submit'         => now(),
+                'hasil_pengerjaan'     => $validatedData['hasil_pengerjaan'],
+                'submitted_by_user_id' => optional($request->user())->id,
             ]);
 
             // Simpan foto (array)
@@ -120,8 +129,8 @@ class ProgressWorkorderController extends Controller
                 }
             }
 
-            // Proses detail_progress untuk Selesai
-            if ($tipeProgress === 'Selesai' && isset($validatedData['detail_progress'])) {
+            // Proses detail_progress untuk tipe SELESAI
+            if ($kodeTipe === 'SELESAI' && isset($validatedData['detail_progress'])) {
                 foreach ($validatedData['detail_progress'] as $item) {
                     $detailForm = DetailForm::findOrFail($item['detail_form_id']);
                     $value = $item['value'] ?? null;

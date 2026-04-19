@@ -12,7 +12,6 @@ use App\Models\MasterLocation;
 use App\Models\Pegawai;
 use App\Models\Pic;
 use App\Models\Role;
-use App\Models\Status;
 use App\Models\TipeWorkorder;
 use App\Models\User;
 use App\Models\Workorder;
@@ -59,7 +58,12 @@ class DatabaseSeeder extends Seeder
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
         Role::factory(3)->create();
-        Status::factory(8)->create();
+
+        // Master status: 8 row historis (workorder/lembur) + 3 row progres
+        // (DRAFT/SUBMITTED/VERIFIED) hasil TKT-03. Pakai seeder idempotent
+        // dengan id eksplisit supaya kode lain yang masih hardcode id status
+        // (mis. status_id => 5 di ProgressWorkorderService) tidak bergeser.
+        $this->call(StatusSeeder::class);
 
         Pegawai::updateOrCreate(['id' => 1], [
         'nama' => 'Super Admin',
@@ -231,12 +235,18 @@ class DatabaseSeeder extends Seeder
         TipeWorkorder::factory(2)->create();
         // Master data aksi wajib diseed SEBELUM JenisWorkorder:
         // WorkorderService::createWorkorders() selalu insert workorder_action
-        // dengan action_id = 1 saat membuat WO, sehingga m_action harus
+        // dengan kode = 'PENUGASAN' saat membuat WO, sehingga m_action harus
         // sudah terisi walaupun seeder JenisWorkorder gagal di tengah jalan.
+        // Factory mengisi 4 row default: PENUGASAN, FREEZE, RESUME, EXTEND.
         MasterAction::factory(4)->create();
+
+        // Master tipe progres (MULAI / PROGRESS / SELESAI). Sudah di-seed
+        // inline lewat migration, tapi seeder ini idempotent dan berfungsi
+        // sebagai jaring pengaman saat dijalankan terpisah / setelah refresh.
+        $this->call(TipeProgressSeeder::class);
+
         JenisWorkorder::factory(10)->create();
         // Workorder::factory(10)->create(); 
-
         // $this->call(DetailFormSeeder::class);
     }
 }

@@ -22,9 +22,33 @@ class Workorder extends Model
         return $this->belongsTo(User::class, 'pic_id')->with(['pegawai:id,nama,nip']);
     }
 
-    public function petugas()
+    /**
+     * Daftar petugas yang ditugaskan ke WO ini (TKT-07).
+     *
+     * Menggantikan relasi lama `petugas()` `belongsTo` yang mengasumsikan
+     * 1 WO = 1 petugas. Setelah migration `workorder_petugas` + drop kolom
+     * `petugas_id`, hubungan WO ↔ user bersifat many-to-many via tabel
+     * pivot `workorder_petugas`.
+     *
+     * `withPivot('peran')` untuk menyimpan peran per-assignment (mis.
+     * "koordinator" / "anggota") — nullable untuk kompatibilitas backfill.
+     * Eager-load `pegawai` supaya response API bisa langsung menampilkan
+     * nama & NIP tiap petugas tanpa N+1 query.
+     *
+     * Breaking untuk FE Web (Next.js): response key berubah dari
+     * `petugas` (object) → `petugas_list` (array) via relasi ini.
+     */
+    public function petugasList()
     {
-        return $this->belongsTo(User::class, 'petugas_id')->with(['pegawai:id,nama,nip']);
+        return $this->belongsToMany(
+            User::class,
+            'workorder_petugas',
+            'workorder_id',
+            'user_id'
+        )
+            ->withPivot('peran')
+            ->withTimestamps()
+            ->with(['pegawai:id,nama,nip']);
     }
 
     public function status()
@@ -65,7 +89,8 @@ class Workorder extends Model
     public function latestFreeze()
     {
         return $this->hasOne(WorkorderAction::class, 'workorder_id')
-            ->where('action_id', 2)->latest();
+            ->whereHas('action', fn ($q) => $q->where('kode', 'FREEZE'))
+            ->latest();
     }
 
     public function progressWorkorder()

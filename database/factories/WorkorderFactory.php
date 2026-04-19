@@ -3,8 +3,6 @@
 namespace Database\Factories;
 
 use App\Models\MasterLocation;
-use App\Models\User;
-use App\Models\Workorder;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class WorkorderFactory extends Factory
@@ -16,9 +14,14 @@ class WorkorderFactory extends Factory
      */
     public function definition()
     {
-        // Ambil random MasterLocation untuk mendapatkan koordinat dan location_id
         $location = MasterLocation::inRandomOrder()->first();
-        
+
+        // TKT-07: kolom `petugas_id` sudah di-drop — relasi WO ↔ petugas
+        // sekarang lewat pivot `workorder_petugas`. Factory ini hanya
+        // membuat baris WO; attach petugas dilakukan terpisah via
+        // `->hasAttached(...)` atau `$workorder->petugasList()->attach([...])`
+        // di seeder/tes yang memanggil factory. Dibiarkan ringkas supaya
+        // factory tidak memaksakan asumsi soal user/petugas tertentu.
         return [
             'judul_pekerjaan' => $this->faker->jobTitle(),
             'waktu_penugasan' => $this->faker->dateTimeThisMonth(),
@@ -28,8 +31,7 @@ class WorkorderFactory extends Factory
             'longitude' => $location?->longitude ?? $this->faker->longitude(),
             'latitude' => $location?->latitude ?? $this->faker->latitude(),
             'location_id' => $location?->id,
-            'petugas_id' => $this->faker->numberBetween(4, 5), // Users 4 (David) and 5 (Budi) are employees
-            'pic_id' => $this->faker->numberBetween(1, 3),   // Users 1-3 are Admin/Managers
+            'pic_id' => $this->faker->numberBetween(1, 3),
             'status_id' => $this->faker->numberBetween(1, 8),
             'jenis_workorder_id' => $this->faker->numberBetween(1, 5),
             'jenis_lokasi_id' => $this->faker->numberBetween(1, 2),
