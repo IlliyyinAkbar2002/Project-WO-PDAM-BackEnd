@@ -53,7 +53,7 @@ class FormWorkorderController extends Controller
             $validator = Validator::make($request->all(), [
                 "jenis_workorder_id" =>
                     "required|integer|exists:m_jenis_workorder,id",
-                "kpi_id" => "required|integer|exists:master_kpi,id",
+                "kpi_id" => "required|integer|exists:m_kpi,id",
                 "nama_field" => "required|string|max:255",
                 "tipe_field" => "required|string",
                 "tipe_data" => "nullable|string",
@@ -140,7 +140,7 @@ class FormWorkorderController extends Controller
             $validator = Validator::make($request->all(), [
                 "jenis_workorder_id" =>
                     "required|integer|exists:m_jenis_workorder,id",
-                "kpi_id" => "required|integer|exists:master_kpi,id",
+                "kpi_id" => "required|integer|exists:m_kpi,id",
                 "nama_field" => "required|string|max:255",
                 "tipe_field" => "required|string",
                 "tipe_data" => "nullable|string",

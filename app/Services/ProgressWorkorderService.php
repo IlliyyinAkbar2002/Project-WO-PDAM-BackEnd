@@ -135,9 +135,9 @@ class ProgressWorkorderService
         $kode = optional($progress->tipeProgress)->kode;
 
         if ($kode === 'MULAI') {
-            $progress->workorder->update(['status_id' => 7]);
+            $progress->workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
         } elseif ($kode === 'SELESAI') {
-            $progress->workorder->update(['status_id' => 5]);
+            $progress->workorder->update(['status_id' => $this->statusId('PENGECEKAN')]);
         }
     }
 }

@@ -5,14 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class MasterKpi extends Model
+class WoMeter extends Model
 {
     use HasFactory;
-    protected $table = 'm_kpi';
+
+    protected $table = 'wo_meter';
+
     protected $guarded = [];
 
-    public function formWorkorder()
+    public function workorder()
     {
-        return $this->hasMany(FormWorkorder::class, 'kpi_id');
+        return $this->belongsTo(Workorder::class, 'workorder_id');
     }
 }

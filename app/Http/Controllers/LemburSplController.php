@@ -91,22 +91,13 @@ class LemburSplController extends Controller
 
                 if ((int) $validatedData['status_id'] === 2 && (int) $previousStatusId !== 2) {
                     (new ProgressWorkorderService())->createInitialProgress($lemburSpl->workorder->id);
-
-                    // Resolve action via slug `kode` supaya tidak bergantung
-                    // pada id numerik master action yang bisa berubah.
                     $penugasanActionId = MasterAction::where('kode', 'PENUGASAN')->value('id');
-
-                    // TKT-06: pelaku aksi PENUGASAN tetap SPV yang membuat
-                    // WO (`pic_id`) — bukan verifikator lembur — agar
-                    // konsisten dengan jalur penugasan normal di
-                    // `WorkorderService::createWorkorders`. Verifikator SPL
-                    // sudah tercatat terpisah di `lembur_spl.verifikator_id`.
                     (new WorkorderActionService())->createAction([
                         'workorder_id' => $lemburSpl->workorder->id,
                         'action_id' => $penugasanActionId,
-                        'actor_id' => $lemburSpl->workorder->pic_id,
+                        'actor_id' => $lemburSpl->workorder->assigned_to,
                         'keterangan' => 'Penugasan awal',
-                        'waktu_mulai' => $lemburSpl->workorder->waktu_penugasan,
+                        'waktu_mulai' => $lemburSpl->workorder->tanggal_mulai,
                         'estimasi_selesai' => $lemburSpl->workorder->estimasi_selesai,
                     ]);
                 }

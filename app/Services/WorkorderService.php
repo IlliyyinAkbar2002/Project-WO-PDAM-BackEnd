@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\LemburSpl;
 use App\Models\MasterAction;
+use App\Models\Status;
 use App\Models\Workorder;
 use Illuminate\Support\Facades\DB;
 
@@ -34,32 +35,43 @@ class WorkorderService
       $penugasanActionId = $this->ensureDefaultActionExists();
 
       $lemburSplId = null;
-      $statusId    = 2;
+      $statusId    = $this->statusIdByKode('DITUGASKAN_KE_SPV')
+        ?? $this->statusIdByKode('DISETUJUI')
+        ?? Status::query()->min('id');
+      $assignedTo  = (int) ($data['assigned_to'] ?? $data['pic_id']);
 
       if ((int) $data['tipe_workorder_id'] === 2) {
         $lemburSpl = LemburSpl::create([
-          'status_id'       => 1,
+          'status_id'       => $statusId,
           'waktu_pengajuan' => now(),
         ]);
         $lemburSplId = $lemburSpl->id;
-        $statusId    = 1;
       }
 
       $workorder = Workorder::create([
-        'judul_pekerjaan'    => $data['judul_pekerjaan'],
-        'waktu_penugasan'    => $data['waktu_penugasan'],
+        'nama_workorder'     => $data['nama_workorder'] ?? $data['judul_pekerjaan'],
+        'deskripsi'          => $data['deskripsi'] ?? null,
+        'tanggal_mulai'      => $data['tanggal_mulai'] ?? $data['waktu_penugasan'],
+        'tanggal_laporan'    => $data['tanggal_laporan'] ?? null,
         'estimasi_durasi'    => $data['estimasi_durasi'],
         'unit_waktu'         => $data['unit_waktu'],
         'estimasi_selesai'   => $data['estimasi_selesai'],
+        'tanggal_selesai'    => $data['tanggal_selesai'] ?? null,
+        'lokasi'             => $data['lokasi'] ?? null,
         'longitude'          => $data['longitude'] ?? null,
         'latitude'           => $data['latitude'] ?? null,
         'location_id'        => $data['location_id'] ?? null,
-        'pic_id'             => $data['pic_id'],
+        'assigned_to'        => $assignedTo,
+        'created_by_user_id' => $data['created_by_user_id'] ?? null,
         'lembur_spl_id'      => $lemburSplId,
         'status_id'          => $statusId,
         'jenis_workorder_id' => $data['jenis_workorder_id'],
         'jenis_lokasi_id'    => $data['jenis_lokasi_id'],
         'tipe_workorder_id'  => $data['tipe_workorder_id'],
+        'departemen_id'      => $data['departemen_id'] ?? null,
+        'pengaduan_id'       => $data['pengaduan_id'] ?? null,
+        'kpi_id'             => $data['kpi_id'] ?? null,
+        'prioritas'          => $data['prioritas'] ?? null,
       ]);
 
       // Attach multi-petugas ke pivot `workorder_petugas`. Memakai
@@ -71,22 +83,17 @@ class WorkorderService
         $workorder->petugasList()->syncWithoutDetaching($petugasIds);
       }
 
-      if ($statusId === 2) {
-        (new ProgressWorkorderService())->createInitialProgress($workorder->id);
-
-        // TKT-06: pelaku aksi PENUGASAN = SPV yang membuat WO (pic_id).
-        // Tidak memakai auth()->id() di sini karena service ini bisa juga
-        // dijalankan dari konteks non-request (mis. job/artisan) — pic_id
-        // sudah pasti valid dari validator WorkorderController::store.
-        (new WorkorderActionService())->createAction([
-          'workorder_id'     => $workorder->id,
-          'action_id'        => $penugasanActionId,
-          'actor_id'         => $data['pic_id'],
-          'keterangan'       => 'Penugasan awal',
-          'waktu_mulai'      => $data['waktu_penugasan'],
-          'estimasi_selesai' => $data['estimasi_selesai'],
-        ]);
-      }
+      // Flow baru: saat create WO oleh Superadmin, WO masih pada tahap
+      // DITUGASKAN_KE_SPV. Progress awal belum di-spawn dan assignment staff
+      // belum wajib terjadi di tahap ini.
+      (new WorkorderActionService())->createAction([
+        'workorder_id'     => $workorder->id,
+        'action_id'        => $penugasanActionId,
+        'actor_id'         => $data['created_by_user_id'] ?? $assignedTo,
+        'keterangan'       => 'Superadmin membuat WO dan menugaskan SPV',
+        'waktu_mulai'      => $data['tanggal_mulai'] ?? $data['waktu_penugasan'],
+        'estimasi_selesai' => $data['estimasi_selesai'],
+      ]);
 
       // Kontrak lama: mengembalikan array of workorders. Setelah TKT-07
       // tinggal 1 elemen karena WO tidak lagi di-duplikasi per petugas.
@@ -120,5 +127,10 @@ class WorkorderService
     );
 
     return (int) $action->id;
+  }
+
+  private function statusIdByKode(string $kode): ?int
+  {
+    return Status::where('kode', $kode)->value('id');
   }
 }

@@ -233,16 +233,7 @@ class DatabaseSeeder extends Seeder
         MasterKpi::factory(10)->create();
         JenisLokasi::factory(2)->create();
         TipeWorkorder::factory(2)->create();
-        // Master data aksi wajib diseed SEBELUM JenisWorkorder:
-        // WorkorderService::createWorkorders() selalu insert workorder_action
-        // dengan kode = 'PENUGASAN' saat membuat WO, sehingga m_action harus
-        // sudah terisi walaupun seeder JenisWorkorder gagal di tengah jalan.
-        // Factory mengisi 4 row default: PENUGASAN, FREEZE, RESUME, EXTEND.
         MasterAction::factory(4)->create();
-
-        // Master tipe progres (MULAI / PROGRESS / SELESAI). Sudah di-seed
-        // inline lewat migration, tapi seeder ini idempotent dan berfungsi
-        // sebagai jaring pengaman saat dijalankan terpisah / setelah refresh.
         $this->call(TipeProgressSeeder::class);
 
         JenisWorkorder::factory(10)->create();

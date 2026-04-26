@@ -11,6 +11,9 @@ class ProgressWorkorder extends Model
 
     protected $table = 'progress_workorder';
     protected $guarded = [];
+    protected $casts = [
+        'field_to_revise' => 'array',
+    ];
 
     public function detailProgress()
     {
@@ -62,6 +65,12 @@ class ProgressWorkorder extends Model
     public function submitter()
     {
         return $this->belongsTo(User::class, 'submitted_by_user_id')
+            ->with(['pegawai:id,nama,nip']);
+    }
+
+    public function reviewer()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_user_id')
             ->with(['pegawai:id,nama,nip']);
     }
 }

@@ -62,14 +62,22 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('workorder', WorkorderController::class);
+        Route::post('workorder/{id}/approve', [WorkorderController::class, 'approve']);
+        Route::post('workorder/{id}/reject', [WorkorderController::class, 'reject']);
+        Route::post('workorder/{id}/assign-staff', [WorkorderController::class, 'assignStaff']);
 
 
         Route::get('workorder-action',  [WorkorderActionController::class, 'index']);
         Route::post('workorder-action', [WorkorderActionController::class, 'store']);
 
-        Route::apiResource('progress-workorder', ProgressWorkorderController::class);
-        Route::apiResource('detail-progress',    DetailProgressController::class);
         Route::post('progress-workorder/manual-run', [ProgressWorkorderController::class, 'manualRun']);
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/start', [ProgressWorkorderController::class, 'start']);
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/submit', [ProgressWorkorderController::class, 'submit']);
+        // Compatibility layer: terima method override legacy (_method PUT/PATCH) dari client lama.
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/review', [ProgressWorkorderController::class, 'review']);
+        Route::apiResource('progress-workorder', ProgressWorkorderController::class)
+            ->whereNumber('progress_workorder');
+        Route::apiResource('detail-progress',    DetailProgressController::class);
 
         Route::apiResource('lembur-spl', LemburSplController::class);
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);

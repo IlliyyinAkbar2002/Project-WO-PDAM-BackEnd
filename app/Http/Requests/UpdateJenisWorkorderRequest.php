@@ -28,7 +28,7 @@ class UpdateJenisWorkorderRequest extends FormRequest
             'nama' => 'required|string|max:255|unique:m_jenis_workorder,nama,' . $this->route('jenis_workorder'),
             'form_workorder' => 'required|array|min:1',
             'form_workorder.*.id' => 'required|integer',
-            'form_workorder.*.kpi_id' => 'required|integer|exists:master_kpi,id',
+            'form_workorder.*.kpi_id' => 'required|integer|exists:m_kpi,id',
             'form_workorder.*.nama_field' => 'required|string|max:255',
             'form_workorder.*.tipe_field' => 'required|string|in:text,dropdown,image,date',
             'form_workorder.*.tipe_data' => 'nullable|string|in:string,integer,float',

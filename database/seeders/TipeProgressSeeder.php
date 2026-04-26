@@ -23,6 +23,8 @@ class TipeProgressSeeder extends Seeder
             ['id' => 1, 'kode' => 'MULAI',    'nama' => 'Mulai'],
             ['id' => 2, 'kode' => 'PROGRESS', 'nama' => 'Progress'],
             ['id' => 3, 'kode' => 'SELESAI',  'nama' => 'Selesai'],
+            ['id' => 4, 'kode' => 'REVISI',   'nama' => 'Revisi'],
+            ['id' => 5, 'kode' => 'DITOLAK',  'nama' => 'Ditolak'],
         ];
 
         foreach ($rows as $row) {

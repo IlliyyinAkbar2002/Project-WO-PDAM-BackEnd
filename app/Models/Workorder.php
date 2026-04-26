@@ -19,7 +19,12 @@ class Workorder extends Model
 
     public function pic()
     {
-        return $this->belongsTo(User::class, 'pic_id')->with(['pegawai:id,nama,nip']);
+        return $this->belongsTo(User::class, 'assigned_to')->with(['pegawai:id,nama,nip']);
+    }
+
+    public function assignedTo()
+    {
+        return $this->belongsTo(User::class, 'assigned_to')->with(['pegawai:id,nama,nip']);
     }
 
     /**
@@ -61,6 +66,16 @@ class Workorder extends Model
         return $this->belongsTo(JenisWorkorder::class, 'jenis_workorder_id');
     }
 
+    public function pengaduan()
+    {
+        return $this->belongsTo(Pengaduan::class, 'pengaduan_id');
+    }
+
+    public function departemen()
+    {
+        return $this->belongsTo(Departemen::class, 'departemen_id');
+    }
+
     public function tipeWorkorder()
     {
         return $this->belongsTo(TipeWorkorder::class, 'tipe_workorder_id');
@@ -96,5 +111,25 @@ class Workorder extends Model
     public function progressWorkorder()
     {
         return $this->hasMany(ProgressWorkorder::class, 'workorder_id');
+    }
+
+    public function woMeter()
+    {
+        return $this->hasOne(WoMeter::class, 'workorder_id');
+    }
+
+    public function woJaringan()
+    {
+        return $this->hasOne(WoJaringan::class, 'workorder_id');
+    }
+
+    public function woInfrastruktur()
+    {
+        return $this->hasOne(WoInfrastruktur::class, 'workorder_id');
+    }
+
+    public function laporanWorkorder()
+    {
+        return $this->hasOne(LaporanWorkorder::class, 'workorder_id');
     }
 }
