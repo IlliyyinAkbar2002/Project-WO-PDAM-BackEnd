@@ -28,26 +28,31 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        MasterLocation::factory(1)->create([
-            'nama' => 'PDAM Surya Sembada Kota Surabaya',
-            'latitude' => -7.2654798,
-            'longitude' => 112.754074,
-            'radius_meter' => 100,
-        ]);
-        
-        MasterLocation::factory(1)->create([
-            'nama' => 'Ciputra World Surabaya',
-            'latitude' => -7.2925952,
-            'longitude' => 112.7200837,
-            'radius_meter' => 150,
-        ]);
-        
-        MasterLocation::factory(1)->create([
-            'nama' => 'Telkom Universitas Surabaya',
-            'latitude' => -7.3111665,
-            'longitude' => 112.728915,
-            'radius_meter' => 200,
-        ]);
+        MasterLocation::updateOrCreate(
+            ['nama' => 'PERUMDA Air Minum Surya Sembada Kota Surabaya'],
+            [
+                'latitude' => -7.2654798,
+                'longitude' => 112.754074,
+                'radius_meter' => 50,
+            ]
+        );
+        MasterLocation::updateOrCreate(
+            ['nama' => 'PDAM IPAM Karangpilang'],
+            [
+                'latitude' => -7.347395836428751,
+                'longitude' => 112.6821334744601,
+                'radius_meter' => 100,
+            ]
+        );
+        MasterLocation::updateOrCreate(
+            ['nama' => 'PDAM Ngagel Tirto'],
+            [
+                'latitude' => -7.299541498200452,
+                'longitude' => 112.74518509673882,
+                'radius_meter' => 150,
+            ]
+        );
+
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
         Role::factory(3)->create();

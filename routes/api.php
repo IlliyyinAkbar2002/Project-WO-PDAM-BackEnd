@@ -15,6 +15,7 @@ use App\Http\Controllers\DetailProgressController;
 use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
+use App\Http\Controllers\PengaduanController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -63,6 +64,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('lembur-spl', LemburSplController::class);
         Route::post('lembur-spl', [LemburSplController::class, 'store']);
         Route::put('lembur-spl/{id}', [LemburSplController::class, 'update']);
+
+        // Pengaduan
+        Route::apiResource('pengaduan', PengaduanController::class);
 
         // Jenis Work Order
         Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
