@@ -4,6 +4,14 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * Response serializer untuk master Jenis Workorder.
+ *
+ * Revisi Mei 2026: Field `form_workorder` / `detail_form` (EAV lama) di-DROP.
+ * Sekarang Jenis WO hanya mengekspos `nama` + `kategori_form`. Schema field
+ * kategori yang sebenarnya (nomor_meter, diameter_pipa, dsb.) tinggal di
+ * tabel `wo_meter` / `wo_jaringan` / `wo_infrastruktur`.
+ */
 class JenisWorkorderResource extends JsonResource
 {
     /**
@@ -15,45 +23,9 @@ class JenisWorkorderResource extends JsonResource
     public function toArray($request)
     {
         return [
-            'id' => $this->id,
-            'nama' => $this->nama,
-            'form_workorder' => FormWorkorderResource::collection($this->formWorkorder),
-        ];
-    }
-}
-
-class FormWorkorderResource extends JsonResource
-{
-    public function toArray($request)
-    {
-        return [
-            'id' => $this->id,
-            'kpi_id' => $this->kpi_id,
-            'nama_field' => $this->nama_field,
-            'tipe_data' => $this->tipe_data,
-            'unit_satuan' => $this->unit_satuan,
-            'min' => $this->min,
-            'max' => $this->max,
-            'tipe_field' => $this->tipe_field,
-            'sifat' => $this->sifat,
-            'keterangan' => $this->keterangan,
-            'hint_text' => $this->hint_text,
-            'parent' => $this->parent,
-            'order' => $this->order,
-            'detail_form' => DetailFormResource::collection($this->detailForm),
-        ];
-    }
-}
-
-class DetailFormResource extends JsonResource
-{
-    public function toArray($request)
-    {
-        return [
-            'id' => $this->id,
-            'nama_opsi' => $this->nama_opsi,
-            'parent' => $this->parent,
-            'order' => $this->order,
+            'id'            => $this->id,
+            'nama'          => $this->nama,
+            'kategori_form' => $this->kategori_form,
         ];
     }
 }

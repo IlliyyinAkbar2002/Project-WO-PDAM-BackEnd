@@ -2,76 +2,45 @@
 
 namespace Database\Factories;
 
-use App\Models\DetailForm;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * Factory untuk JenisWorkorder.
+ *
+ * Revisi Mei 2026: afterCreating() yang dulu spawn baris DetailForm (EAV)
+ * sudah di-hapus — tabel `detail_form` dan `form_workorder` di-drop. Sekarang
+ * factory cukup isi `nama` + `kategori_form` (diputar round-robin supaya
+ * seeder selalu menghasilkan kombinasi 3 meter / 4 jaringan / 3 infrastruktur
+ * sesuai mapping di .cursor/ERD_Physical.dbml #6).
+ */
 class JenisWorkorderFactory extends Factory
 {
     /**
-     * Define the model's default state.
+     * Mapping nama jenis → kategori_form, sesuai .cursor/ERD_Physical.dbml
+     * catatan implementasi #6. Di-konsumsi round-robin oleh definition().
      *
-     * @return array
+     * @var array<int, array{nama: string, kategori_form: string}>
      */
+    private static array $starter = [
+        ['nama' => 'Pemasangan Meter Baru',  'kategori_form' => 'meter'],
+        ['nama' => 'Pergantian Meter',       'kategori_form' => 'meter'],
+        ['nama' => 'Kalibrasi Meteran',      'kategori_form' => 'meter'],
+        ['nama' => 'Perbaikan Pipa Bocor',   'kategori_form' => 'jaringan'],
+        ['nama' => 'Pemasangan Pipa Baru',   'kategori_form' => 'jaringan'],
+        ['nama' => 'Pergantian Pipa Lama',   'kategori_form' => 'jaringan'],
+        ['nama' => 'Pembersihan Saluran',    'kategori_form' => 'jaringan'],
+        ['nama' => 'Pemeliharaan Pompa',     'kategori_form' => 'infrastruktur'],
+        ['nama' => 'Pemeliharaan Reservoir', 'kategori_form' => 'infrastruktur'],
+        ['nama' => 'Inspeksi Rutin Aset',    'kategori_form' => 'infrastruktur'],
+    ];
+
     public function definition()
     {
-        static $names = [
-            "Perbaikan Pipa",
-            "Pemasangan Meteran",
-            "Inspeksi Jaringan",
-            "Penggantian Meteran",
-            "Pembersihan Saluran",
-            "Pemeliharaan Pompa",
-            "Pengaduan Pelanggan",
-            "Penanganan Kebocoran",
-            "Instalasi Baru",
-            "Kalibrasi Meteran",
+        $row = array_shift(self::$starter) ?? [
+            'nama'          => $this->faker->unique()->words(3, true),
+            'kategori_form' => $this->faker->randomElement(['meter', 'jaringan', 'infrastruktur']),
         ];
-        $nama = array_shift($names);
 
-        return [
-            'nama' => $nama,
-        ];
-    }
-
-    /**
-     * Configure the model factory.
-     * Auto-create minimal detail_form setelah JenisWorkorder dibuat
-     * untuk memastikan data valid (tidak kosong).
-     */
-    public function configure()
-    {
-        return $this->afterCreating(function ($jenisWorkorder) {
-            // Create default detail_form dengan dropdown "Hasil Pengerjaan"
-            $detailForm = DetailForm::create([
-                'jenis_workorder_id' => $jenisWorkorder->id,
-                'nama_field' => 'Hasil Pengerjaan',
-                'tipe_field' => 'dropdown',
-                'tipe_data' => 'string',
-                'sifat' => 'required',
-                'hint_text' => 'Pilih status hasil pengerjaan',
-                'order' => 0,
-                'parent' => 0,
-                'keterangan' => null,
-                'unit_satuan' => null,
-                'min' => null,
-                'max' => null,
-            ]);
-
-            // Create detail_form untuk catatan (optional)
-            DetailForm::create([
-                'jenis_workorder_id' => $jenisWorkorder->id,
-                'nama_field' => 'Catatan',
-                'tipe_field' => 'textarea',
-                'tipe_data' => 'string',
-                'sifat' => 'optional',
-                'hint_text' => 'Catatan tambahan (opsional)',
-                'order' => 1,
-                'parent' => 0,
-                'keterangan' => null,
-                'unit_satuan' => null,
-                'min' => null,
-                'max' => null,
-            ]);
-        });
+        return $row;
     }
 }

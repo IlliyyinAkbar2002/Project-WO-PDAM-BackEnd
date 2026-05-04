@@ -62,14 +62,19 @@ Authorization: Bearer YOUR_TOKEN_HERE
 | Jenis Workorder | `/v1/jenis-workorder` | GET, POST, PUT, DELETE |
 | Jenis Lokasi | `/v1/jenis-lokasi` | GET, POST, PUT, DELETE |
 | Progress Workorder | `/v1/progress-workorder` | GET, POST, PUT, DELETE |
-| Detail Progress | `/v1/detail-progress` | GET, POST, PUT, DELETE |
 | Lembur SPL | `/v1/lembur-spl` | GET, POST, PUT |
 | KPI | `/v1/kpi` | GET |
 | User | `/v1/user` | GET |
 | Pegawai | `/v1/pegawai` | GET |
 | Master Location | `/v1/master-location` | GET, POST |
 | Workorder Action | `/v1/workorder-action` | GET |
-| Detail Form | `/v1/detail-form` | GET |
+
+> **Revisi Mei 2026:** Endpoint legacy `/v1/detail-progress`, `/v1/detail-form`,
+> `/v1/jenis-workorder/{id}/form-workorder`, dan variannya sudah DIHAPUS.
+> Tabel EAV di-drop; form WO sekarang pakai tabel kategori statis
+> (`wo_meter` / `wo_jaringan` / `wo_infrastruktur`). Schema field yang harus
+> di-render FE Mobile akan diserve lewat endpoint baru
+> `GET /v1/jenis-workorder/{id}/schema` (ticket terpisah).
 
 ---
 

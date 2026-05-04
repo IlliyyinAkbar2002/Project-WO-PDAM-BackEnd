@@ -15,11 +15,6 @@ class ProgressWorkorder extends Model
         'field_to_revise' => 'array',
     ];
 
-    public function detailProgress()
-    {
-        return $this->hasMany(DetailProgress::class, 'progress_workorder_id');
-    }
-
     public function workorder()
     {
         return $this->belongsTo(Workorder::class, 'workorder_id');

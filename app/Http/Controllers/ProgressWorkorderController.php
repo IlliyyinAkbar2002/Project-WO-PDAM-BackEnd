@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\DetailForm;
-use App\Models\DetailProgress;
 use App\Models\ProgressWorkorder;
 use App\Models\Status;
 use App\Models\TipeProgress;
@@ -305,19 +303,18 @@ class ProgressWorkorderController extends Controller
         $progressWorkorder = ProgressWorkorder::with('tipeProgress')->findOrFail($id);
         $kodeTipe = optional($progressWorkorder->tipeProgress)->kode;
 
+        // Revisi Mei 2026: Blok `detail_progress` (EAV lama) sudah DIHAPUS.
+        // Tabel detail_progress + detail_form di-drop. Field hasil akhir
+        // pengerjaan untuk tipe SELESAI sekarang di-UPDATE langsung ke
+        // wo_meter / wo_jaringan / wo_infrastruktur — lihat Flow_WO Tahap 8.
+        // Endpoint terpisah untuk update field tabel kategori akan disediakan
+        // di ticket yang sama (belum diimplementasi di revisi ini).
         $rules = [
             'hasil_pengerjaan' => 'required|string|max:255',
-            'waktu_submit' => 'required|date',
-            'foto' => 'required|array|min:1',
-            'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+            'waktu_submit'     => 'required|date',
+            'foto'             => 'required|array|min:1',
+            'foto.*'           => 'image|mimes:jpeg,png,jpg|max:2048',
         ];
-
-        if ($kodeTipe === 'SELESAI') {
-            $rules['detail_progress'] = 'nullable|array';
-            $rules['detail_progress.*.detail_form_id'] = 'required_if:detail_progress,array|integer|exists:detail_form,id';
-            $rules['detail_progress.*.value'] = 'nullable';
-            $rules['detail_progress_images.*'] = 'nullable|image|mimes:jpeg,png,jpg|max:2048';
-        }
 
         $validatedData = $request->validate($rules);
 
@@ -329,7 +326,6 @@ class ProgressWorkorderController extends Controller
                 'submitted_by_user_id' => optional($request->user())->id,
             ]);
 
-            // Simpan foto (array)
             if ($request->hasFile('foto')) {
                 foreach ($request->file('foto') as $file) {
                     $path = $file->store('dokumentasi_progress', 'public');
@@ -337,38 +333,10 @@ class ProgressWorkorderController extends Controller
                 }
             }
 
-            // Proses detail_progress untuk tipe SELESAI
-            if ($kodeTipe === 'SELESAI' && isset($validatedData['detail_progress'])) {
-                foreach ($validatedData['detail_progress'] as $item) {
-                    $detailForm = DetailForm::findOrFail($item['detail_form_id']);
-                    $value = $item['value'] ?? null;
-
-                    if ($detailForm->tipe_field === 'image') {
-                        // Simpan satu gambar dari detail_progress_images[detail_form_id]
-                        if ($request->hasFile("detail_progress_images.{$item['detail_form_id']}")) {
-                            $file = $request->file("detail_progress_images.{$item['detail_form_id']}");
-                            $value = $file->store('detail_progress_images', 'public');
-                            Log::info("🖼️ Saved image for detail_form_id {$item['detail_form_id']}: $value");
-                        } else {
-                            $value = null; // Flutter tangani mandatory
-                        }
-                    }
-
-                    // Update detail_progress
-                    DetailProgress::where('progress_workorder_id', $id)
-                        ->where('detail_form_id', $item['detail_form_id'])
-                        ->update(['value' => $value]);
-                }
-            }
-
             (new ProgressWorkorderService())->updateStatusOnSubmit($progressWorkorder->id);
 
             DB::commit();
-            return response()->json($progressWorkorder->load('dokumentasiProgress', 'detailProgress'), 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Update error:', ['error' => $e->getMessage()]);
-            return response()->json(['error' => 'Terjadi kesalahan saat memperbarui data'], 500);
+            return response()->json($progressWorkorder->load('dokumentasiProgress'), 200);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Update error:', ['error' => $e->getMessage()]);

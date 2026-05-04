@@ -167,14 +167,22 @@ This refactoring implements a **multi-client API architecture** to support both 
 | Jenis Workorder | GET, POST, PUT, DELETE | `/api/v1/jenis-workorder` |
 | Jenis Lokasi | GET, POST, PUT, DELETE | `/api/v1/jenis-lokasi` |
 | Progress Workorder | GET, POST, PUT, DELETE | `/api/v1/progress-workorder` |
-| Detail Progress | GET, POST, PUT, DELETE | `/api/v1/detail-progress` |
 | Lembur SPL | GET, POST, PUT | `/api/v1/lembur-spl` |
 | KPI | GET | `/api/v1/kpi` |
 | User | GET | `/api/v1/user` |
 | Pegawai | GET | `/api/v1/pegawai` |
 | Master Location | GET, POST | `/api/v1/master-location` |
 | Workorder Action | GET | `/api/v1/workorder-action` |
-| Detail Form | GET | `/api/v1/detail-form` |
+
+> **Revisi Mei 2026 — Breaking change untuk FE:** Endpoint legacy EAV form
+> (`/api/v1/detail-progress`, `/api/v1/detail-form`,
+> `/api/v1/jenis-workorder/{id}/form-workorder` + semua variannya)
+> sudah dihapus. Tabel DB `form_workorder`, `detail_form`, `detail_progress`
+> di-drop. Form WO pindah ke tabel kategori statis (`wo_meter` /
+> `wo_jaringan` / `wo_infrastruktur`) yang di-INSERT oleh SPV via
+> `POST /api/v1/workorder/{id}/assign-staff`. Endpoint pengganti untuk
+> fetch schema field kategori: `GET /api/v1/jenis-workorder/{id}/schema`
+> (ticket terpisah, belum tersedia).
 
 #### **Utility Endpoints**
 

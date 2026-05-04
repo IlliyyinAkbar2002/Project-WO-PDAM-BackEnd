@@ -132,4 +132,16 @@ class Workorder extends Model
     {
         return $this->hasOne(LaporanWorkorder::class, 'workorder_id');
     }
+
+    /**
+     * Event assign WO oleh SPV (Tahap 5). 1:1 — 1 WO = 1 row assignment.
+     * Menjawab "kapan SPV melakukan assign?" tanpa JOIN ke workorder_action.
+     *
+     * Di-INSERT di transaction yang sama dengan wo_{kategori} +
+     * workorder_petugas saat SPV klik "Tugaskan".
+     */
+    public function workorderAssignment()
+    {
+        return $this->hasOne(WorkorderAssignment::class, 'workorder_id');
+    }
 }

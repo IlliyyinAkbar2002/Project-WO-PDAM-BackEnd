@@ -5,59 +5,45 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * Validation untuk Update master Jenis Workorder.
+ *
+ * Revisi Mei 2026: Skema form dinamis (`form_workorder.*` + `detail_form.*`)
+ * sudah di-drop. Sekarang Jenis WO hanya punya nama + kategori_form.
+ */
 class UpdateJenisWorkorderRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize()
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
     public function rules()
     {
         return [
-            'nama' => 'required|string|max:255|unique:m_jenis_workorder,nama,' . $this->route('jenis_workorder'),
-            'form_workorder' => 'required|array|min:1',
-            'form_workorder.*.id' => 'required|integer',
-            'form_workorder.*.kpi_id' => 'required|integer|exists:m_kpi,id',
-            'form_workorder.*.nama_field' => 'required|string|max:255',
-            'form_workorder.*.tipe_field' => 'required|string|in:text,dropdown,image,date',
-            'form_workorder.*.tipe_data' => 'nullable|string|in:string,integer,float',
-            'form_workorder.*.unit_satuan' => 'nullable|string|max:50',
-            'form_workorder.*.sifat' => 'required|string|in:mandatory,opsional',
-            'form_workorder.*.min' => 'nullable|integer',
-            'form_workorder.*.max' => 'nullable|integer',
-            'form_workorder.*.parent' => 'required|integer',
-            'form_workorder.*.keterangan' => 'nullable|string|max:255',
-            'form_workorder.*.hint_text' => 'required|string|max:50',
-            'form_workorder.*.order' => 'required|integer|min:1',
-            'form_workorder.*.detail_form' => 'nullable|array',
-            'form_workorder.*.detail_form.*.id' => 'required|integer',
-            'form_workorder.*.detail_form.*.nama_opsi' => 'required|string|max:255',
-            'form_workorder.*.detail_form.*.parent' => 'required|integer',
-            'form_workorder.*.detail_form.*.order' => 'required|integer|min:1',
+            'nama' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('m_jenis_workorder', 'nama')->ignore($this->route('jenis_workorder')),
+            ],
+            'kategori_form' => [
+                'sometimes',
+                'required',
+                'string',
+                Rule::in(['meter', 'jaringan', 'infrastruktur']),
+            ],
         ];
     }
 
     public function messages()
     {
         return [
-            'nama.required' => 'Nama jenis workorder wajib diisi.',
-            'nama.unique' => 'Nama jenis workorder sudah digunakan.',
-            'form_workorder.required' => 'Form workorder wajib diisi.',
-            'form_workorder.*.kpi_id.required' => 'KPI ID wajib dipilih.',
-            'form_workorder.*.kpi_id.exists' => 'KPI ID tidak valid.',
-            'form_workorder.*.nama_field.required' => 'Nama field wajib diisi.',
-            'form_workorder.*.detail_form.*.nama_opsi.required' => 'Nama opsi wajib diisi.',
+            'nama.required'          => 'Nama jenis workorder wajib diisi.',
+            'nama.unique'            => 'Nama jenis workorder sudah digunakan.',
+            'kategori_form.required' => 'Kategori form wajib diisi.',
+            'kategori_form.in'       => 'Kategori form harus salah satu dari: meter, jaringan, infrastruktur.',
         ];
     }
 }

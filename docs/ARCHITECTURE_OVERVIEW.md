@@ -86,8 +86,8 @@
 │                         Models Layer                                 │
 │                                                                      │
 │  ┌─────────┐  ┌─────────┐  ┌────────────┐  ┌──────────────────┐   │
-│  │  User   │  │Workorder│  │  Progress  │  │   DetailForm     │   │
-│  │         │  │         │  │            │  │                  │   │
+│  │  User   │  │Workorder│  │  Progress  │  │ WoMeter/Jaringan │   │
+│  │         │  │         │  │            │  │ /Infrastruktur   │   │
 │  └─────────┘  └─────────┘  └────────────┘  └──────────────────┘   │
 │                                                                      │
 └──────────────────────────────┬───────────────────────────────────────┘
@@ -99,13 +99,21 @@
 │                                                                      │
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │  Tables:                                                      │  │
-│  │  - users                    - m_workorder                     │  │
-│  │  - m_pegawai                - progress_workorder              │  │
-│  │  - m_role                   - detail_progress                 │  │
-│  │  - m_jenis_workorder        - dokumentasi_progress            │  │
-│  │  - m_jenis_lokasi           - personal_access_tokens          │  │
-│  │  - m_location               - lembur_spl                      │  │
+│  │  - users                    - workorder                       │  │
+│  │  - m_pegawai                - workorder_assignment            │  │
+│  │  - m_role                   - workorder_petugas               │  │
+│  │  - m_jenis_workorder        - progress_workorder              │  │
+│  │  - m_jenis_lokasi           - dokumentasi_progress            │  │
+│  │  - m_location               - wo_meter / wo_jaringan          │  │
+│  │  - m_status / m_action      - wo_infrastruktur                │  │
+│  │  - m_kpi / m_tipe_progress  - laporan_workorder               │  │
+│  │  - pengaduan / m_jenis_pengaduan                              │  │
+│  │  - personal_access_tokens  - lembur_spl                       │  │
 │  └──────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  Revisi Mei 2026: Tabel legacy pola EAV — form_workorder,           │
+│  detail_form, detail_progress — sudah DI-DROP. Form WO sekarang     │
+│  pakai Class Table Inheritance ke wo_{kategori}.                    │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```

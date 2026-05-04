@@ -2,11 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\DetailProgress;
 use App\Models\ProgressWorkorder;
 use App\Models\Status;
 use App\Models\TipeProgress;
-use App\Models\Workorder;
 use Illuminate\Support\Facades\DB;
 
 class ProgressWorkorderService
@@ -41,12 +39,16 @@ class ProgressWorkorderService
 
     public function createInitialProgress(int $workOrderId): void
     {
-        // Dibungkus transaction supaya kalau ada exception di tengah (mis.
-        // relasi `detailForm` sempat undefined seperti yang terjadi di
-        // tinker sebelum fix TKT-03), dua row progres "Mulai" & "Selesai"
-        // tidak terlanjur ter-commit menyisakan "dirty row" berstatus DRAFT.
+        // Dibungkus transaction supaya dua row progres "Mulai" & "Selesai"
+        // tidak terlanjur ter-commit kalau salah satu create gagal di tengah.
         // Laravel akan otomatis pakai savepoint kalau sudah ada transaction
         // luar (mis. WorkorderService::createWorkorders), jadi aman.
+        //
+        // Revisi Mei 2026: loop DetailProgress::create() sudah DIHAPUS — tabel
+        // `detail_form` + `detail_progress` di-drop, diganti Class Table
+        // Inheritance (wo_meter / wo_jaringan / wo_infrastruktur). Field hasil
+        // pengerjaan di-isi langsung ke tabel kategori oleh Staff saat klik
+        // "Selesai" di Tahap 8.
         DB::transaction(function () use ($workOrderId) {
             $statusDraftId = $this->statusId('DRAFT');
             $tipeMulaiId   = $this->tipeProgressId('MULAI');
@@ -59,24 +61,12 @@ class ProgressWorkorderService
                 'order'            => 0,
             ]);
 
-            $progressSelesai = ProgressWorkorder::create([
+            ProgressWorkorder::create([
                 'workorder_id'     => $workOrderId,
                 'tipe_progress_id' => $tipeSelesaiId,
                 'status_id'        => $statusDraftId,
                 'order'            => 1,
             ]);
-
-            $workorder = Workorder::with('jenisWorkorder.detailForm')->findOrFail($workOrderId);
-
-            $detailForms = $workorder->jenisWorkorder->detailForm;
-
-            foreach ($detailForms as $detailForm) {
-                DetailProgress::create([
-                    'progress_workorder_id' => $progressSelesai->id,
-                    'detail_form_id'        => $detailForm->id,
-                    'value'                 => '',
-                ]);
-            }
         });
     }
 

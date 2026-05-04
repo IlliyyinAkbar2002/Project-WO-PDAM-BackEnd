@@ -1,8 +1,6 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DetailFormController;
-use App\Http\Controllers\FormWorkorderController;
 use App\Http\Controllers\JenisLokasiController;
 use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
@@ -11,7 +9,6 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkorderActionController;
 use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
-use App\Http\Controllers\DetailProgressController;
 use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
@@ -77,7 +74,6 @@ Route::prefix('v1')->group(function () {
         Route::match(['post', 'put', 'patch'], 'progress-workorder/review', [ProgressWorkorderController::class, 'review']);
         Route::apiResource('progress-workorder', ProgressWorkorderController::class)
             ->whereNumber('progress_workorder');
-        Route::apiResource('detail-progress',    DetailProgressController::class);
 
         Route::apiResource('lembur-spl', LemburSplController::class);
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);
@@ -94,24 +90,12 @@ Route::prefix('v1')->group(function () {
             Route::patch('admin/pegawai/{id}/assign', [PegawaiController::class, 'assign']);
         });
 
-        Route::get('jenis-workorder/{id}/form-workorder',           [FormWorkorderController::class, 'index']);
-        Route::post('jenis-workorder/{id}/form-workorder',          [FormWorkorderController::class, 'store']);
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}',    [FormWorkorderController::class, 'show']);
-        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}',    [FormWorkorderController::class, 'update']);
-        Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'destroy']);
-
-        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form',           [DetailFormController::class, 'index']);
-        Route::post('jenis-workorder/{jenis_workorder_id}/detail-form',          [DetailFormController::class, 'store']);
-        Route::get('jenis-workorder/{jenis_workorder_id}/detail-form/{id}',      [DetailFormController::class, 'show']);
-        Route::put('jenis-workorder/{jenis_workorder_id}/detail-form/{id}',      [DetailFormController::class, 'update']);
-        Route::delete('jenis-workorder/{jenis_workorder_id}/detail-form/{id}',   [DetailFormController::class, 'destroy']);
-
-
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form',           [DetailFormController::class, 'index']);
-        Route::post('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form',          [DetailFormController::class, 'store']);
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}',      [DetailFormController::class, 'show']);
-        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}',      [DetailFormController::class, 'update']);
-        Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}',   [DetailFormController::class, 'destroy']);
+        // Route legacy pola EAV (form-workorder, detail-form, detail-progress)
+        // sudah DIHAPUS per Mei 2026. Diganti:
+        //   - Schema field kategori: tabel wo_meter / wo_jaringan / wo_infrastruktur
+        //     yang di-INSERT oleh SPV via POST /v1/workorder/{id}/assign-staff.
+        //   - Endpoint render form kosong (FE Mobile): lihat ticket
+        //     GET /v1/jenis-workorder/{id}/schema (belum dibuat, di ticket terpisah).
 
         Route::get('kpi', [KpiController::class, 'index']);
 

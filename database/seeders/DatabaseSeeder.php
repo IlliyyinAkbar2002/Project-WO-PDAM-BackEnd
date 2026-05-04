@@ -237,7 +237,7 @@ class DatabaseSeeder extends Seeder
         $this->call(TipeProgressSeeder::class);
 
         JenisWorkorder::factory(10)->create();
-        // Workorder::factory(10)->create(); 
-        // $this->call(DetailFormSeeder::class);
+        // Workorder::factory(10)->create();
+        // DetailFormSeeder dihapus per Mei 2026 (tabel detail_form di-drop).
     }
 }

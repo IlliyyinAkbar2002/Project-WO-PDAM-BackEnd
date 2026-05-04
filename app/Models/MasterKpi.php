@@ -11,8 +11,8 @@ class MasterKpi extends Model
     protected $table = 'm_kpi';
     protected $guarded = [];
 
-    public function formWorkorder()
+    public function workorder()
     {
-        return $this->hasMany(FormWorkorder::class, 'kpi_id');
+        return $this->hasMany(Workorder::class, 'kpi_id');
     }
 }
