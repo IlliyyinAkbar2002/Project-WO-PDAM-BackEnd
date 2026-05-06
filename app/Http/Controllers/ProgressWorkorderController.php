@@ -34,13 +34,13 @@ class ProgressWorkorderController extends Controller
         ]);
 
         $userId = optional($request->user())->id;
-        $workorder = Workorder::with('petugasList')->findOrFail($validated['workorder_id']);
+        $workorder = Workorder::with('assignmentMembers')->findOrFail($validated['workorder_id']);
         $allowedStatuses = array_filter([
             $this->statusId('DITUGASKAN_KE_STAFF'),
             $this->statusId('IN_PROGRESS'),
         ]);
 
-        if (! $workorder->petugasList->pluck('id')->contains($userId)) {
+        if (! $workorder->assignmentMembers->pluck('user_id')->contains($userId)) {
             return response()->json(['error' => 'User bukan petugas WO ini'], 403);
         }
 
@@ -106,9 +106,9 @@ class ProgressWorkorderController extends Controller
         }
 
         $userId = optional($request->user())->id;
-        $workorder = Workorder::with('petugasList')->findOrFail($validated['workorder_id']);
+        $workorder = Workorder::with('assignmentMembers')->findOrFail($validated['workorder_id']);
 
-        if (! $workorder->petugasList->pluck('id')->contains($userId)) {
+        if (! $workorder->assignmentMembers->pluck('user_id')->contains($userId)) {
             return response()->json(['error' => 'User bukan petugas WO ini'], 403);
         }
 

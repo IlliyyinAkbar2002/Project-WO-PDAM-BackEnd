@@ -10,6 +10,7 @@ class Workorder extends Model
     use HasFactory;
     protected $table = 'workorder';
     protected $guarded = [];
+    protected $appends = ['progres_persen'];
 
     protected $casts = [
         'latitude' => 'float',
@@ -28,32 +29,25 @@ class Workorder extends Model
     }
 
     /**
-     * Daftar petugas yang ditugaskan ke WO ini (TKT-07).
+     * Daftar anggota tim yang ditugaskan ke WO ini.
      *
-     * Menggantikan relasi lama `petugas()` `belongsTo` yang mengasumsikan
-     * 1 WO = 1 petugas. Setelah migration `workorder_petugas` + drop kolom
-     * `petugas_id`, hubungan WO ↔ user bersifat many-to-many via tabel
-     * pivot `workorder_petugas`.
+     * Menggantikan relasi lama `petugasList()` yang menggunakan tabel pivot
+     * `workorder_petugas`. Sekarang anggota tim disimpan di `wo_assignment_member`
+     * yang ter-relasi ke `workorder_assignment` (bukan langsung ke `workorder`).
      *
-     * `withPivot('peran')` untuk menyimpan peran per-assignment (mis.
-     * "koordinator" / "anggota") — nullable untuk kompatibilitas backfill.
-     * Eager-load `pegawai` supaya response API bisa langsung menampilkan
-     * nama & NIP tiap petugas tanpa N+1 query.
-     *
-     * Breaking untuk FE Web (Next.js): response key berubah dari
-     * `petugas` (object) → `petugas_list` (array) via relasi ini.
+     * Akses via: $workorder->workorderAssignment->members
+     * Atau gunakan helper ini untuk shortcut HasManyThrough.
      */
-    public function petugasList()
+    public function assignmentMembers()
     {
-        return $this->belongsToMany(
-            User::class,
-            'workorder_petugas',
-            'workorder_id',
-            'user_id'
-        )
-            ->withPivot('peran')
-            ->withTimestamps()
-            ->with(['pegawai:id,nama,nip']);
+        return $this->hasManyThrough(
+            WoAssignmentMember::class,
+            WorkorderAssignment::class,
+            'workorder_id',    // FK di workorder_assignment
+            'assignment_id',   // FK di wo_assignment_member
+            'id',              // PK di workorder
+            'id'               // PK di workorder_assignment
+        );
     }
 
     public function status()
@@ -143,5 +137,68 @@ class Workorder extends Model
     public function workorderAssignment()
     {
         return $this->hasOne(WorkorderAssignment::class, 'workorder_id');
+    }
+
+    /**
+     * Peminjaman material/aset untuk WO ini. Opsional — hanya ada
+     * kalau WO membutuhkan material.
+     */
+    public function peminjamanMaterial()
+    {
+        return $this->hasMany(WoPeminjamanMaterial::class, 'workorder_id');
+    }
+
+    /**
+     * Menghitung persentase progres secara dinamis menggunakan pendekatan hybrid:
+     * state-based (dari status_id) + time-based clamping (untuk IN_PROGRESS).
+     */
+    public function getProgresPersenAttribute(): int
+    {
+        $statusKode = optional($this->status)->kode;
+
+        // 0%: Belum dikerjakan oleh staff
+        if (in_array($statusKode, ['DITUGASKAN_KE_SPV', 'DISETUJUI', 'DITUGASKAN_KE_STAFF'])) {
+            return 0;
+        }
+
+        // 100%: Sudah di-approve final oleh SPV/Manager (tergantung alur)
+        if ($statusKode === 'SELESAI') {
+            return 100;
+        }
+
+        // 90%: Staff sudah klik Selesai, menunggu review SPV
+        if ($statusKode === 'PENGECEKAN') {
+            return 90;
+        }
+
+        // 10% - 80%: Dalam pengerjaan (linear interpolasi berdasarkan waktu)
+        if (in_array($statusKode, ['IN_PROGRESS', 'REVISI_REQUESTED', 'DITOLAK_SPV'])) {
+            if (!$this->tanggal_mulai || !$this->estimasi_selesai) {
+                return 50;
+            }
+
+            $start = \Illuminate\Support\Carbon::parse($this->tanggal_mulai);
+            $end = \Illuminate\Support\Carbon::parse($this->estimasi_selesai);
+            $now = \Illuminate\Support\Carbon::now();
+
+            $totalMinutes = $start->diffInMinutes($end, false);
+            if ($totalMinutes <= 0) {
+                return 50;
+            }
+
+            $elapsedMinutes = $start->diffInMinutes($now, false);
+            if ($elapsedMinutes < 0) {
+                $elapsedMinutes = 0; // belum mulai
+            }
+
+            $ratio = $elapsedMinutes / $totalMinutes;
+            if ($ratio > 1) {
+                $ratio = 1; // mentok di estimasi selesai
+            }
+
+            return (int) (10 + ($ratio * 70));
+        }
+
+        return 0;
     }
 }

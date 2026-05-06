@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 class WorkorderService
 {
   /**
-   * Membuat 1 workorder lalu attach N petugas via pivot `workorder_petugas`.
+   * Membuat 1 workorder. Petugas (staff) akan di-assign oleh SPV nanti
    *
    * Sebelum TKT-07: satu pengajuan dengan N petugas membuat **N row**
    * workorder (karena FK tunggal `workorder.petugas_id`). Efeknya: laporan
@@ -74,14 +74,9 @@ class WorkorderService
         'prioritas'          => $data['prioritas'] ?? null,
       ]);
 
-      // Attach multi-petugas ke pivot `workorder_petugas`. Memakai
-      // `syncWithoutDetaching` bukan `attach` supaya kalau — misalnya —
-      // FE tidak sengaja kirim id duplikat, insert tidak gagal di unique
-      // constraint. `array_unique` sebagai safety tambahan.
-      $petugasIds = array_values(array_unique(array_map('intval', $data['petugas_id'] ?? [])));
-      if (!empty($petugasIds)) {
-        $workorder->petugasList()->syncWithoutDetaching($petugasIds);
-      }
+      // Petugas tidak lagi di-attach saat create WO oleh Superadmin.
+      // Staff akan di-assign oleh SPV di tahap selanjutnya via
+      // workorder_assignment + wo_assignment_member.
 
       // Flow baru: saat create WO oleh Superadmin, WO masih pada tahap
       // DITUGASKAN_KE_SPV. Progress awal belum di-spawn dan assignment staff
@@ -100,7 +95,7 @@ class WorkorderService
       // Eager-load relasi utama supaya response langsung lengkap.
       return [
         $workorder->load(
-          'petugasList',
+          'assignmentMembers',
           'pic',
           'status',
           'jenisWorkorder',

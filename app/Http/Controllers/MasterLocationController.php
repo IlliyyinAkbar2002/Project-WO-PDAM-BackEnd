@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterLocation;
-use App\Models\UserLocations;
+// UserLocations removed — lokasi tracking sekarang di progress_workorder
 use Illuminate\Http\Request;
 // use function React\Promise\all;
 
@@ -21,7 +21,8 @@ class MasterLocationController extends Controller
             $userLocation = null;
             
             if ($request->user()) {
-                $userLocation = UserLocations::where('user_id', $request->user()->id)->latest()->first();
+                // user_locations dropped — lokasi sekarang di progress_workorder
+                $userLocation = null;
             }
 
             // tambahkan flag inside pada tiap master

@@ -12,6 +12,7 @@ use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
+use App\Http\Controllers\WoPeminjamanMaterialController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -102,6 +103,11 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('material', MaterialController::class);
         Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
         Route::put('material/{kode_material}/edit',    [MaterialController::class, 'edit']);
+
+        // Fitur Peminjaman & Pengembalian Material untuk Work Order
+        Route::get('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'index']);
+        Route::post('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'pinjam']);
+        Route::post('peminjaman-material/{id}/kembalikan', [WoPeminjamanMaterialController::class, 'kembalikan']);
     });
 });
 

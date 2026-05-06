@@ -42,4 +42,22 @@ class WorkorderAssignment extends Model
         return $this->belongsTo(User::class, 'spv_user_id')
             ->with(['pegawai:id,nama,nip']);
     }
+
+    /**
+     * Anggota tim yang ditugaskan untuk WO ini.
+     * Relasi 1:N dari workorder_assignment ke wo_assignment_member.
+     */
+    public function members()
+    {
+        return $this->hasMany(WoAssignmentMember::class, 'assignment_id');
+    }
+
+    /**
+     * PIC / koordinator tim (is_pic = true).
+     */
+    public function picMember()
+    {
+        return $this->hasOne(WoAssignmentMember::class, 'assignment_id')
+            ->where('is_pic', true);
+    }
 }

@@ -53,7 +53,7 @@ class WorkorderController extends Controller
             $sort = $request->query('sort', 'desc');
             $all = $request->query('all', false);
 
-            $query = Workorder::with('petugasList', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'location');
+            $query = Workorder::with('assignmentMembers', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'location');
 
             // Filter berdasarkan role authenticated user.
             $user = $request->user();
@@ -61,7 +61,7 @@ class WorkorderController extends Controller
             if ($user->role_id != 1) {
                 $query->where(function ($q) use ($user) {
                     $q->where('assigned_to', $user->id)
-                      ->orWhereHas('petugasList', fn ($qq) => $qq->where('users.id', $user->id));
+                      ->orWhereHas('assignmentMembers', fn ($qq) => $qq->where('user_id', $user->id));
                 });
             }
             
@@ -86,7 +86,7 @@ class WorkorderController extends Controller
                         ->orWhere('estimasi_durasi', 'ILIKE', "%{$search}%")
                         ->orWhere('unit_waktu', 'ILIKE', "%{$search}%")
                         ->orWhereHas(
-                            'petugasList.pegawai',
+                            'assignmentMembers.user.pegawai',
                             fn($q) =>
                             $q->where('nama', 'ILIKE', "%{$search}%")
                                 ->orWhere('nip', 'ILIKE', "%{$search}%")
@@ -108,7 +108,7 @@ class WorkorderController extends Controller
                 $query->where('assigned_to', $assignedTo);
             }
             if ($userId) {
-                $query->whereHas('petugasList', fn ($q) => $q->where('users.id', $userId));
+                $query->whereHas('assignmentMembers', fn ($q) => $q->where('user_id', $userId));
             }
             if ($dateRange) {
                 switch ($dateRange) {
@@ -233,7 +233,7 @@ class WorkorderController extends Controller
     public function show($id)
     {
         try {
-            $workorder = Workorder::with('petugasList', 'assignedTo', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'latestFreeze', 'location')->findOrFail($id);
+            $workorder = Workorder::with('assignmentMembers', 'assignedTo', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'latestFreeze', 'location')->findOrFail($id);
             return response()->json($workorder, 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -290,7 +290,7 @@ class WorkorderController extends Controller
 
         DB::beginTransaction();
         try {
-            $workorder = Workorder::with('jenisWorkorder', 'assignedTo.pegawai', 'petugasList')
+            $workorder = Workorder::with('jenisWorkorder', 'assignedTo.pegawai', 'workorderAssignment.members')
                 ->findOrFail($id);
 
             $statusSpv = $this->statusId('DITUGASKAN_KE_SPV');
@@ -304,7 +304,7 @@ class WorkorderController extends Controller
                 return response()->json(['error' => 'WO bukan pada status DITUGASKAN_KE_SPV'], 422);
             }
 
-            if ($workorder->petugasList()->exists()) {
+            if ($workorder->workorderAssignment && $workorder->workorderAssignment->members()->exists()) {
                 return response()->json(['error' => 'WO sudah pernah di-assign ke staff'], 422);
             }
 
@@ -315,13 +315,23 @@ class WorkorderController extends Controller
 
             $this->createKategoriForm($kategori, $workorder->id, $validated['form_kategori']);
 
-            $syncPayload = [];
+            // Buat atau update workorder_assignment
+            $assignment = \App\Models\WorkorderAssignment::updateOrCreate(
+                ['workorder_id' => $workorder->id],
+                [
+                    'spv_user_id' => $request->user()->id,
+                    'assigned_at' => now(),
+                ]
+            );
+
+            // Insert anggota tim ke wo_assignment_member
             foreach ($validated['petugas'] as $staff) {
-                $syncPayload[(int) $staff['user_id']] = [
-                    'peran' => $staff['peran'] ?? null,
-                ];
+                \App\Models\WoAssignmentMember::create([
+                    'assignment_id' => $assignment->id,
+                    'user_id'       => (int) $staff['user_id'],
+                    'is_pic'        => ($staff['peran'] ?? null) === 'koordinator',
+                ]);
             }
-            $workorder->petugasList()->syncWithoutDetaching($syncPayload);
 
             $workorder->update(['status_id' => $statusStaff]);
 
@@ -362,7 +372,7 @@ class WorkorderController extends Controller
                 'woMeter',
                 'woJaringan',
                 'woInfrastruktur',
-                'petugasList.pegawai',
+                'assignmentMembers.user.pegawai',
             ])->findOrFail($id);
 
             $menungguManager = $this->statusId('MENUNGGU_APPROVAL_MANAGER');
@@ -391,11 +401,12 @@ class WorkorderController extends Controller
 
             $reportNo = sprintf('LAP-WO-%s-%04d', now()->format('Y'), $workorder->id);
             $snapshot = $this->resolveKategoriSnapshot($workorder);
-            $petugasSnapshot = $workorder->petugasList->map(function ($u) {
+            $petugasSnapshot = $workorder->assignmentMembers->map(function ($member) {
+                $u = $member->user;
                 return [
-                    'user_id' => $u->id,
-                    'nama' => optional($u->pegawai)->nama,
-                    'nip' => optional($u->pegawai)->nip,
+                    'user_id' => optional($u)->id,
+                    'nama' => optional(optional($u)->pegawai)->nama,
+                    'nip' => optional(optional($u)->pegawai)->nip,
                 ];
             })->values()->all();
 

@@ -21,6 +21,9 @@ class Material extends Model
         'kode_material',
         'nama',
         'jumlah_stok',
+        'terpakai',
+        'satuan',
+        'kategori',
         'pegawai_id',
     ];
 
@@ -37,5 +40,13 @@ class Material extends Model
     public function pegawai()
     {
         return $this->belongsTo(Pegawai::class, 'pegawai_id');
+    }
+
+    /**
+     * Riwayat peminjaman material ini.
+     */
+    public function peminjaman()
+    {
+        return $this->hasMany(WoPeminjamanMaterial::class, 'material_kode', 'kode_material');
     }
 }
