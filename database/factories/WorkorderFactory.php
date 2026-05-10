@@ -34,8 +34,6 @@ class WorkorderFactory extends Factory
             'pic_id' => $this->faker->numberBetween(1, 3),
             'status_id' => $this->faker->numberBetween(1, 8),
             'jenis_workorder_id' => $this->faker->numberBetween(1, 5),
-            'jenis_lokasi_id' => $this->faker->numberBetween(1, 2),
-            'tipe_workorder_id' => $this->faker->numberBetween(1, 2),
         ];
     }
 }

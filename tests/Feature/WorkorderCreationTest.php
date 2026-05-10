@@ -8,8 +8,6 @@ use App\Models\Pegawai;
 use App\Models\Departemen;
 use App\Models\Jabatan;
 use App\Models\JenisWorkorder;
-use App\Models\JenisLokasi;
-use App\Models\TipeWorkorder;
 use App\Models\MasterLocation;
 use App\Models\Status;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,8 +55,6 @@ class WorkorderCreationTest extends TestCase
 
         // 5. Create required master data
         $jenisWo = JenisWorkorder::factory()->create();
-        $jenisLokasi = JenisLokasi::factory()->create();
-        $tipeWo = TipeWorkorder::factory()->create();
         $location = MasterLocation::factory()->create();
         $status = Status::factory()->create();
 
@@ -67,17 +63,9 @@ class WorkorderCreationTest extends TestCase
             'nama_workorder' => 'Test WO by Superadmin',
             'deskripsi' => 'This is a test work order created by superadmin for SPV',
             'tanggal_mulai' => now()->toDateString(),
-            'estimasi_durasi' => 2,
-            'unit_waktu' => 'jam',
-            'estimasi_selesai' => now()->addDays(1)->toDateString(),
-            'location_id' => $location->id,
             'jenis_workorder_id' => $jenisWo->id,
-            'jenis_lokasi_id' => $jenisLokasi->id,
-            'tipe_workorder_id' => $tipeWo->id,
             'assigned_to' => $spv->id, // Assigned to SPV
-            'status_id' => $status->id,
             'prioritas' => 'sedang',
-            'petugas_id' => [$spv->id], // Including SPV as staff
         ];
 
         // 6. Act: Authenticate as Superadmin and call the API

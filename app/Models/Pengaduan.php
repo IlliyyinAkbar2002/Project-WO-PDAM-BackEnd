@@ -19,11 +19,6 @@ class Pengaduan extends Model
         'raw_payload' => 'array',
     ];
 
-    public function jenisPengaduan()
-    {
-        return $this->belongsTo(JenisPengaduan::class, 'jenis_pengaduan_id');
-    }
-
     public function status()
     {
         return $this->belongsTo(Status::class, 'status_id');

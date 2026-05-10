@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\LemburSpl;
 use App\Models\MasterAction;
 use App\Models\Status;
 use App\Models\Workorder;
@@ -34,22 +33,10 @@ class WorkorderService
       // (gejala: WO seolah "berhasil" di FE tapi list tetap kosong).
       $penugasanActionId = $this->ensureDefaultActionExists();
 
-      $lemburSplId = null;
       $statusId    = $this->statusIdByKode('DITUGASKAN_KE_SPV')
         ?? $this->statusIdByKode('DISETUJUI')
         ?? Status::query()->min('id');
       $assignedTo  = (int) ($data['assigned_to'] ?? $data['pic_id']);
-
-      // Lembur: sebelumnya cek tipe_workorder_id===2 (FK ke m_tipe_workorder).
-      // Setelah tipe_wo dihapus, cek dari field string 'tipe_workorder'.
-      $tipeWo = $data['tipe_workorder'] ?? null;
-      if ($tipeWo && strtolower($tipeWo) === 'lembur') {
-        $lemburSpl = LemburSpl::create([
-          'status_id'       => $statusId,
-          'waktu_pengajuan' => now(),
-        ]);
-        $lemburSplId = $lemburSpl->id;
-      }
 
       // Field timeline (estimasi_durasi, unit_waktu, estimasi_selesai,
       // tanggal_selesai) sudah dipindahkan ke workorder_assignment —
@@ -62,7 +49,7 @@ class WorkorderService
         'lokasi'             => $data['lokasi'] ?? null,
         'assigned_to'        => $assignedTo,
         'created_by_user_id' => $data['created_by_user_id'] ?? null,
-        'lembur_spl_id'      => $lemburSplId,
+        'lembur_spl_id'      => $data['lembur_spl_id'] ?? null,
         'status_id'          => $statusId,
         'jenis_workorder_id' => $data['jenis_workorder_id'],
         'departemen_id'      => $data['departemen_id'] ?? null,

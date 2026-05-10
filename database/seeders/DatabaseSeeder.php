@@ -4,15 +4,12 @@ namespace Database\Seeders;
 
 use App\Models\Departemen;
 use App\Models\Jabatan;
-use App\Models\JenisLokasi;
 use App\Models\JenisWorkorder;
 use App\Models\MasterAction;
 use App\Models\MasterKpi;
 use App\Models\MasterLocation;
 use App\Models\Pegawai;
-use App\Models\Pic;
 use App\Models\Role;
-use App\Models\TipeWorkorder;
 use App\Models\User;
 use App\Models\Workorder;
 use Illuminate\Support\Facades\DB;
@@ -199,8 +196,6 @@ class DatabaseSeeder extends Seeder
             ]
         );
         MasterKpi::factory(10)->create();
-        JenisLokasi::factory(2)->create();
-        TipeWorkorder::factory(2)->create();
         MasterAction::factory(4)->create();
         $this->call(TipeProgressSeeder::class);
         JenisWorkorder::factory(10)->create();

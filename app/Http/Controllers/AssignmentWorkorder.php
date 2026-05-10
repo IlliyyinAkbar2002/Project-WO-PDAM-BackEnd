@@ -26,7 +26,6 @@ class AssignmentWorkorder extends Controller
             'longitude'              => 'nullable|numeric|between:-180,180',
             'accuracy'               => 'nullable|numeric|min:0',
             'deskripsi'              => 'nullable|string',
-            'tipe_workorder'         => 'nullable|string',
             'tanggal_mulai'          => 'nullable|date',
             'tanggal_selesai'        => 'nullable|date',
             'estimasi_selesai'       => 'nullable|date',

@@ -61,7 +61,6 @@ class AssignmentService
                     'spv_user_id'      => $spvUserId,
                     'assigned_at'      => now(),
                     'deskripsi'        => $data['deskripsi'] ?? null,
-                    'tipe_workorder'   => $data['tipe_workorder'] ?? null,
                     'tanggal_mulai'    => $data['tanggal_mulai'] ?? null,
                     'tanggal_selesai'  => $data['tanggal_selesai'] ?? null,
                     'estimasi_selesai' => $data['estimasi_selesai'] ?? null,
