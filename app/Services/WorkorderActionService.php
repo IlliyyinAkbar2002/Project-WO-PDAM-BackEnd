@@ -45,8 +45,13 @@ class WorkorderActionService
 
   public function handleFreeze($action, $workorder, $data): void
   {
-    $sisaDurasi = Carbon::parse($workorder->estimasi_selesai)
-      ->diffInMinutes(Carbon::parse($data['waktu_mulai']));
+    // estimasi_selesai sekarang ada di workorder_assignment
+    $assignment = $workorder->workorderAssignment;
+    $estimasiSelesai = optional($assignment)->estimasi_selesai;
+
+    $sisaDurasi = $estimasiSelesai
+      ? Carbon::parse($estimasiSelesai)->diffInMinutes(Carbon::parse($data['waktu_mulai']))
+      : 0;
     $statusSebelumnya = $workorder->status_id;
 
     $action->update([
@@ -72,9 +77,16 @@ class WorkorderActionService
       $estimasiBaru = Carbon::parse($data['waktu_mulai'])->addMinutes($sisaDurasi);
 
       $workorder->update([
-        'estimasi_selesai' => $estimasiBaru,
-        'status_id'        => $statusSebelumnya,
+        'status_id' => $statusSebelumnya,
       ]);
+
+      // estimasi_selesai sekarang ada di workorder_assignment
+      $assignment = $workorder->workorderAssignment;
+      if ($assignment) {
+        $assignment->update([
+          'estimasi_selesai' => $estimasiBaru,
+        ]);
+      }
 
       $action->update([
         'estimasi_selesai' => $estimasiBaru,
@@ -84,8 +96,12 @@ class WorkorderActionService
 
   public function handleExtend($action, $workorder, $data): void
   {
-    $workorder->update([
-      'estimasi_selesai' => $data['estimasi_selesai'],
-    ]);
+    // estimasi_selesai sekarang ada di workorder_assignment (bukan workorder)
+    $assignment = $workorder->workorderAssignment;
+    if ($assignment) {
+      $assignment->update([
+        'estimasi_selesai' => $data['estimasi_selesai'],
+      ]);
+    }
   }
 }

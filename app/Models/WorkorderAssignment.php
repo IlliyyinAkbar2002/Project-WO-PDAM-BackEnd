@@ -10,15 +10,17 @@ use Illuminate\Database\Eloquent\Model;
  *
  * Event assign WO oleh SPV — 1 row per workorder (1:1). Di-INSERT di
  * Tahap 5 (SPV klik "Tugaskan") bersamaan dengan insert `wo_{kategori}`
- * + `workorder_petugas` dalam satu DB transaction.
+ * + `wo_assignment_member` dalam satu DB transaction.
  *
  * Menjawab pertanyaan bisnis "kapan + siapa SPV yang melakukan assign +
  * catatan apa yang diberikan" tanpa perlu JOIN ke tabel audit
  * `workorder_action`.
  *
+ * Revisi Mei 2026: menampung latitude/longitude dari FE untuk
+ * disimpan + berelasi ke m_location (geofencing).
+ *
  * Lihat:
- *   - .cursor/ERD_Physical.dbml (Group 4, Table workorder_assignment)
- *   - .cursor/Flow_WO.md Section 3.5 (contoh transaction)
+ *   - .vscode_ai/ERD_Physical.dbml (Group 4, Table workorder_assignment)
  */
 class WorkorderAssignment extends Model
 {
@@ -29,7 +31,14 @@ class WorkorderAssignment extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'assigned_at' => 'datetime',
+        'assigned_at'      => 'datetime',
+        'tanggal_mulai'    => 'datetime',
+        'tanggal_selesai'  => 'datetime',
+        'estimasi_selesai' => 'datetime',
+        'latitude'         => 'float',
+        'longitude'        => 'float',
+        'accuracy'         => 'float',
+        'location_id'      => 'integer',
     ];
 
     public function workorder()
@@ -41,6 +50,15 @@ class WorkorderAssignment extends Model
     {
         return $this->belongsTo(User::class, 'spv_user_id')
             ->with(['pegawai:id,nama,nip']);
+    }
+
+    /**
+     * Lokasi geofencing yang terkait dengan assignment ini.
+     * FK location_id → m_location.id.
+     */
+    public function location()
+    {
+        return $this->belongsTo(MasterLocation::class, 'location_id');
     }
 
     /**

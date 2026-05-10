@@ -13,6 +13,9 @@ class ProgressWorkorder extends Model
     protected $guarded = [];
     protected $casts = [
         'field_to_revise' => 'array',
+        'latitude'        => 'float',
+        'longitude'       => 'float',
+        'accuracy'        => 'float',
     ];
 
     public function workorder()

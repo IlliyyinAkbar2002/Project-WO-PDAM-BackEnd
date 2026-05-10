@@ -1,7 +1,8 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\JenisLokasiController;
+use App\Http\Controllers\ApprovalWorkorder;
+use App\Http\Controllers\AssignmentWorkorder;
 use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
 use App\Http\Controllers\LemburSplController;
@@ -19,23 +20,9 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | API Routes (v1)
 |--------------------------------------------------------------------------
-|
-| Semua route API di bawah adalah versi `v1`. Konsumen:
-|
 |   [M] Mobile (Flutter)  — aplikasi petugas lapangan
 |   [W] Web (Next.js)     — dashboard admin / SPV
 |   [S] Shared            — dipakai keduanya
-|
-| Tanda [M]/[W]/[S] di komentar hanya hint untuk developer. Authorization
-| sebenarnya (role_id, kepemilikan data, dll.) diterapkan di sisi controller.
-|
-| Catatan refactor pasca TKT-01..07:
-|   - `POST /workorder-action` ditambahkan (TKT-06). Sebelumnya hanya
-|     `GET /workorder-action` yang terdaftar, padahal controller `store()`
-|     sudah di-refactor untuk menginject `actor_id` dari auth user.
-|   - Duplikasi route yang sudah tercover `apiResource` dihapus (supaya
-|     `php artisan route:list` tidak menampilkan entri ganda). Tidak ada
-|     perubahan perilaku untuk kedua FE.
 |
 */
 
@@ -60,9 +47,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('workorder', WorkorderController::class);
-        Route::post('workorder/{id}/approve', [WorkorderController::class, 'approve']);
-        Route::post('workorder/{id}/reject', [WorkorderController::class, 'reject']);
-        Route::post('workorder/{id}/assign-staff', [WorkorderController::class, 'assignStaff']);
+        Route::post('workorder/{id}/approve', [ApprovalWorkorder::class, 'approve']);
+        Route::post('workorder/{id}/reject', [ApprovalWorkorder::class, 'reject']);
+        Route::post('workorder/{id}/assign-staff', [AssignmentWorkorder::class, 'assignStaff']);
 
 
         Route::get('workorder-action',  [WorkorderActionController::class, 'index']);
@@ -78,14 +65,16 @@ Route::prefix('v1')->group(function () {
 
         Route::apiResource('lembur-spl', LemburSplController::class);
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);
-        Route::apiResource('jenis-lokasi',    JenisLokasiController::class);
 
         Route::get('user',            [UserController::class, 'index']);
         Route::get('pegawai',         [PegawaiController::class, 'index']);
         Route::get('pegawai/filter',  [PegawaiController::class, 'getPegawaiByFilter']);
 
-        Route::get('master-location',  [MasterLocationController::class, 'index']);
-        Route::post('master-location', [MasterLocationController::class, 'store']);
+        Route::get('master-location',       [MasterLocationController::class, 'index']);
+        Route::post('master-location',      [MasterLocationController::class, 'store']);
+        Route::get('master-location/{id}',  [MasterLocationController::class, 'show']);
+        Route::put('master-location/{id}',  [MasterLocationController::class, 'update']);
+        Route::delete('master-location/{id}', [MasterLocationController::class, 'destroy']);
 
         Route::middleware('role:superadmin')->group(function () {
             Route::patch('admin/pegawai/{id}/assign', [PegawaiController::class, 'assign']);
@@ -111,9 +100,6 @@ Route::prefix('v1')->group(function () {
     });
 });
 
-// =========================================================
-// [S] Health Check (unversioned — di luar prefix v1)
-// =========================================================
 Route::get('ping', function () {
     return response()->json([
         'message'   => 'API Laravel Connected!',

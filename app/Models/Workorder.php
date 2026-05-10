@@ -12,11 +12,7 @@ class Workorder extends Model
     protected $guarded = [];
     protected $appends = ['progres_persen'];
 
-    protected $casts = [
-        'latitude' => 'float',
-        'longitude' => 'float',
-        'location_id' => 'integer',
-    ];
+    protected $casts = [];
 
     public function pic()
     {
@@ -70,24 +66,9 @@ class Workorder extends Model
         return $this->belongsTo(Departemen::class, 'departemen_id');
     }
 
-    public function tipeWorkorder()
-    {
-        return $this->belongsTo(TipeWorkorder::class, 'tipe_workorder_id');
-    }
-
     public function lemburSpl()
     {
         return $this->belongsTo(LemburSpl::class, 'lembur_spl_id');
-    }
-
-    public function jenisLokasi()
-    {
-        return $this->belongsTo(JenisLokasi::class, 'jenis_lokasi_id');
-    }
-
-    public function location()
-    {
-        return $this->belongsTo(MasterLocation::class, 'location_id');
     }
 
     public function workorderAction()
@@ -173,12 +154,16 @@ class Workorder extends Model
 
         // 10% - 80%: Dalam pengerjaan (linear interpolasi berdasarkan waktu)
         if (in_array($statusKode, ['IN_PROGRESS', 'REVISI_REQUESTED', 'DITOLAK_SPV'])) {
-            if (!$this->tanggal_mulai || !$this->estimasi_selesai) {
+            $assignment = $this->workorderAssignment;
+            $tanggalMulai = optional($assignment)->tanggal_mulai ?? $this->tanggal_mulai;
+            $estimasiSelesai = optional($assignment)->estimasi_selesai;
+
+            if (!$tanggalMulai || !$estimasiSelesai) {
                 return 50;
             }
 
-            $start = \Illuminate\Support\Carbon::parse($this->tanggal_mulai);
-            $end = \Illuminate\Support\Carbon::parse($this->estimasi_selesai);
+            $start = \Illuminate\Support\Carbon::parse($tanggalMulai);
+            $end = \Illuminate\Support\Carbon::parse($estimasiSelesai);
             $now = \Illuminate\Support\Carbon::now();
 
             $totalMinutes = $start->diffInMinutes($end, false);

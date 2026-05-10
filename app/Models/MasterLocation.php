@@ -13,8 +13,11 @@ class MasterLocation extends Model
     protected $fillable = ['nama','latitude','longitude','radius_meter'];
     protected $casts = ['latitude'=>'float','longitude'=>'float','radius_meter'=>'int'];
 
-    public function workorders()
+    /**
+     * Assignment yang menggunakan lokasi ini untuk geofencing.
+     */
+    public function assignments()
     {
-        return $this->hasMany(Workorder::class, 'location_id');
+        return $this->hasMany(WorkorderAssignment::class, 'location_id');
     }
 }

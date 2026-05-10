@@ -98,7 +98,7 @@ class LemburSplController extends Controller
                         'actor_id' => $lemburSpl->workorder->assigned_to,
                         'keterangan' => 'Penugasan awal',
                         'waktu_mulai' => $lemburSpl->workorder->tanggal_mulai,
-                        'estimasi_selesai' => $lemburSpl->workorder->estimasi_selesai,
+                        'estimasi_selesai' => optional($lemburSpl->workorder->workorderAssignment)->estimasi_selesai,
                     ]);
                 }
             }

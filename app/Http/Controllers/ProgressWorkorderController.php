@@ -29,6 +29,9 @@ class ProgressWorkorderController extends Controller
         $validated = $request->validate([
             'workorder_id' => 'required|exists:workorder,id',
             'hasil_pengerjaan' => 'nullable|string|max:255',
+            'latitude'  => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
         ]);
@@ -60,6 +63,9 @@ class ProgressWorkorderController extends Controller
                 'hasil_pengerjaan' => $validated['hasil_pengerjaan'] ?? 'Mulai pekerjaan',
                 'waktu_submit' => now(),
                 'order' => $order,
+                'latitude'  => $validated['latitude'],
+                'longitude' => $validated['longitude'],
+                'accuracy'  => $validated['accuracy'] ?? null,
             ]);
 
             if ($request->hasFile('foto')) {
@@ -89,6 +95,9 @@ class ProgressWorkorderController extends Controller
             'tipe_progress_kode' => 'nullable|in:PROGRESS,SELESAI',
             'tipe_progress' => 'nullable|in:PROGRESS,SELESAI',
             'hasil_pengerjaan' => 'required|string|max:255',
+            'latitude'  => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
         ]);
@@ -124,6 +133,9 @@ class ProgressWorkorderController extends Controller
                 'hasil_pengerjaan' => $validated['hasil_pengerjaan'],
                 'waktu_submit' => now(),
                 'order' => $order,
+                'latitude'  => $validated['latitude'],
+                'longitude' => $validated['longitude'],
+                'accuracy'  => $validated['accuracy'] ?? null,
             ]);
 
             if ($request->hasFile('foto')) {

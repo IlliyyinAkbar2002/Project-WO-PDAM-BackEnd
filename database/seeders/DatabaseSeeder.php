@@ -27,42 +27,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        MasterLocation::factory(1)->create([
-            'nama' => 'PDAM Surya Sembada Kota Surabaya',
-            'latitude' => -7.2654798,
-            'longitude' => 112.754074,
-            'radius_meter' => 100,
-        ]);
-        
-        MasterLocation::factory(1)->create([
-            'nama' => 'Ciputra World Surabaya',
-            'latitude' => -7.2925952,
-            'longitude' => 112.7200837,
-            'radius_meter' => 150,
-        ]);
-        
-        MasterLocation::factory(1)->create([
-            'nama' => 'Telkom Universitas Surabaya',
-            'latitude' => -7.3111665,
-            'longitude' => 112.728915,
-            'radius_meter' => 200,
-        ]);
-
-        MasterLocation::factory(1)->create([
-            'nama' => 'Perum Lestari Indah',
-            'latitude' => -7.3482089,
-            'longitude' => 112.5987654,
-            'radius_meter' => 100,
-        ]);
-
+        // $this->call(MasterLocationSeeder::class);
+        // Disabled: lokasi sekarang dikirim dari FE Mobile, bukan seeder.
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
         Role::factory(3)->create();
-
-        // Master status: 8 row historis (workorder/lembur) + 3 row progres
-        // (DRAFT/SUBMITTED/VERIFIED) hasil TKT-03. Pakai seeder idempotent
-        // dengan id eksplisit supaya kode lain yang masih hardcode id status
-        // (mis. status_id => 5 di ProgressWorkorderService) tidak bergeser.
         $this->call(StatusSeeder::class);
 
         Pegawai::updateOrCreate(['id' => 1], [
@@ -87,7 +56,6 @@ class DatabaseSeeder extends Seeder
         'jabatan_id' => 2,
         ]);
 
-        // Pastikan sequence id m_pegawai mengikuti nilai maksimum saat ini
         DB::statement("SELECT setval(pg_get_serial_sequence('m_pegawai', 'id'), (SELECT COALESCE(MAX(id), 0) FROM m_pegawai))");
 
         Pegawai::factory(20)->create();
@@ -235,9 +203,6 @@ class DatabaseSeeder extends Seeder
         TipeWorkorder::factory(2)->create();
         MasterAction::factory(4)->create();
         $this->call(TipeProgressSeeder::class);
-
         JenisWorkorder::factory(10)->create();
-        // Workorder::factory(10)->create();
-        // DetailFormSeeder dihapus per Mei 2026 (tabel detail_form di-drop).
     }
 }
