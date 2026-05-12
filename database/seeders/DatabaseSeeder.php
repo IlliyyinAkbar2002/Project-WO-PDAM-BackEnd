@@ -55,7 +55,7 @@ class DatabaseSeeder extends Seeder
 
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
-        Role::factory(3)->create();
+        Role::factory(4)->create();
         Status::factory(8)->create();
 
         Pegawai::updateOrCreate(['id' => 1], [
@@ -70,11 +70,22 @@ class DatabaseSeeder extends Seeder
         ]);
 
         Pegawai::updateOrCreate(['id' => 2], [
-        'nama' => 'Geo Anak baik',
+        'nama' => 'Admin Baik',
         'nip' => '4.99.70756',
         'tanggal_lahir' => '1985-02-02',
         'jenis_kelamin' => 'Perempuan',
         'alamat' => 'Jl. Surabaya No.2',
+        'telepon' => '081234567891',
+        'departemen_id' => 2,
+        'jabatan_id' => 2,
+        ]);
+
+        Pegawai::updateOrCreate(['id' => 3], [
+        'nama' => 'Manager Baik',
+        'nip' => '4.98.70756',
+        'tanggal_lahir' => '1985-03-02',
+        'jenis_kelamin' => 'Laki-laki',
+        'alamat' => 'Jl. Surabaya No.5',
         'telepon' => '081234567891',
         'departemen_id' => 2,
         'jabatan_id' => 2,
@@ -93,13 +104,13 @@ class DatabaseSeeder extends Seeder
         ]);
         User::updateOrCreate([
             'pegawai_id' => 2,
-            'role_id' => 1,
-            'email' => 'geo@gmail.com',
+            'role_id' => 2,
+            'email' => 'admin@gmail.com',
             'password' => bcrypt('password'),
         ]);
         User::updateOrCreate([
             'pegawai_id' => 3,
-            'role_id' => 2,
+            'role_id' => 3,
             'email' => 'manager@gmail.com',
             'password' => bcrypt('password'),
         ]);

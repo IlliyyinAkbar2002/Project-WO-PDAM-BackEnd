@@ -13,7 +13,7 @@ class RoleFactory extends Factory
      */
     public function definition()
     {
-        static $names = ['superadmin', 'manager', 'employee'];
+        static $names = ['superadmin', 'admin', 'manager', 'employee'];
         $nama = array_shift($names);
 
         return [

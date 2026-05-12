@@ -31,7 +31,9 @@ class AuthController extends Controller
                 'password' => 'required|string',
             ]);
             
-        $user = User::where('email', $data['email'])->first();
+        $user = User::with(['role', 'pegawai'])
+        ->where('email', $data['email'])
+        ->first();
             
         if (!$user) {
             return response()->json([
@@ -65,9 +67,10 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => [
                 'id' => $user->id,
-                'name' => $user->name,
+                'name' => $user->pegawai->nama,
                 'email' => $user->email,
                 'role_id' => $user->role_id,
+                'role_name' => $user->role->nama,
             ],
         ], 200);
     }
