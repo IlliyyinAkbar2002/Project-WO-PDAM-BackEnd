@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Workorder extends Model
 {
     use HasFactory;
     protected $table = 'workorder';
     protected $guarded = [];
-    protected $appends = ['progres_persen'];
+    protected $appends = ['progres_persen', 'kategori_form'];
 
     protected $casts = [];
 
@@ -24,25 +25,15 @@ class Workorder extends Model
         return $this->belongsTo(User::class, 'assigned_to')->with(['pegawai:id,nama,nip']);
     }
 
-    /**
-     * Daftar anggota tim yang ditugaskan ke WO ini.
-     *
-     * Menggantikan relasi lama `petugasList()` yang menggunakan tabel pivot
-     * `workorder_petugas`. Sekarang anggota tim disimpan di `wo_assignment_member`
-     * yang ter-relasi ke `workorder_assignment` (bukan langsung ke `workorder`).
-     *
-     * Akses via: $workorder->workorderAssignment->members
-     * Atau gunakan helper ini untuk shortcut HasManyThrough.
-     */
     public function assignmentMembers()
     {
         return $this->hasManyThrough(
             WoAssignmentMember::class,
             WorkorderAssignment::class,
-            'workorder_id',    // FK di workorder_assignment
-            'assignment_id',   // FK di wo_assignment_member
-            'id',              // PK di workorder
-            'id'               // PK di workorder_assignment
+            'workorder_id',    
+            'assignment_id',   
+            'id',              
+            'id'               
         );
     }
 
@@ -130,8 +121,47 @@ class Workorder extends Model
     }
 
     /**
+     * Resolve kategori form WO berdasarkan prioritas:
+     * 1. Keberadaan relasi wo_jaringan / wo_infrastruktur / wo_meter
+     * 2. Kolom kategori_form dari jenis_workorder (m_jenis_workorder)
+     * 3. Default 'meter'
+     *
+     * Ini memastikan FE selalu mendapat kategori yang benar di root level
+     * response, terlepas dari jenis_workorder_id yang dipakai saat create.
+     */
+    public function getKategoriFormAttribute(): string
+    {
+        // Prioritas 1: deteksi dari keberadaan relasi detail
+        if ($this->relationLoaded('woJaringan') && $this->woJaringan !== null) {
+            return 'jaringan';
+        }
+        if ($this->relationLoaded('woInfrastruktur') && $this->woInfrastruktur !== null) {
+            return 'infrastruktur';
+        }
+        if ($this->relationLoaded('woMeter') && $this->woMeter !== null) {
+            return 'meter';
+        }
+
+        // Prioritas 2: dari jenis_workorder.kategori_form
+        if ($this->relationLoaded('jenisWorkorder') && $this->jenisWorkorder) {
+            return $this->jenisWorkorder->kategori_form ?? 'meter';
+        }
+
+        // Fallback: query langsung jika relasi belum di-load
+        if ($this->jenis_workorder_id) {
+            $jenis = JenisWorkorder::find($this->jenis_workorder_id);
+            return $jenis->kategori_form ?? 'meter';
+        }
+
+        return 'meter';
+    }
+
+    /**
      * Menghitung persentase progres secara dinamis menggunakan pendekatan hybrid:
      * state-based (dari status_id) + time-based clamping (untuk IN_PROGRESS).
+     *
+     * Tambahan: jika kuota pelaporan harian (8x/hari) ATAU kuota total habis,
+     * langsung return 100% karena pekerjaan dianggap selesai secara operasional.
      */
     public function getProgresPersenAttribute(): int
     {
@@ -150,6 +180,13 @@ class Workorder extends Model
         // 90%: Staff sudah klik Selesai, menunggu review SPV
         if ($statusKode === 'PENGECEKAN') {
             return 90;
+        }
+
+        // Cek kuota habis → paksa 100% (pekerjaan dianggap selesai secara operasional)
+        if (in_array($statusKode, ['IN_PROGRESS', 'REVISI_REQUESTED', 'DITOLAK_SPV', 'MENUNGGU_APPROVAL_MANAGER'])) {
+            if ($this->isQuotaExhausted()) {
+                return 100;
+            }
         }
 
         // 10% - 80%: Dalam pengerjaan (linear interpolasi berdasarkan waktu)
@@ -185,5 +222,49 @@ class Workorder extends Model
         }
 
         return 0;
+    }
+
+    /**
+     * Cek apakah kuota pelaporan sudah habis (harian 8x ATAU total berdasarkan estimasi hari).
+     * Digunakan oleh getProgresPersenAttribute untuk force 100%.
+     */
+    private function isQuotaExhausted(): bool
+    {
+        // Cek kuota harian: maksimal 8 pelaporan per hari (hari ini ATAU hari sebelumnya).
+        // Jika kuota harian pernah habis di hari manapun, pekerjaan dianggap selesai secara
+        // operasional dan status 100% harus tetap bertahan di hari-hari berikutnya.
+        $dailyQuotaEverExhausted = DB::table('progress_workorder')
+            ->selectRaw('1')
+            ->where('workorder_id', $this->id)
+            ->whereNotNull('waktu_submit')
+            ->groupByRaw('waktu_submit::date')
+            ->havingRaw('COUNT(*) >= 8')
+            ->exists();
+
+        if ($dailyQuotaEverExhausted) {
+            return true;
+        }
+
+        // Cek kuota total: totalDays * 8
+        $assignment = $this->workorderAssignment;
+        $tanggalMulai = optional($assignment)->tanggal_mulai ?? $this->tanggal_mulai;
+        $estimasiSelesai = optional($assignment)->estimasi_selesai;
+
+        if ($tanggalMulai && $estimasiSelesai) {
+            $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
+            $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
+            $totalDays = max(1, (int) $start->diffInDays($end, false) + 1);
+
+            $maxPelaporanTotal = $totalDays * 8;
+            $totalPelaporan = ProgressWorkorder::where('workorder_id', $this->id)
+                ->whereNotNull('waktu_submit')
+                ->count();
+
+            if ($totalPelaporan >= $maxPelaporanTotal) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -32,7 +32,19 @@ class WorkorderController extends Controller
             $sort = $request->query('sort', 'desc');
             $all = $request->query('all', false);
 
-            $query = Workorder::with('assignmentMembers', 'pic', 'jenisWorkorder', 'status', 'lemburSpl');
+            $query = Workorder::with([
+                'assignmentMembers.user.pegawai',
+                'pic',
+                'jenisWorkorder',
+                'status',
+                'lemburSpl',
+                'woMeter',
+                'woJaringan',
+                'woInfrastruktur',
+                'workorderAssignment.location',
+                'workorderAssignment.spv.pegawai',
+                'workorderAssignment.members.user.pegawai',
+            ]);
 
             // Filter berdasarkan role authenticated user.
             $user = $request->user();
@@ -196,7 +208,20 @@ class WorkorderController extends Controller
     public function show($id)
     {
         try {
-            $workorder = Workorder::with('assignmentMembers', 'assignedTo', 'jenisWorkorder', 'status', 'lemburSpl', 'latestFreeze')->findOrFail($id);
+            $workorder = Workorder::with([
+                'assignmentMembers.user.pegawai',
+                'assignedTo',
+                'jenisWorkorder',
+                'status',
+                'lemburSpl',
+                'latestFreeze',
+                'woMeter',
+                'woJaringan',
+                'woInfrastruktur',
+                'workorderAssignment.location',
+                'workorderAssignment.spv.pegawai',
+                'workorderAssignment.members.user.pegawai',
+            ])->findOrFail($id);
             return response()->json($workorder, 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);

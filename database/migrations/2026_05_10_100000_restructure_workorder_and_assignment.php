@@ -5,24 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * [BACKEND ONLY] [BREAKING CHANGE]
- *
- * Restrukturisasi tabel workorder & workorder_assignment sesuai
- * ERD Physical revisi Mei 2026:
- *
- *   1. workorder: hapus relasi ke m_location, m_jenis_lokasi, m_tipe_workorder.
- *      Kolom `lokasi` (varchar teks bebas) TETAP dipertahankan.
- *   2. workorder_assignment: tambah lat/lng, accuracy, FK ke m_location,
- *      + kolom operasional (deskripsi, tipe_workorder, tanggal_mulai, dll).
- *
- * Latar belakang:
- *   - tipe_wo (wo_lembur vs wo_normal) dan tipe_lokasi (statis vs dinamis)
- *     sudah dihapus dari ERD karena tidak relevan lagi.
- *   - Lokasi tracking dipindah ke workorder_assignment supaya FE bisa
- *     mengirim lat/lng saat SPV assign staff, dan data tersimpan + berelasi
- *     ke m_location untuk geofencing.
- */
 class RestructureWorkorderAndAssignment extends Migration
 {
     public function up()
@@ -48,10 +30,18 @@ class RestructureWorkorderAndAssignment extends Migration
             if (Schema::hasColumn('workorder', 'longitude')) {
                 $table->dropColumn('longitude');
             }
+
+            if (Schema::hasColumn('workorder', 'estimasi_durasi')) {
+                $table->dropColumn('estimasi_durasi');
+            }
+            if (Schema::hasColumn('workorder', 'unit_waktu')) {
+                $table->dropColumn('unit_waktu');
+            }
+            if (Schema::hasColumn('workorder', 'estimasi_selesai')) {
+                $table->dropColumn('estimasi_selesai');
+            }
         });
 
-        // ─── 2. Tambah kolom baru ke workorder_assignment ───────────────
-        // Rename catatan_spv → deskripsi sesuai ERD (raw SQL, no doctrine/dbal needed)
         if (Schema::hasColumn('workorder_assignment', 'catatan_spv')
             && ! Schema::hasColumn('workorder_assignment', 'deskripsi')) {
             DB::statement('ALTER TABLE workorder_assignment RENAME COLUMN catatan_spv TO deskripsi');
@@ -133,6 +123,16 @@ class RestructureWorkorderAndAssignment extends Migration
             }
             if (! Schema::hasColumn('workorder', 'tipe_workorder_id')) {
                 $table->foreignId('tipe_workorder_id')->nullable()->constrained('m_tipe_workorder');
+            }
+            // Kembalikan kolom timeline
+            if (! Schema::hasColumn('workorder', 'estimasi_durasi')) {
+                $table->integer('estimasi_durasi')->nullable();
+            }
+            if (! Schema::hasColumn('workorder', 'unit_waktu')) {
+                $table->string('unit_waktu')->nullable();
+            }
+            if (! Schema::hasColumn('workorder', 'estimasi_selesai')) {
+                $table->datetime('estimasi_selesai')->nullable();
             }
         });
     }

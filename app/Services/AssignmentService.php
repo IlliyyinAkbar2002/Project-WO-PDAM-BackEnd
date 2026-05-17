@@ -30,9 +30,6 @@ use Illuminate\Support\Facades\DB;
  */
 class AssignmentService
 {
-    // ------------------------------------------------------------------
-    // PUBLIC
-    // ------------------------------------------------------------------
 
     /**
      * SPV assign staff ke WO.
@@ -50,7 +47,13 @@ class AssignmentService
         return DB::transaction(function () use ($workorder, $data, $spvUserId) {
             $this->guardAssignability($workorder, $spvUserId);
 
-            $kategori = optional($workorder->jenisWorkorder)->kategori_form;
+            // Prioritas: payload FE > DB jenis_workorder.kategori_form
+            $kategori = $data['kategori_form'] ?? optional($workorder->jenisWorkorder)->kategori_form;
+
+            if (! in_array($kategori, ['meter', 'jaringan', 'infrastruktur'], true)) {
+                throw new \LogicException('kategori_form tidak valid: ' . ($kategori ?? 'null'));
+            }
+
             $this->createKategoriForm($kategori, $workorder->id, $data['form_kategori']);
 
             $locationId = $this->resolveLocation($workorder, $data);
@@ -106,11 +109,6 @@ class AssignmentService
 
         if ($workorder->workorderAssignment && $workorder->workorderAssignment->members()->exists()) {
             throw new \LogicException('WO sudah pernah di-assign ke staff');
-        }
-
-        $kategori = optional($workorder->jenisWorkorder)->kategori_form;
-        if (! in_array($kategori, ['meter', 'jaringan', 'infrastruktur'], true)) {
-            throw new \LogicException('kategori_form belum valid pada jenis workorder');
         }
     }
 
@@ -189,6 +187,11 @@ class AssignmentService
 
     /**
      * Auto-create m_location dari lat/lng jika dikirim FE.
+     *
+     * Prioritas nama lokasi:
+     *   1. payload FE `nama_lokasi`
+     *   2. `workorder.lokasi` (judul lokasi yang diisi pelapor)
+     *   3. `workorder.nama_workorder` (fallback terakhir)
      */
     private function resolveLocation(Workorder $workorder, array $data): ?int
     {
@@ -196,8 +199,12 @@ class AssignmentService
             return null;
         }
 
+        $namaLokasi = $data['nama_lokasi']
+            ?? $workorder->lokasi
+            ?? $workorder->nama_workorder;
+
         $location = MasterLocation::create([
-            'nama'         => $workorder->lokasi ?? $workorder->nama_workorder,
+            'nama'         => $namaLokasi,
             'latitude'     => $data['latitude'],
             'longitude'    => $data['longitude'],
             'radius_meter' => 100,

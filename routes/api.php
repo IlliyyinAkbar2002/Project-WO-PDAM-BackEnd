@@ -49,19 +49,26 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('workorder', WorkorderController::class);
         Route::post('workorder/{id}/approve', [ApprovalWorkorder::class, 'approve']);
         Route::post('workorder/{id}/reject', [ApprovalWorkorder::class, 'reject']);
+        Route::get('workorder/{id}/assignment', [AssignmentWorkorder::class, 'show']);
         Route::post('workorder/{id}/assign-staff', [AssignmentWorkorder::class, 'assignStaff']);
 
 
         Route::get('workorder-action',  [WorkorderActionController::class, 'index']);
         Route::post('workorder-action', [WorkorderActionController::class, 'store']);
 
+
+        Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
+        Route::get('progress-workorder/quota/{id}', [ProgressWorkorderController::class, 'quota']);
+        Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show']);
+
+        // Kompatibilitas FE: terima beberapa method untuk payload progress.
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
+
         Route::post('progress-workorder/manual-run', [ProgressWorkorderController::class, 'manualRun']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/start', [ProgressWorkorderController::class, 'start']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/submit', [ProgressWorkorderController::class, 'submit']);
-        // Compatibility layer: terima method override legacy (_method PUT/PATCH) dari client lama.
         Route::match(['post', 'put', 'patch'], 'progress-workorder/review', [ProgressWorkorderController::class, 'review']);
-        Route::apiResource('progress-workorder', ProgressWorkorderController::class)
-            ->whereNumber('progress_workorder');
+       
 
         Route::apiResource('lembur-spl', LemburSplController::class);
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);
@@ -79,13 +86,6 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:superadmin')->group(function () {
             Route::patch('admin/pegawai/{id}/assign', [PegawaiController::class, 'assign']);
         });
-
-        // Route legacy pola EAV (form-workorder, detail-form, detail-progress)
-        // sudah DIHAPUS per Mei 2026. Diganti:
-        //   - Schema field kategori: tabel wo_meter / wo_jaringan / wo_infrastruktur
-        //     yang di-INSERT oleh SPV via POST /v1/workorder/{id}/assign-staff.
-        //   - Endpoint render form kosong (FE Mobile): lihat ticket
-        //     GET /v1/jenis-workorder/{id}/schema (belum dibuat, di ticket terpisah).
 
         Route::get('kpi', [KpiController::class, 'index']);
 
