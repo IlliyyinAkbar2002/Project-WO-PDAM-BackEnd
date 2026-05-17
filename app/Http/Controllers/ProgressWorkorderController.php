@@ -241,8 +241,8 @@ class ProgressWorkorderController extends Controller
 
         $validated = $request->validate([
             'workorder_id' => 'required|exists:workorder,id',
-            'tipe_progress_kode' => 'nullable|in:PROGRESS,SELESAI',
-            'tipe_progress' => 'nullable|in:PROGRESS,SELESAI',
+            'tipe_progress_kode' => 'required_without:tipe_progress|nullable|in:PROGRESS,SELESAI',
+            'tipe_progress' => 'required_without:tipe_progress_kode|nullable|in:PROGRESS,SELESAI',
             'hasil_pengerjaan' => 'required|string|max:255',
             'latitude'  => 'required|numeric',
             'longitude' => 'required|numeric',
@@ -251,16 +251,12 @@ class ProgressWorkorderController extends Controller
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        // Backward compatibility: terima key lama `tipe_progress`
-        // namun prioritaskan key resmi `tipe_progress_kode`.
         $tipeProgressKode = $validated['tipe_progress_kode'] ?? $validated['tipe_progress'] ?? null;
+
         if ($tipeProgressKode === null) {
-            return response()->json([
-                'message' => 'The given data was invalid.',
-                'errors' => [
-                    'tipe_progress_kode' => ['The tipe progress kode field is required.'],
-                ],
-            ], 422);
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'tipe_progress_kode' => ['Harus mengisi tipe_progress_kode atau tipe_progress (PROGRESS / SELESAI).'],
+            ]);
         }
 
         $userId = optional($request->user())->id;
@@ -270,8 +266,10 @@ class ProgressWorkorderController extends Controller
             return response()->json(['error' => 'User bukan petugas WO ini'], 403);
         }
 
-        if ($limitError = $this->validateProgressLimit($workorder)) {
-            return $limitError;
+        if ($tipeProgressKode !== 'SELESAI') {
+            if ($limitError = $this->validateProgressLimit($workorder)) {
+                return $limitError;
+            }
         }
 
         DB::beginTransaction();
@@ -346,7 +344,15 @@ class ProgressWorkorderController extends Controller
         $userId = optional($request->user())->id;
 
         if ((int) $workorder->assigned_to !== (int) $userId) {
-            return response()->json(['error' => 'Hanya SPV assigned yang bisa review'], 403);
+            return response()->json(['error' => 'Hanya SPV yang membuat WO ini yang bisa review'], 403);
+        }
+
+        $allowedStatuses = array_filter([
+            $this->statusId('PENGECEKAN'),
+            $this->statusId('IN_PROGRESS'),
+        ]);
+        if (!in_array((int) $workorder->status_id, $allowedStatuses, true)) {
+            return response()->json(['error' => 'Status WO tidak valid untuk review'], 422);
         }
 
         DB::beginTransaction();
@@ -358,7 +364,12 @@ class ProgressWorkorderController extends Controller
                     'reviewed_at' => now(),
                 ]);
 
-                $workorder->update(['status_id' => $this->statusId('MENUNGGU_APPROVAL_MANAGER')]);
+                $workorder->update([
+                    'status_id' => $this->statusId('SELESAI'),
+                    'approved_by_user_id' => $userId,
+                    'approved_at' => now(),
+                    'tanggal_selesai' => now(),
+                ]);
             } elseif ($validated['decision'] === 'revisi') {
                 $progress->update([
                     'status_id' => $this->statusId('REVISI_REQUESTED'),
@@ -401,7 +412,60 @@ class ProgressWorkorderController extends Controller
             }
 
             DB::commit();
-            return response()->json(['message' => 'Review progress berhasil diproses'], 200);
+
+            $workorder->refresh();
+            $workorder->load('status');
+
+            return response()->json([
+                'message' => 'Review progress berhasil diproses',
+                'workorder' => [
+                    'id' => $workorder->id,
+                    'status' => $workorder->status,
+                    'approved_by_user_id' => $workorder->approved_by_user_id,
+                    'approved_at' => $workorder->approved_at,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function cancel(Request $request, $id)
+    {
+        $progress = ProgressWorkorder::with('workorder.assignmentMembers')->findOrFail($id);
+        $userId = optional($request->user())->id;
+
+        if ((int) $progress->submitted_by_user_id !== (int) $userId) {
+            return response()->json(['error' => 'Hanya petugas yang submit yang bisa membatalkan'], 403);
+        }
+
+        if ((int) $progress->status_id !== $this->statusId('SUBMITTED')) {
+            return response()->json(['error' => 'Progress sudah direview, tidak bisa dibatalkan'], 422);
+        }
+
+        if ($progress->waktu_submit === null) {
+            return response()->json(['error' => 'Progress belum disubmit'], 422);
+        }
+
+        $submitTime = \Illuminate\Support\Carbon::parse($progress->waktu_submit);
+        if ($submitTime->diffInSeconds(now(), false) > 300) {
+            return response()->json(['error' => 'Batas waktu pembatalan (5 menit) telah lewat'], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $progress->update([
+                'status_id' => $this->statusId('DIBATALKAN'),
+                'waktu_submit' => null,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Progress berhasil dibatalkan',
+                'progress_id' => $progress->id,
+            ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
@@ -605,6 +669,12 @@ class ProgressWorkorderController extends Controller
 
             $sisaKuotaTotal = max(0, $maxPelaporanTotal - $totalPelaporan);
 
+            $cancelableIds = ProgressWorkorder::where('workorder_id', $workorder->id)
+                ->where('status_id', $this->statusId('SUBMITTED'))
+                ->whereNotNull('waktu_submit')
+                ->where('waktu_submit', '>=', now()->subMinutes(5))
+                ->pluck('id');
+
             return response()->json([
                 'workorder_id' => $workorder->id,
                 'sisa_kuota_hari_ini' => $sisaHariIni,
@@ -613,7 +683,8 @@ class ProgressWorkorderController extends Controller
                 'total_kuota_keseluruhan' => $maxPelaporanTotal,
                 'sudah_submit_hari_ini' => $countHariIni,
                 'sudah_submit_total' => $totalPelaporan,
-                'estimasi_hari' => $totalDays
+                'estimasi_hari' => $totalDays,
+                'bisa_cancel' => $cancelableIds,
             ], 200);
 
         } catch (ModelNotFoundException $e) {

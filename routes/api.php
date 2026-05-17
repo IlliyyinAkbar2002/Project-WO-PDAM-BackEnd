@@ -59,15 +59,14 @@ Route::prefix('v1')->group(function () {
 
         Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
         Route::get('progress-workorder/quota/{id}', [ProgressWorkorderController::class, 'quota']);
-        Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show']);
-
-        // Kompatibilitas FE: terima beberapa method untuk payload progress.
-        Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
-
         Route::post('progress-workorder/manual-run', [ProgressWorkorderController::class, 'manualRun']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/start', [ProgressWorkorderController::class, 'start']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/submit', [ProgressWorkorderController::class, 'submit']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/review', [ProgressWorkorderController::class, 'review']);
+
+        Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show'])->whereNumber('id');
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
+        Route::post('progress-workorder/{id}/cancel', [ProgressWorkorderController::class, 'cancel'])->whereNumber('id');
        
 
         Route::apiResource('lembur-spl', LemburSplController::class);

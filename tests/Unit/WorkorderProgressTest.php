@@ -4,8 +4,9 @@ namespace Tests\Unit;
 
 use App\Models\Status;
 use App\Models\Workorder;
+use App\Models\WorkorderAssignment;
 use Illuminate\Support\Carbon;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class WorkorderProgressTest extends TestCase
 {
@@ -41,7 +42,8 @@ class WorkorderProgressTest extends TestCase
         $status = new Status(['kode' => 'IN_PROGRESS']);
         $wo = new Workorder();
         $wo->setRelation('status', $status);
-        
+        $wo->setRelation('workorderAssignment', null);
+
         $this->assertEquals(50, $wo->progres_persen);
     }
 
@@ -50,16 +52,19 @@ class WorkorderProgressTest extends TestCase
         $status = new Status(['kode' => 'IN_PROGRESS']);
         $wo = new Workorder();
         $wo->setRelation('status', $status);
-        
+
+        $assignment = new WorkorderAssignment([
+            'tanggal_mulai' => '2026-05-04 12:00:00',
+            'estimasi_selesai' => '2026-05-06 12:00:00',
+        ]);
+        $wo->setRelation('workorderAssignment', $assignment);
+
         // Mock current time
         $now = Carbon::create(2026, 5, 5, 12, 0, 0);
         Carbon::setTestNow($now);
 
-        // 48 hours total. 24 hours elapsed. Ratio = 0.5. 
+        // 48 hours total. 24 hours elapsed. Ratio = 0.5.
         // 10 + (0.5 * 70) = 45%
-        $wo->tanggal_mulai = '2026-05-04 12:00:00';
-        $wo->estimasi_selesai = '2026-05-06 12:00:00';
-
         $this->assertEquals(45, $wo->progres_persen);
 
         // 12 hours elapsed. Ratio = 0.25.
@@ -71,7 +76,7 @@ class WorkorderProgressTest extends TestCase
         // 10 + (1.0 * 70) = 80%
         Carbon::setTestNow(Carbon::create(2026, 5, 6, 12, 0, 0));
         $this->assertEquals(80, $wo->progres_persen);
-        
+
         // Overdue. Ratio = 1.0 (clamped).
         // 10 + (1.0 * 70) = 80%
         Carbon::setTestNow(Carbon::create(2026, 5, 7, 12, 0, 0));

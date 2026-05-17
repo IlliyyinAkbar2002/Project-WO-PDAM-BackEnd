@@ -43,6 +43,7 @@ class StatusSeeder extends Seeder
             ['id' => 15, 'kode' => 'DITOLAK_SPV',              'nama' => 'Ditolak SPV',              'keterangan' => 'Progress atau WO ditolak oleh SPV'],
             ['id' => 16, 'kode' => 'MENUNGGU_APPROVAL_MANAGER','nama' => 'Menunggu Approval Manager','keterangan' => 'WO menunggu persetujuan akhir Manager'],
             ['id' => 17, 'kode' => 'DITOLAK_MANAGER',          'nama' => 'Ditolak Manager',          'keterangan' => 'WO ditolak oleh Manager'],
+            ['id' => 18, 'kode' => 'DIBATALKAN',               'nama' => 'Dibatalkan',               'keterangan' => 'Progress dibatalkan oleh petugas dalam batas waktu'],
         ];
 
         foreach ($rows as $row) {
