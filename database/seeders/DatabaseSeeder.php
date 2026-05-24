@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
         // $this->call(MasterLocationSeeder::class);
         // Disabled: lokasi sekarang dikirim dari FE Mobile, bukan seeder.
         Departemen::factory(3)->create();
-        Jabatan::factory(6)->create();
+        $this->call(JabatanSeeder::class);
         Role::factory(3)->create();
         $this->call(StatusSeeder::class);
 
@@ -50,7 +50,7 @@ class DatabaseSeeder extends Seeder
         'alamat' => 'Jl. Surabaya No.2',
         'telepon' => '081234567891',
         'departemen_id' => 2,
-        'jabatan_id' => 2,
+        'jabatan_id' => 1,
         ]);
 
         DB::statement("SELECT setval(pg_get_serial_sequence('m_pegawai', 'id'), (SELECT COALESCE(MAX(id), 0) FROM m_pegawai))");
@@ -81,7 +81,7 @@ class DatabaseSeeder extends Seeder
                 'alamat' => 'Jl. Geo No. 1',
                 'telepon' => '081234567892',
                 'departemen_id' => 2,
-                'jabatan_id' => 3,
+                'jabatan_id' => 1,
             ]
         );
 
@@ -95,7 +95,7 @@ class DatabaseSeeder extends Seeder
                 'alamat' => 'Jl. Geo No. 1',
                 'telepon' => '081234567892',
                 'departemen_id' => 2,
-                'jabatan_id' => 4,
+                'jabatan_id' => 2,
             ]
         );
 
@@ -109,11 +109,11 @@ class DatabaseSeeder extends Seeder
                 'alamat' => 'Jl. Manager No. 1',
                 'telepon' => '081234567893',
                 'departemen_id' => 2,
-                'jabatan_id' => 4,
+                'jabatan_id' => 2,
             ]
         );
 
-        // Pegawai 5: David (Employee as jabatan Staff)
+        // Pegawai 5: David (Employee as jabatan Senior Staff — PIC closer untuk SELESAI)
         Pegawai::updateOrCreate(
             [
                 'nama' => 'David',
@@ -123,7 +123,7 @@ class DatabaseSeeder extends Seeder
                 'alamat' => 'Jl. David No. 1',
                 'telepon' => '081234567894',
                 'departemen_id' => 2,
-                'jabatan_id' => 5,
+                'jabatan_id' => 3,
             ]
         );
 
@@ -137,7 +137,7 @@ class DatabaseSeeder extends Seeder
                 'alamat' => 'Jl. Budi No. 1',
                 'telepon' => '081234567895',
                 'departemen_id' => 2,
-                'jabatan_id' => 6,
+                'jabatan_id' => 4,
             ]
         );
 
@@ -196,7 +196,22 @@ class DatabaseSeeder extends Seeder
             ]
         );
         MasterKpi::factory(10)->create();
-        MasterAction::factory(4)->create();
+
+        $masterActions = [
+            ['kode' => 'PENUGASAN',       'nama' => 'Penugasan',       'keterangan' => 'Penugasan kepada pegawai'],
+            ['kode' => 'FREEZE',          'nama' => 'Ditunda',         'keterangan' => 'Pekerjaan ditunda sementara'],
+            ['kode' => 'RESUME',          'nama' => 'Dilanjut',        'keterangan' => 'Pekerjaan dilanjutkan'],
+            ['kode' => 'EXTEND',          'nama' => 'Perpanjangan',    'keterangan' => 'Perpanjangan waktu tugas'],
+            ['kode' => 'MULAI_KERJA',     'nama' => 'Mulai Kerja',     'keterangan' => 'Petugas memulai pekerjaan'],
+            ['kode' => 'SUBMIT_PROGRESS', 'nama' => 'Submit Progress', 'keterangan' => 'Petugas melaporkan progres'],
+            ['kode' => 'SELESAI_KERJA',   'nama' => 'Selesai Kerja',   'keterangan' => 'Petugas menandai pekerjaan selesai'],
+            ['kode' => 'APPROVE',         'nama' => 'Persetujuan',     'keterangan' => 'SPV menyetujui hasil pekerjaan'],
+            ['kode' => 'REJECT',          'nama' => 'Penolakan',       'keterangan' => 'SPV menolak hasil pekerjaan'],
+        ];
+        foreach ($masterActions as $action) {
+            MasterAction::updateOrCreate(['kode' => $action['kode']], $action);
+        }
+
         $this->call(TipeProgressSeeder::class);
         JenisWorkorder::factory(10)->create();
     }

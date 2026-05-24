@@ -27,7 +27,7 @@ class PegawaiFactory extends Factory
             'alamat' => $this->faker->address(),
             'telepon' => $this->faker->phoneNumber(),
             'departemen_id' => $this->faker->numberBetween(1, 3),
-            'jabatan_id' => $this->faker->numberBetween(1, 6),
+            'jabatan_id' => $this->faker->numberBetween(1, 4),
         ];
     }
 }

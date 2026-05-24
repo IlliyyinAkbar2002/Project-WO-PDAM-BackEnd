@@ -3,15 +3,30 @@
 namespace App\Http\Controllers;
 
 use App\Models\LemburSpl;
+use App\Models\LemburSplMember;
 use App\Models\MasterAction;
+use App\Models\Status;
 
 use App\Services\ProgressWorkorderService;
 use App\Services\WorkorderActionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class LemburSplController extends Controller
 {
+    /**
+     * Eager-load default untuk endpoint listing & detail.
+     * Dipusatkan agar response konsisten antara index & show.
+     */
+    private array $defaultWith = [
+        'workorder',
+        'status',
+        'pemohon.pegawai:id,nama,nip',
+        'verifikator.pegawai:id,nama,nip',
+        'members.user.pegawai',
+    ];
+
     /**
      * Display a listing of the resource.
      *
@@ -20,7 +35,7 @@ class LemburSplController extends Controller
     public function index()
     {
         try {
-            $lemburSpl = LemburSpl::with('workorder')->get();
+            $lemburSpl = LemburSpl::with($this->defaultWith)->get();
             return response()->json($lemburSpl, 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -33,12 +48,82 @@ class LemburSplController extends Controller
     /**
      * Store a newly created resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
+     * Endpoint ini dipakai mobile (Flutter) untuk submit form
+     * "Pengajuan Lembur":
+     *   - judul_pekerjaan
+     *   - jenis_pekerjaan (free text, contoh: "Emergency Maintainance")
+     *   - tanggal_lembur
+     *   - jam_mulai (opsional, jam mulai lembur)
+     *   - estimasi_jam (Estimasi Waktu Lembur, jam)
+     *   - members (Anggota Tim — array of user_id)
+     *   - alasan_lembur
+     *
+     * Sisi web (FE Next.js) cukup melakukan PUT/PATCH ke endpoint update
+     * untuk verifikasi (approve/reject). Field verifikasi (`verifikator_id`,
+     * `status_id`, `waktu_verifikasi`, `alasan_ditolak`) tetap diisi di
+     * sana — TIDAK diubah oleh kontrak ini.
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'judul_pekerjaan'    => 'required|string|max:255',
+            'jenis_pekerjaan'    => 'required|string|max:255',
+            'tanggal_lembur'     => 'required|date',
+            'jam_mulai'          => 'nullable|date_format:H:i',
+            'estimasi_jam'       => 'required|integer|min:1|max:24',
+            'alasan_lembur'      => 'required|string',
+
+            // Anggota tim — minimal 1, harus user yang valid, tidak boleh duplikat.
+            'members'            => 'required|array|min:1',
+            'members.*'          => ['integer', 'distinct', Rule::exists('users', 'id')],
+        ]);
+
+        $statusAwalId = Status::where('kode', 'BELUM_DISETUJUI')->value('id')
+            ?? Status::query()->min('id');
+
+        DB::beginTransaction();
+        try {
+            $lemburSpl = LemburSpl::create([
+                'pemohon_id'         => $request->user()->id,
+                'jenis_pekerjaan'    => $validated['jenis_pekerjaan'],
+                'judul_pekerjaan'    => $validated['judul_pekerjaan'],
+                'tanggal_lembur'     => $validated['tanggal_lembur'],
+                'jam_mulai'          => $validated['jam_mulai'] ?? null,
+                'estimasi_jam'       => $validated['estimasi_jam'],
+                'alasan_lembur'      => $validated['alasan_lembur'],
+                'status_id'          => $statusAwalId,
+                'waktu_pengajuan'    => now(),
+            ]);
+
+            $rows = collect($validated['members'])
+                ->unique()
+                ->map(fn ($userId) => [
+                    'lembur_spl_id' => $lemburSpl->id,
+                    'user_id'       => (int) $userId,
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ])
+                ->all();
+
+            if (! empty($rows)) {
+                LemburSplMember::insert($rows);
+            }
+
+            DB::commit();
+
+            $lemburSpl->load($this->defaultWith);
+
+            return response()->json([
+                'message' => 'Pengajuan lembur SPL berhasil dibuat',
+                'data'    => $lemburSpl,
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error'   => 'Gagal menyimpan pengajuan lembur SPL',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -50,7 +135,7 @@ class LemburSplController extends Controller
     public function show($id)
     {
         try {
-            $lemburSpl = LemburSpl::with('workorder')->findOrFail($id);
+            $lemburSpl = LemburSpl::with($this->defaultWith)->findOrFail($id);
             return response()->json($lemburSpl, 200);
         } catch (\Exception $e) {
             return response()->json([

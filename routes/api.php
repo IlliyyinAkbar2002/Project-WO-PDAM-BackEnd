@@ -1,15 +1,16 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ApprovalWorkorder;
 use App\Http\Controllers\AssignmentWorkorder;
 use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
+use App\Http\Controllers\LaporanWorkorderController;
 use App\Http\Controllers\LemburSplController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkorderActionController;
 use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
+use App\Http\Controllers\ProgressDetailController;
 use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
@@ -47,15 +48,11 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('workorder', WorkorderController::class);
-        Route::post('workorder/{id}/approve', [ApprovalWorkorder::class, 'approve']);
-        Route::post('workorder/{id}/reject', [ApprovalWorkorder::class, 'reject']);
         Route::get('workorder/{id}/assignment', [AssignmentWorkorder::class, 'show']);
         Route::post('workorder/{id}/assign-staff', [AssignmentWorkorder::class, 'assignStaff']);
 
-
         Route::get('workorder-action',  [WorkorderActionController::class, 'index']);
         Route::post('workorder-action', [WorkorderActionController::class, 'store']);
-
 
         Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
         Route::get('progress-workorder/quota/{id}', [ProgressWorkorderController::class, 'quota']);
@@ -67,7 +64,16 @@ Route::prefix('v1')->group(function () {
         Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show'])->whereNumber('id');
         Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
         Route::post('progress-workorder/{id}/cancel', [ProgressWorkorderController::class, 'cancel'])->whereNumber('id');
-       
+
+        // Progress Detail - review history tracking
+        Route::get('progress-detail', [ProgressDetailController::class, 'index']);
+        Route::get('progress-detail/{id}', [ProgressDetailController::class, 'show'])->whereNumber('id');
+        Route::post('progress-detail/resubmit', [ProgressDetailController::class, 'resubmit']);
+        Route::post('progress-detail/{id}/approve', [ProgressDetailController::class, 'approve'])->whereNumber('id');
+        Route::post('progress-detail/{id}/reject', [ProgressDetailController::class, 'reject'])->whereNumber('id');
+
+        // Laporan Workorder
+        Route::apiResource('laporan-workorder', LaporanWorkorderController::class)->only(['index', 'show', 'store']);
 
         Route::apiResource('lembur-spl', LemburSplController::class);
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);

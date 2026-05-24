@@ -4,14 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 
 class Workorder extends Model
 {
     use HasFactory;
     protected $table = 'workorder';
     protected $guarded = [];
-    protected $appends = ['progres_persen', 'kategori_form'];
+    protected $appends = ['progres_persen', 'kategori_form', 'avg_cadence_minutes'];
 
     protected $casts = [];
 
@@ -182,89 +181,73 @@ class Workorder extends Model
             return 90;
         }
 
-        // Cek kuota habis → paksa 100% (pekerjaan dianggap selesai secara operasional)
-        if (in_array($statusKode, ['IN_PROGRESS', 'REVISI_REQUESTED', 'DITOLAK_SPV', 'MENUNGGU_APPROVAL_MANAGER'])) {
-            if ($this->isQuotaExhausted()) {
-                return 100;
-            }
-        }
-
-        // 10% - 80%: Dalam pengerjaan (linear interpolasi berdasarkan waktu)
+        // Quota-based: (total PROGRESS reports / max quota) * 100, capped at 90%
         if (in_array($statusKode, ['IN_PROGRESS', 'REVISI_REQUESTED', 'DITOLAK_SPV'])) {
             $assignment = $this->workorderAssignment;
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $this->tanggal_mulai;
             $estimasiSelesai = optional($assignment)->estimasi_selesai;
 
-            if (!$tanggalMulai || !$estimasiSelesai) {
-                return 50;
+            $totalDays = 1;
+            if ($tanggalMulai && $estimasiSelesai) {
+                $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
+                $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
+                $totalDays = max(1, (int) $start->diffInDays($end, false) + 1);
             }
 
-            $start = \Illuminate\Support\Carbon::parse($tanggalMulai);
-            $end = \Illuminate\Support\Carbon::parse($estimasiSelesai);
-            $now = \Illuminate\Support\Carbon::now();
+            $maxPelaporanTotal = $totalDays * 8;
 
-            $totalMinutes = $start->diffInMinutes($end, false);
-            if ($totalMinutes <= 0) {
-                return 50;
-            }
+            $mulaiTipeId = \App\Models\TipeProgress::where('kode', 'MULAI')->value('id');
+            $totalPelaporan = ProgressWorkorder::where('workorder_id', $this->id)
+                ->whereNotNull('waktu_submit')
+                ->where('tipe_progress_id', '!=', $mulaiTipeId)
+                ->count();
 
-            $elapsedMinutes = $start->diffInMinutes($now, false);
-            if ($elapsedMinutes < 0) {
-                $elapsedMinutes = 0; // belum mulai
-            }
-
-            $ratio = $elapsedMinutes / $totalMinutes;
-            if ($ratio > 1) {
-                $ratio = 1; // mentok di estimasi selesai
-            }
-
-            return (int) (10 + ($ratio * 70));
+            return (int) min(90, round(($totalPelaporan / $maxPelaporanTotal) * 100));
         }
 
         return 0;
     }
 
     /**
-     * Cek apakah kuota pelaporan sudah habis (harian 8x ATAU total berdasarkan estimasi hari).
-     * Digunakan oleh getProgresPersenAttribute untuk force 100%.
+     * Rata-rata jeda (menit) antar submission progres yang berturutan.
+     *
+     * Dipakai oleh dashboard superadmin untuk mengurutkan tim berdasarkan
+     * kecepatan upload progres — semakin kecil nilai cadence, semakin cepat
+     * tim merespons. Tipe MULAI dikecualikan (sama dengan progres_persen dan
+     * validateProgressLimit) karena bukan submission lapor pekerjaan.
+     * Baris REVISI/DITOLAK auto-generated SPV tidak memiliki waktu_submit
+     * sehingga otomatis terfilter oleh whereNotNull('waktu_submit').
+     *
+     * Return null jika data belum cukup (< 2 submission terhitung).
      */
-    private function isQuotaExhausted(): bool
+    public function getAvgCadenceMinutesAttribute(): ?float
     {
-        // Cek kuota harian: maksimal 8 pelaporan per hari (hari ini ATAU hari sebelumnya).
-        // Jika kuota harian pernah habis di hari manapun, pekerjaan dianggap selesai secara
-        // operasional dan status 100% harus tetap bertahan di hari-hari berikutnya.
-        $dailyQuotaEverExhausted = DB::table('progress_workorder')
-            ->selectRaw('1')
-            ->where('workorder_id', $this->id)
+        $mulaiTipeId = \App\Models\TipeProgress::where('kode', 'MULAI')->value('id');
+
+        $submitTimes = ProgressWorkorder::where('workorder_id', $this->id)
             ->whereNotNull('waktu_submit')
-            ->groupByRaw('waktu_submit::date')
-            ->havingRaw('COUNT(*) >= 8')
-            ->exists();
+            ->where('tipe_progress_id', '!=', $mulaiTipeId)
+            ->orderBy('waktu_submit', 'asc')
+            ->pluck('waktu_submit');
 
-        if ($dailyQuotaEverExhausted) {
-            return true;
+        if ($submitTimes->count() < 2) {
+            return null;
         }
 
-        // Cek kuota total: totalDays * 8
-        $assignment = $this->workorderAssignment;
-        $tanggalMulai = optional($assignment)->tanggal_mulai ?? $this->tanggal_mulai;
-        $estimasiSelesai = optional($assignment)->estimasi_selesai;
-
-        if ($tanggalMulai && $estimasiSelesai) {
-            $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
-            $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
-            $totalDays = max(1, (int) $start->diffInDays($end, false) + 1);
-
-            $maxPelaporanTotal = $totalDays * 8;
-            $totalPelaporan = ProgressWorkorder::where('workorder_id', $this->id)
-                ->whereNotNull('waktu_submit')
-                ->count();
-
-            if ($totalPelaporan >= $maxPelaporanTotal) {
-                return true;
+        $deltas = [];
+        $previous = null;
+        foreach ($submitTimes as $waktu) {
+            $current = \Illuminate\Support\Carbon::parse($waktu);
+            if ($previous !== null) {
+                $deltas[] = $previous->diffInSeconds($current) / 60.0;
             }
+            $previous = $current;
         }
 
-        return false;
+        if (empty($deltas)) {
+            return null;
+        }
+
+        return round(array_sum($deltas) / count($deltas), 2);
     }
 }

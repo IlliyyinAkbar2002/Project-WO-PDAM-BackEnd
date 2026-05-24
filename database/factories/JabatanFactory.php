@@ -13,15 +13,17 @@ class JabatanFactory extends Factory
      */
     public function definition()
     {
+        // Urutan menentukan hirarki seniority (id makin kecil = makin senior),
+        // dipakai oleh PegawaiController::index() via `where('id', '>', $callerJabatanId)`.
+        // Daftar berjumlah 6 supaya `Jabatan::factory(6)->create()` di DatabaseSeeder
+        // tidak meledak karena array_shift mengembalikan null.
         static $names = [
-            'Kepala Departemen',
-            'Manager Senior',
             'Manager',
             'Supervisor',
-            'Staff Senior',
-            'Staff'
+            'Senior Staff',
+            'Staff',
         ];
-        $nama = array_shift($names);
+        $nama = array_shift($names) ?? 'Staff';
 
         return [
             'nama' => $nama,

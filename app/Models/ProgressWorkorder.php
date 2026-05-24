@@ -12,10 +12,9 @@ class ProgressWorkorder extends Model
     protected $table = 'progress_workorder';
     protected $guarded = [];
     protected $casts = [
-        'field_to_revise' => 'array',
-        'latitude'        => 'float',
-        'longitude'       => 'float',
-        'accuracy'        => 'float',
+        'latitude'  => 'float',
+        'longitude' => 'float',
+        'accuracy'  => 'float',
     ];
 
     public function workorder()
@@ -66,9 +65,22 @@ class ProgressWorkorder extends Model
             ->with(['pegawai:id,nama,nip']);
     }
 
-    public function reviewer()
+    /**
+     * Review history for this progress.
+     * One progress can have multiple details (initial submit + resubmits).
+     */
+    public function progressDetails()
     {
-        return $this->belongsTo(User::class, 'reviewed_by_user_id')
-            ->with(['pegawai:id,nama,nip']);
+        return $this->hasMany(ProgressDetail::class, 'progress_workorder_id')
+            ->orderBy('created_at', 'desc');
+    }
+
+    /**
+     * Latest review detail.
+     */
+    public function latestDetail()
+    {
+        return $this->hasOne(ProgressDetail::class, 'progress_workorder_id')
+            ->latestOfMany();
     }
 }

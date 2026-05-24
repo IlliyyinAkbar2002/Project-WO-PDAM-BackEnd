@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LaporanWorkorder;
+use App\Models\MasterAction;
+use App\Models\ProgressDetail;
 use App\Models\ProgressWorkorder;
 use App\Models\Status;
 use App\Models\TipeProgress;
 use App\Models\Workorder;
+use App\Models\WorkorderAction;
 use App\Services\ProgressWorkorderService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -111,13 +115,13 @@ class ProgressWorkorderController extends Controller
 
     private function validateProgressLimit(Workorder $workorder): ?\Illuminate\Http\JsonResponse
     {
-        // 1. Cek limit pelaporan harian (1 hari maksimal 8x pelaporan).
-        // Jika kuota harian pernah habis di hari manapun (termasuk hari-hari sebelumnya),
-        // pekerjaan dianggap selesai secara operasional dan pelaporan baru diblokir.
+        $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
+
         $dailyQuotaEverExhausted = DB::table('progress_workorder')
             ->selectRaw('1')
             ->where('workorder_id', $workorder->id)
             ->whereNotNull('waktu_submit')
+            ->where('tipe_progress_id', '!=', $mulaiTipeId)
             ->groupByRaw('waktu_submit::date')
             ->havingRaw('COUNT(*) >= 8')
             ->exists();
@@ -142,6 +146,7 @@ class ProgressWorkorderController extends Controller
         $maxPelaporanTotal = $totalDays * 8;
         $totalPelaporan = ProgressWorkorder::where('workorder_id', $workorder->id)
             ->whereNotNull('waktu_submit')
+            ->where('tipe_progress_id', '!=', $mulaiTipeId)
             ->count();
 
         if ($totalPelaporan >= $maxPelaporanTotal) {
@@ -182,10 +187,6 @@ class ProgressWorkorderController extends Controller
             return response()->json(['error' => 'Status WO tidak valid untuk mulai kerja'], 422);
         }
 
-        if ($limitError = $this->validateProgressLimit($workorder)) {
-            return $limitError;
-        }
-
         DB::beginTransaction();
         try {
             $order = ((int) ProgressWorkorder::where('workorder_id', $workorder->id)->max('order')) + 1;
@@ -214,6 +215,17 @@ class ProgressWorkorderController extends Controller
             }
 
             $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
+
+            $mulaiActionId = MasterAction::where('kode', 'MULAI_KERJA')->value('id');
+            if ($mulaiActionId) {
+                WorkorderAction::create([
+                    'workorder_id' => $workorder->id,
+                    'action_id'    => $mulaiActionId,
+                    'actor_id'     => $userId,
+                    'keterangan'   => 'Petugas memulai pekerjaan',
+                    'waktu_mulai'  => now(),
+                ]);
+            }
 
             DB::commit();
 
@@ -266,6 +278,22 @@ class ProgressWorkorderController extends Controller
             return response()->json(['error' => 'User bukan petugas WO ini'], 403);
         }
 
+        if ($tipeProgressKode === 'SELESAI') {
+            $isPicForThisWO = $workorder->assignmentMembers
+                ->where('user_id', $userId)
+                ->where('is_pic', true)
+                ->isNotEmpty();
+
+            $request->user()->loadMissing('pegawai.jabatan');
+            $jabatanKode = optional(optional($request->user()->pegawai)->jabatan)->kode;
+
+            if (! $isPicForThisWO || $jabatanKode !== 'SENIOR_STAFF') {
+                return response()->json([
+                    'error' => 'Hanya PIC dengan jabatan Senior Staff yang dapat submit SELESAI'
+                ], 403);
+            }
+        }
+
         if ($tipeProgressKode !== 'SELESAI') {
             if ($limitError = $this->validateProgressLimit($workorder)) {
                 return $limitError;
@@ -308,6 +336,20 @@ class ProgressWorkorderController extends Controller
                 $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
             }
 
+            $actionKode = $tipeProgressKode === 'SELESAI' ? 'SELESAI_KERJA' : 'SUBMIT_PROGRESS';
+            $submitActionId = MasterAction::where('kode', $actionKode)->value('id');
+            if ($submitActionId) {
+                WorkorderAction::create([
+                    'workorder_id' => $workorder->id,
+                    'action_id'    => $submitActionId,
+                    'actor_id'     => $userId,
+                    'keterangan'   => $tipeProgressKode === 'SELESAI'
+                        ? 'Petugas menandai pekerjaan selesai'
+                        : 'Petugas melaporkan progres',
+                    'waktu_mulai'  => now(),
+                ]);
+            }
+
             DB::commit();
 
             // Refresh workorder agar progres_persen terhitung ulang (termasuk cek kuota)
@@ -333,10 +375,11 @@ class ProgressWorkorderController extends Controller
         $this->hydrateInputFromBody($request);
 
         $validated = $request->validate([
-            'progress_id' => 'required|exists:progress_workorder,id',
-            'decision' => 'required|in:accept,revisi,tolak',
+            'progress_id'      => 'required|exists:progress_workorder,id',
+            'decision'         => 'required|in:accept,revisi,tolak',
+            'approval_notes'   => 'nullable|string',
             'alasan_penolakan' => 'nullable|string',
-            'field_to_revise' => 'nullable|array',
+            'field_to_revise'  => 'nullable|array',
         ]);
 
         $progress = ProgressWorkorder::with('workorder')->findOrFail($validated['progress_id']);
@@ -357,26 +400,85 @@ class ProgressWorkorderController extends Controller
 
         DB::beginTransaction();
         try {
+            // Catat hasil review ke progress_detail (1 progres bisa punya
+            // banyak siklus review). Kolom alasan_penolakan/field_to_revise/
+            // reviewed_at sudah tidak lagi disimpan di progress_workorder.
+            $fieldToReviseArr = $validated['field_to_revise'] ?? null;
+            $fieldToReviseStr = is_array($fieldToReviseArr)
+                ? implode(',', array_map('strval', $fieldToReviseArr))
+                : $fieldToReviseArr;
+
             if ($validated['decision'] === 'accept') {
+                $approvalNotes = $validated['approval_notes'] ?? null;
+
+                ProgressDetail::create([
+                    'progress_workorder_id' => $progress->id,
+                    'status'                => 'approved',
+                    'reviewed_by_user_id'   => $userId,
+                    'reviewed_at'           => now(),
+                ]);
+
                 $progress->update([
                     'status_id' => $this->statusId('VERIFIED'),
-                    'reviewed_by_user_id' => $userId,
-                    'reviewed_at' => now(),
                 ]);
 
                 $workorder->update([
-                    'status_id' => $this->statusId('SELESAI'),
+                    'status_id'           => $this->statusId('SELESAI'),
                     'approved_by_user_id' => $userId,
-                    'approved_at' => now(),
-                    'tanggal_selesai' => now(),
+                    'approved_at'         => now(),
+                    'approval_notes'      => $approvalNotes,
+                    'tanggal_selesai'     => now(),
                 ]);
+
+                $workorder->loadMissing([
+                    'jenisWorkorder',
+                    'woMeter',
+                    'woJaringan',
+                    'woInfrastruktur',
+                    'assignmentMembers.user.pegawai',
+                ]);
+
+                LaporanWorkorder::updateOrCreate(
+                    ['workorder_id' => $workorder->id],
+                    [
+                        'nomor_laporan'         => sprintf('LAP-WO-%s-%04d', now()->format('Y'), $workorder->id),
+                        'tanggal_terbit'        => now(),
+                        'ringkasan_pekerjaan'   => $workorder->deskripsi ?? $workorder->nama_workorder,
+                        'hasil_akhir_snapshot'  => $this->resolveKategoriSnapshot($workorder),
+                        'petugas_snapshot'      => $workorder->assignmentMembers->map(fn ($m) => [
+                            'user_id' => optional($m->user)->id,
+                            'nama'    => optional(optional($m->user)->pegawai)->nama,
+                            'nip'     => optional(optional($m->user)->pegawai)->nip,
+                        ])->values()->all(),
+                        'catatan_spv'           => $approvalNotes,
+                        'issued_by_user_id'     => $workorder->assigned_to,
+                        'approved_by_user_id'   => $userId,
+                        'approved_at'           => now(),
+                    ]
+                );
+
+                $approveActionId = MasterAction::where('kode', 'APPROVE')->value('id');
+                if ($approveActionId) {
+                    WorkorderAction::create([
+                        'workorder_id' => $workorder->id,
+                        'action_id'    => $approveActionId,
+                        'actor_id'     => $userId,
+                        'keterangan'   => $approvalNotes,
+                        'waktu_mulai'  => now(),
+                    ]);
+                }
             } elseif ($validated['decision'] === 'revisi') {
+                ProgressDetail::create([
+                    'progress_workorder_id' => $progress->id,
+                    'status'                => 'rejected',
+                    'reviewed_by_user_id'   => $userId,
+                    'reviewed_at'           => now(),
+                    'alasan_penolakan'      => $validated['alasan_penolakan'] ?? null,
+                    'field_to_revise'       => $fieldToReviseStr,
+                ]);
+
                 $progress->update([
                     'status_id' => $this->statusId('REVISI_REQUESTED'),
-                    'reviewed_by_user_id' => $userId,
-                    'reviewed_at' => now(),
-                    'alasan_penolakan' => $validated['alasan_penolakan'] ?? null,
-                    'field_to_revise' => $validated['field_to_revise'] ?? null,
                 ]);
 
                 $nextOrder = ((int) ProgressWorkorder::where('workorder_id', $workorder->id)->max('order')) + 1;
@@ -391,11 +493,16 @@ class ProgressWorkorderController extends Controller
 
                 $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
             } else {
+                ProgressDetail::create([
+                    'progress_workorder_id' => $progress->id,
+                    'status'                => 'rejected',
+                    'reviewed_by_user_id'   => $userId,
+                    'reviewed_at'           => now(),
+                    'alasan_penolakan'      => $validated['alasan_penolakan'] ?? null,
+                ]);
+
                 $progress->update([
                     'status_id' => $this->statusId('DITOLAK_SPV'),
-                    'reviewed_by_user_id' => $userId,
-                    'reviewed_at' => now(),
-                    'alasan_penolakan' => $validated['alasan_penolakan'] ?? null,
                 ]);
 
                 $nextOrder = ((int) ProgressWorkorder::where('workorder_id', $workorder->id)->max('order')) + 1;
@@ -409,6 +516,17 @@ class ProgressWorkorderController extends Controller
                 ]);
 
                 $workorder->update(['status_id' => $this->statusId('DITOLAK_SPV')]);
+
+                $rejectActionId = MasterAction::where('kode', 'REJECT')->value('id');
+                if ($rejectActionId) {
+                    WorkorderAction::create([
+                        'workorder_id' => $workorder->id,
+                        'action_id'    => $rejectActionId,
+                        'actor_id'     => $userId,
+                        'keterangan'   => $validated['alasan_penolakan'] ?? null,
+                        'waktu_mulai'  => now(),
+                    ]);
+                }
             }
 
             DB::commit();
@@ -592,6 +710,21 @@ class ProgressWorkorderController extends Controller
 
 
 
+    private function resolveKategoriSnapshot(Workorder $workorder): array
+    {
+        $kategori = optional($workorder->jenisWorkorder)->kategori_form;
+        if ($kategori === 'meter') {
+            return optional($workorder->woMeter)->toArray() ?? [];
+        }
+        if ($kategori === 'jaringan') {
+            return optional($workorder->woJaringan)->toArray() ?? [];
+        }
+        if ($kategori === 'infrastruktur') {
+            return optional($workorder->woInfrastruktur)->toArray() ?? [];
+        }
+        return [];
+    }
+
     /**
      * Manual run to add progress for active workorders
      *
@@ -631,11 +764,11 @@ class ProgressWorkorderController extends Controller
     {
         try {
             $workorder = Workorder::with('workorderAssignment')->findOrFail($workorderId);
-            
-            // Limit pelaporan harian — cek hari ini dan hari-hari sebelumnya.
-            // Jika kuota harian pernah habis di hari manapun, sisa kuota = 0.
+            $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
+
             $countHariIni = ProgressWorkorder::where('workorder_id', $workorder->id)
                 ->whereNotNull('waktu_submit')
+                ->where('tipe_progress_id', '!=', $mulaiTipeId)
                 ->whereDate('waktu_submit', now()->toDateString())
                 ->count();
 
@@ -643,6 +776,7 @@ class ProgressWorkorderController extends Controller
                 ->selectRaw('1')
                 ->where('workorder_id', $workorder->id)
                 ->whereNotNull('waktu_submit')
+                ->where('tipe_progress_id', '!=', $mulaiTipeId)
                 ->groupByRaw('waktu_submit::date')
                 ->havingRaw('COUNT(*) >= 8')
                 ->exists();
@@ -665,6 +799,7 @@ class ProgressWorkorderController extends Controller
             $maxPelaporanTotal = $totalDays * 8;
             $totalPelaporan = ProgressWorkorder::where('workorder_id', $workorder->id)
                 ->whereNotNull('waktu_submit')
+                ->where('tipe_progress_id', '!=', $mulaiTipeId)
                 ->count();
 
             $sisaKuotaTotal = max(0, $maxPelaporanTotal - $totalPelaporan);

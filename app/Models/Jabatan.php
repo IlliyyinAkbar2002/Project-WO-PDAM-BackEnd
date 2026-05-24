@@ -9,6 +9,7 @@ class Jabatan extends Model
 {
     use HasFactory;
     protected $table = 'm_jabatan';
+    protected $guarded = [];
 
     public function pegawai()
     {

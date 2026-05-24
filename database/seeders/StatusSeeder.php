@@ -41,8 +41,6 @@ class StatusSeeder extends Seeder
             ['id' => 13, 'kode' => 'DITUGASKAN_KE_STAFF',      'nama' => 'Ditugaskan ke Staff',      'keterangan' => 'WO sudah diassign SPV ke tim pelaksana'],
             ['id' => 14, 'kode' => 'REVISI_REQUESTED',         'nama' => 'Revisi Requested',         'keterangan' => 'SPV meminta perbaikan progres'],
             ['id' => 15, 'kode' => 'DITOLAK_SPV',              'nama' => 'Ditolak SPV',              'keterangan' => 'Progress atau WO ditolak oleh SPV'],
-            ['id' => 16, 'kode' => 'MENUNGGU_APPROVAL_MANAGER','nama' => 'Menunggu Approval Manager','keterangan' => 'WO menunggu persetujuan akhir Manager'],
-            ['id' => 17, 'kode' => 'DITOLAK_MANAGER',          'nama' => 'Ditolak Manager',          'keterangan' => 'WO ditolak oleh Manager'],
             ['id' => 18, 'kode' => 'DIBATALKAN',               'nama' => 'Dibatalkan',               'keterangan' => 'Progress dibatalkan oleh petugas dalam batas waktu'],
         ];
 

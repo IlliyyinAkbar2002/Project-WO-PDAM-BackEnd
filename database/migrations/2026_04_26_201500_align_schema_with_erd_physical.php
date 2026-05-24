@@ -286,8 +286,6 @@ class AlignSchemaWithErdPhysical extends Migration
             $table->jsonb('hasil_akhir_snapshot');
             $table->jsonb('petugas_snapshot');
             $table->text('catatan_spv')->nullable();
-            $table->text('catatan_manager')->nullable();
-            $table->string('pdf_url', 500)->nullable();
             $table->foreignId('issued_by_user_id')->constrained('users');
             $table->foreignId('approved_by_user_id')->constrained('users');
             $table->timestamp('approved_at');
