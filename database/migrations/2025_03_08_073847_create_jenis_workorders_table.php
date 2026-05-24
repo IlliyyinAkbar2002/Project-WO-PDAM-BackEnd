@@ -16,6 +16,12 @@ class CreateJenisWorkordersTable extends Migration
         Schema::create('m_jenis_workorder', function (Blueprint $table) {
             $table->id();
             $table->string('nama');
+            $table->enum('kategori', [
+                'meter',
+                'jaringan',
+                'infrastruktur'
+            ]);
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }

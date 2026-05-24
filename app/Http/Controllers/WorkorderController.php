@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\LemburSpl;
+use App\Models\JenisWorkorder;
 use App\Models\Workorder;
 use App\Models\WorkorderAction;
 
@@ -14,6 +15,13 @@ use Illuminate\Support\Facades\DB;
 
 class WorkorderController extends Controller
 {
+    protected $workorderService;
+
+    public function __construct(WorkorderService $workorderService)
+    {
+        $this->workorderService = $workorderService;
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -22,121 +30,64 @@ class WorkorderController extends Controller
     public function index(Request $request)
     {
         try {
-            $type = $request->query('type');
             $search = $request->query('search');
-            $status = $request->query('status') ? explode(',', $request->query('status')) : null;
-            $excludeStatus = $request->query('exclude_status') ? explode(',', $request->query('exclude_status')) : null;
-            $picId = $request->query('pic_id');
-            $userId = $request->query('user_id');
-            $dateRange = $request->query('date_range');
-            $startDate = $request->query('start_date');
-            $endDate = $request->query('end_date');
+            $status = $request->query('status');
+            $prioritas = $request->query('prioritas');
             $page = $request->query('page', 1);
             $limit = $request->query('limit', 10);
             $sort = $request->query('sort', 'desc');
-            $all = $request->query('all', false);
 
-            $query = Workorder::with('petugas', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl');
-            if ($type) {
-                $query->where('tipe_workorder_id', $type);
-            }
+            $query = Workorder::with([
+                'departemen',
+                'jenisWorkorder',
+                'pic',
+                'user',
+            ]);
             if ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('judul_pekerjaan', 'ILIKE', "%{$search}%")
-                        ->orWhereHas(
-                            'jenisWorkorder',
-                            fn($q) =>
-                            $q->where('nama', 'ILIKE', "%{$search}%")
-                        )
-                        ->orWhereHas(
-                            'jenisLokasi',
-                            fn($q) =>
-                            $q->where('nama', 'ILIKE', "%{$search}%")
-                        )
-                        ->orWhere('waktu_penugasan', 'ILIKE', "%{$search}%")
-                        ->orWhere('estimasi_selesai', 'ILIKE', "%{$search}%")
-                        ->orWhere('estimasi_durasi', 'ILIKE', "%{$search}%")
-                        ->orWhere('unit_waktu', 'ILIKE', "%{$search}%")
-                        ->orWhereHas(
-                            'petugas.pegawai',
-                            fn($q) =>
-                            $q->where('nama', 'ILIKE', "%{$search}%")
-                                ->orWhere('nip', 'ILIKE', "%{$search}%")
-                        )
-                        ->orWhereHas(
-                            'status',
-                            fn($q) =>
-                            $q->where('nama', 'ILIKE', "%{$search}%")
-                        );
+                    $q->where('nama_workorder', 'ILIKE', "%{$search}%")
+                        ->orWhere('deskripsi', 'ILIKE', "%{$search}%")
+                        ->orWhere('kode_pengaduan', 'ILIKE', "%{$search}%")
+                        ->orWhereHas('jenisWorkorder', function ($sub) use ($search) {
+
+                            $sub->where('nama', 'ILIKE', "%{$search}%");
+                        })
+                        ->orWhereHas('pic', function ($sub) use ($search) {
+
+                            $sub->where('name', 'ILIKE', "%{$search}%");
+                        })
+                        ->orWhereHas('user', function ($sub) use ($search) {
+
+                            $sub->where('name', 'ILIKE', "%{$search}%");
+                        });
                 });
             }
+            // Filter status
             if ($status) {
-                $query->whereIn('status_id', $status);
+                $query->where('status', $status);
             }
-            if ($excludeStatus) {
-                $query->whereNotIn('status_id', $excludeStatus);
+            // Filter prioritas
+            if ($prioritas) {
+                $query->where('prioritas', $prioritas);
             }
-            if ($picId) {
-                $query->where('pic_id', $picId);
-            }
-            if ($userId) {
-                $query->where('petugas_id', $userId);
-            }
-            if ($dateRange) {
-                switch ($dateRange) {
-                    case 'hari_ini':
-                        $query->whereBetween('created_at', [
-                            Carbon::now()->startOfDay(),
-                            Carbon::now()->endOfDay(),
-                        ]);
-                        break;
-                    case 'minggu_ini':
-                        $query->whereBetween('created_at', [
-                            Carbon::now()->startOfWeek(),
-                            Carbon::now()->endOfWeek(),
-                        ]);
-                        break;
-                    case 'bulan_ini':
-                        $query->whereBetween('created_at', [
-                            Carbon::now()->startOfMonth(),
-                            Carbon::now()->endOfMonth(),
-                        ]);
-                        break;
-                    case '3_bulan':
-                        $query->whereBetween('created_at', [
-                            Carbon::now()->subMonths(3)->startOfDay(),
-                            Carbon::now()->endOfDay(),
-                        ]);
-                        break;
-                    case 'custom':
-                        if ($startDate && $endDate) {
-                            $query->whereBetween('created_at', [
-                                Carbon::parse($startDate)->startOfDay(),
-                                Carbon::parse($endDate)->endOfDay(),
-                            ]);
-                        }
-                        break;
-                }
-            }
-
-            $query->orderBy('created_at', $sort)->orderBy('id', $sort);
-
-            if ($all) {
-                return response()->json([
-                    'data' => $query->get(),
-                ]);
-            }
-
-            $workorders = $query->paginate($limit, ['*'], 'page', $page);
+            $query->orderBy('created_at', $sort);
+            // Pagination
+            $workorders = $query->paginate(
+                $limit,
+                ['*'],
+                'page',
+                $page
+            );
             return response()->json([
                 'data' => $workorders->items(),
                 'totalPages' => $workorders->lastPage(),
                 'currentPage' => $workorders->currentPage(),
             ]);
+
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data workorder',
-                'message' => $e->getMessage()
+                'error' => 'Gagal mengambil data workorder',
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -148,35 +99,48 @@ class WorkorderController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
-    {
-        $validatedData = $request->validate([
-            'judul_pekerjaan' => 'required|string',
-            'waktu_penugasan' => 'required|date',
-            'estimasi_durasi' => 'required|integer',
-            'unit_waktu' => 'required|in:Jam,Hari,Bulan',
-            'estimasi_selesai' => 'required|date',
-            'longitude' => 'nullable|numeric',
-            'latitude' => 'nullable|numeric',
-            'pic_id' => 'required|exists:users,id',
-            'jenis_workorder_id' => 'required|exists:m_jenis_workorder,id',
-            'jenis_lokasi_id' => 'required|exists:m_jenis_lokasi,id',
-            'tipe_workorder_id' => 'required|exists:m_tipe_workorder,id',
-            'petugas_id' => 'required|array|min:1',
-            'petugas_id.*' => 'exists:users,id',
-        ]);
-        try {
-            $workorder = (new WorkorderService())->createWorkorders($validatedData);
+{
+    $validatedData = $request->validate([
+        'nama_workorder' => 'required|string|max:255',
+        'deskripsi' => 'nullable|string',
+        'lokasi' => 'nullable|string|max:255',
+        'prioritas' => 'required|in:Rendah,Sedang,Tinggi,Urgent',
+        'status' => 'required|in:Open,Progress,Pending,Done,Cancel',
+        'kode_pengaduan' => 'nullable|string|max:255',
+        'departemen_id' => 'required|exists:m_departemen,id',
+        'jenis_workorder_id' => 'required|exists:m_jenis_workorder,id',
+        'pic_id' => 'required|exists:users,id',
+        'user_id' => 'required|exists:users,id',
+    ]);
 
+    try {
+        // ==================================================
+        // VALIDASI JENIS WORKORDER HARUS AKTIF
+        // ==================================================
+        $jenisWorkorder = JenisWorkorder::findOrFail(
+            $validatedData['jenis_workorder_id']
+        );
+        if (!$jenisWorkorder->is_active) {
             return response()->json([
-                'message' => 'Work Order berhasil disimpan',
-                'data' => $workorder,
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Jenis workorder nonaktif dan tidak dapat digunakan.'
+            ], 422);
         }
+
+        // ==================================================
+        // CREATE WORKORDER
+        // ==================================================
+        $workorder = (new WorkorderService())
+            ->createWorkorders($validatedData);
+        return response()->json([
+            'message' => 'Workorder berhasil disimpan',
+            'data' => $workorder,
+        ], 201);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * Display the specified resource.
@@ -187,10 +151,19 @@ class WorkorderController extends Controller
     public function show($id)
     {
         try {
-            $workorder = Workorder::with('petugas', 'pic', 'jenisWorkorder', 'jenisLokasi', 'tipeWorkorder', 'status', 'lemburSpl', 'latestFreeze')->findOrFail($id);
-            return response()->json($workorder, 200);
+            $workorder = Workorder::with([
+                'departemen',
+                'jenisWorkorder',
+                'pic',
+                'user',
+            ])->findOrFail($id);
+            return response()->json([
+                'data' => $workorder
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -204,15 +177,28 @@ class WorkorderController extends Controller
     public function update(Request $request, $id)
     {
         $validatedData = $request->validate([
-            'estimasi_selesai' => 'nullable|date',
-            'status_id' => 'nullable|exists:m_status,id',
+        'nama_workorder' => 'sometimes|string|max:255',
+        'deskripsi' => 'nullable|string',
+        'lokasi' => 'nullable|string|max:255',
+        'prioritas' => 'sometimes|in:Rendah,Sedang,Tinggi,Urgent',
+        'status' => 'sometimes|in:Open,Progress,Pending,Done,Cancel',
+        'kode_pengaduan' => 'nullable|string|max:255',
+        'departemen_id' => 'sometimes|exists:m_departemen,id',
+        'jenis_workorder_id' => 'sometimes|exists:m_jenis_workorder,id',
+        'pic_id' => 'sometimes|exists:users,id',
+        'user_id' => 'sometimes|exists:users,id',
         ]);
         try {
             $workorder = Workorder::findOrFail($id);
             $workorder->update($validatedData);
-            return response()->json(['message' => 'Workorder berhasil diupdate', 'data' => $workorder], 200);
+            return response()->json([
+                'message' => 'Workorder berhasil diperbarui',
+                'data' => $workorder,
+            ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -225,11 +211,15 @@ class WorkorderController extends Controller
     public function destroy($id)
     {
         try {
-            $workorder = Workorder::findOrFail($id);
-            $workorder->delete();
-            return response()->json(['message' => 'Workorder berhasil dihapus'], 200);
+        $workorder = Workorder::findOrFail($id);
+        $workorder->delete();
+        return response()->json([
+            'message' => 'Workorder berhasil dihapus',
+        ], 200);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
 }

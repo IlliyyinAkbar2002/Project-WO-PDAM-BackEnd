@@ -9,7 +9,14 @@ class JenisWorkorder extends Model
 {
     use HasFactory;
     protected $table = 'm_jenis_workorder';
+
     protected $guarded = [];
+
+    protected $fillable = [
+    'nama',
+    'kategori',
+    'is_active',
+];
 
     public function formWorkorder()
     {

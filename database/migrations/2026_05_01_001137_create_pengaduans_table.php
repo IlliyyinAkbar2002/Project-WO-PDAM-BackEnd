@@ -17,6 +17,12 @@ class CreatePengaduansTable extends Migration
             $table->string('kode_pengaduan')->primary();
             $table->string('judul');
             $table->text('deskripsi')->nullable();
+            $table->enum('status', [
+                'pending',
+                'diproses',
+                'selesai',
+                'ditolak'
+            ])->default('pending');
             $table->timestamp('tanggal_pengaduan')->nullable();
             $table->timestamps();
         });

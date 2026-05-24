@@ -17,10 +17,14 @@ class Pengaduan extends Model
 
     protected $primaryKey = 'kode_pengaduan';
 
+    protected $casts = [
+    'tanggal_pengaduan' => 'datetime',
+    ];
+
     protected $guarded = [];
 
     public function workorders()
     {
-        return $this->hasMany(Workorder::class, 'pengaduan_id');
+        return $this->hasMany(Workorder::class, 'pengaduan_id', 'kode_pengaduan');
     }
 }

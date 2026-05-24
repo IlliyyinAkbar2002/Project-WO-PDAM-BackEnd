@@ -69,9 +69,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('pengaduan', PengaduanController::class);
 
         // Jenis Work Order
+        Route::apiResource('jenis-workorder', JenisWorkorderController::class);
         Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
-        Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
-        Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
+        Route::patch('jenis-workorder/{id}/status', [JenisWorkorderController::class, 'updateStatus']);
         
         // Form Workorder
         Route::get('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'index']);

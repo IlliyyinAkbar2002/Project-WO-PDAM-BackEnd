@@ -15,20 +15,48 @@ class CreateWorkordersTable extends Migration
     {
         Schema::create('workorder', function (Blueprint $table) {
             $table->id();
-            $table->string('judul_pekerjaan');
-            $table->datetime('waktu_penugasan');
-            $table->integer('estimasi_durasi');
-            $table->string('unit_waktu');
-            $table->datetime('estimasi_selesai');
-            $table->decimal('longitude', 9, 6)->nullable();
-            $table->decimal('latitude', 8, 6)->nullable();
-            $table->foreignId('petugas_id')->constrained('users');
-            $table->foreignId('pic_id')->constrained('users');
-            $table->foreignId('lembur_spl_id')->nullable()->constrained('lembur_spl');
-            $table->foreignId('status_id')->constrained('m_status');
-            $table->foreignId('jenis_workorder_id')->constrained('m_jenis_workorder');
-            $table->foreignId('jenis_lokasi_id')->constrained('m_jenis_lokasi');
-            $table->foreignId('tipe_workorder_id')->constrained('m_tipe_workorder');
+            $table->string('nama_workorder');
+            $table->text('deskripsi')->nullable();
+            $table->string('lokasi')->nullable();
+            $table->enum('prioritas', [
+                'Rendah',
+                'Sedang',
+                'Tinggi',
+                'Urgent'
+            ])->default('Sedang');
+            $table->enum('status', [
+                'Open',
+                'Progress',
+                'Pending',
+                'Done',
+                'Cancel'
+            ])->default('Open');
+            $table->string('kode_pengaduan')->nullable();
+
+            $table->foreignId('departemen_id')
+                ->constrained('m_departemen')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
+
+            $table->foreignId('jenis_workorder_id')
+                ->constrained('m_jenis_workorder')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
+
+            // Ditujukan kepada SPV/PIC
+            $table->foreignId('pic_id')
+                ->constrained('users')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
+
+            // User pembuat workorder
+            $table->foreignId('user_id')
+                ->constrained('users')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
+            // $table->foreignId('petugas_id')->constrained('users');
+            // $table->foreignId('pic_id')->constrained('users');
+            // $table->foreignId('jenis_workorder_id')->constrained('m_jenis_workorder');
             $table->timestamps();
         });
     }
