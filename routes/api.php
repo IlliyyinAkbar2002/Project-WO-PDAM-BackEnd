@@ -13,6 +13,7 @@ use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\ProgressDetailController;
 use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\MaterialController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PegawaiController;
 use App\Http\Controllers\WoPeminjamanMaterialController;
 use Illuminate\Support\Facades\Route;
@@ -102,6 +103,10 @@ Route::prefix('v1')->group(function () {
         Route::get('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'index']);
         Route::post('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'pinjam']);
         Route::post('peminjaman-material/{id}/kembalikan', [WoPeminjamanMaterialController::class, 'kembalikan']);
+
+        // [S] Notifikasi — Laravel Database Notification
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::match(['put', 'post'], 'notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     });
 });
 

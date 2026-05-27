@@ -5,13 +5,16 @@ namespace App\Services;
 use App\Models\MasterAction;
 use App\Models\MasterLocation;
 use App\Models\Status;
+use App\Models\User;
 use App\Models\WoAssignmentMember;
 use App\Models\WoInfrastruktur;
 use App\Models\WoJaringan;
 use App\Models\WoMeter;
 use App\Models\Workorder;
 use App\Models\WorkorderAssignment;
+use App\Notifications\WorkOrderNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * AssignmentService
@@ -81,8 +84,42 @@ class AssignmentService
 
             $this->recordAction($workorder, $spvUserId);
 
+            $this->notifyStaffAssigned($workorder, $data['petugas'], $spvUserId);
+
             return $assignment;
         });
+    }
+
+    /**
+     * Kirim notifikasi `wo_assigned` ke setiap staff yang baru di-assign.
+     * Best-effort: gagal notifikasi tidak membatalkan transaksi.
+     */
+    private function notifyStaffAssigned(Workorder $workorder, array $petugasList, int $spvUserId): void
+    {
+        try {
+            $spv = User::with('pegawai:id,nama')->find($spvUserId);
+            $senderName = optional($spv?->pegawai)->nama ?? $spv?->name ?? 'SPV';
+
+            $userIds = collect($petugasList)->pluck('user_id')->filter()->map(fn ($v) => (int) $v)->unique();
+
+            $staffUsers = User::whereIn('id', $userIds)->get();
+
+            foreach ($staffUsers as $staff) {
+                $staff->notify(new WorkOrderNotification(
+                    'Tugas Work Order Baru',
+                    "{$senderName} menugaskan Anda pada WO #{$workorder->nama_workorder}.",
+                    (int) $workorder->id,
+                    'wo_assigned',
+                    $senderName
+                ));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('notifyStaffAssigned failed', [
+                'workorder_id' => $workorder->id,
+                'spv_user_id'  => $spvUserId,
+                'error'        => $e->getMessage(),
+            ]);
+        }
     }
 
     // ------------------------------------------------------------------

@@ -61,9 +61,11 @@ class AuthController extends Controller
             $ability,
         ])->plainTextToken;
         
-        // Load relasi pegawai untuk mendapatkan nama
-        $user->load('pegawai');
-        
+        // Load pegawai + jabatan + departemen.
+        // jabatan WAJIB diikutkan: role_id=3 dipakai bersama oleh SPV dan Staff,
+        // FE membedakan keduanya lewat pegawai.jabatan.kode (SPV vs STAFF/SENIOR_STAFF).
+        $user->load('pegawai.jabatan', 'pegawai.departemen');
+
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil',
@@ -73,6 +75,20 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'email' => $user->email,
                 'role_id' => $user->role_id,
+                'pegawai' => $user->pegawai ? [
+                    'id'        => $user->pegawai->id,
+                    'nama'      => $user->pegawai->nama,
+                    'nip'       => $user->pegawai->nip,
+                    'jabatan'   => $user->pegawai->jabatan ? [
+                        'id'   => $user->pegawai->jabatan->id,
+                        'kode' => $user->pegawai->jabatan->kode,
+                        'nama' => $user->pegawai->jabatan->nama,
+                    ] : null,
+                    'departemen' => $user->pegawai->departemen ? [
+                        'id'   => $user->pegawai->departemen->id,
+                        'nama' => $user->pegawai->departemen->nama,
+                    ] : null,
+                ] : null,
             ],
         ], 200);
     }
@@ -86,17 +102,7 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * Self-register untuk aplikasi mobile karyawan PDAM.
-     *
-     * Registrasi membuat dua entitas dalam satu transaksi:
-     *   1. m_pegawai  → identitas karyawan (nip/alamat/departemen/jabatan kosong,
-     *                   dilengkapi kemudian oleh Super Admin).
-     *   2. users      → kredensial login, role default = employee.
-     *
-     * role_id TIDAK pernah diterima dari request untuk mencegah privilege
-     * escalation — selalu dipaksa ke role "employee" di sisi server.
-     */
+
     public function AuthRegister(Request $request)
     {
         try {
@@ -176,14 +182,27 @@ class AuthController extends Controller
 
     public function me(Request $request) {
         $user = $request->user();
-        $user->load('pegawai');
-        
+        $user->load('pegawai.jabatan', 'pegawai.departemen');
+
         return response()->json([
             'id' => $user->id,
             'name' => $user->pegawai?->nama,
             'email' => $user->email,
             'role_id' => $user->role_id,
-            'pegawai' => $user->pegawai,
+            'pegawai' => $user->pegawai ? [
+                'id'        => $user->pegawai->id,
+                'nama'      => $user->pegawai->nama,
+                'nip'       => $user->pegawai->nip,
+                'jabatan'   => $user->pegawai->jabatan ? [
+                    'id'   => $user->pegawai->jabatan->id,
+                    'kode' => $user->pegawai->jabatan->kode,
+                    'nama' => $user->pegawai->jabatan->nama,
+                ] : null,
+                'departemen' => $user->pegawai->departemen ? [
+                    'id'   => $user->pegawai->departemen->id,
+                    'nama' => $user->pegawai->departemen->nama,
+                ] : null,
+            ] : null,
         ], 200);
     }
 
@@ -199,9 +218,9 @@ class AuthController extends Controller
                 ], 401);
             }
             
-            // Load relasi pegawai untuk mendapatkan nama
-            $user->load('pegawai');
-            
+            // Load relasi pegawai + jabatan + departemen agar FE bisa membedakan SPV vs Staff
+            $user->load('pegawai.jabatan', 'pegawai.departemen');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Data user berhasil diambil',
@@ -210,6 +229,20 @@ class AuthController extends Controller
                     'name' => $user->pegawai?->nama,
                     'email' => $user->email,
                     'role_id' => $user->role_id,
+                    'pegawai' => $user->pegawai ? [
+                        'id'        => $user->pegawai->id,
+                        'nama'      => $user->pegawai->nama,
+                        'nip'       => $user->pegawai->nip,
+                        'jabatan'   => $user->pegawai->jabatan ? [
+                            'id'   => $user->pegawai->jabatan->id,
+                            'kode' => $user->pegawai->jabatan->kode,
+                            'nama' => $user->pegawai->jabatan->nama,
+                        ] : null,
+                        'departemen' => $user->pegawai->departemen ? [
+                            'id'   => $user->pegawai->departemen->id,
+                            'nama' => $user->pegawai->departemen->nama,
+                        ] : null,
+                    ] : null,
                     'created_at' => $user->created_at,
                     'updated_at' => $user->updated_at,
                 ]

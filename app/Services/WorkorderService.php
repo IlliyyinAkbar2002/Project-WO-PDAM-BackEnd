@@ -4,8 +4,11 @@ namespace App\Services;
 
 use App\Models\MasterAction;
 use App\Models\Status;
+use App\Models\User;
 use App\Models\Workorder;
+use App\Notifications\WorkOrderNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WorkorderService
 {
@@ -45,6 +48,8 @@ class WorkorderService
         'waktu_mulai'      => $data['tanggal_mulai'] ?? $data['waktu_penugasan'],
       ]);
 
+      $this->notifySpvAssigned($workorder, $assignedTo, $data['created_by_user_id'] ?? null);
+
       return [
         $workorder->load(
           'assignmentMembers',
@@ -55,6 +60,45 @@ class WorkorderService
         ),
       ];
     });
+  }
+
+  /**
+   * Kirim notifikasi `wo_created` ke SPV yang ditugaskan.
+   * Best-effort: kegagalan notifikasi tidak boleh membatalkan transaksi WO.
+   */
+  private function notifySpvAssigned(Workorder $workorder, int $spvUserId, ?int $creatorUserId): void
+  {
+    try {
+      $spv = User::find($spvUserId);
+      if (! $spv) {
+        return;
+      }
+
+      $senderName = $this->resolveSenderName($creatorUserId, 'Superadmin');
+
+      $spv->notify(new WorkOrderNotification(
+        'Tugas Work Order Baru',
+        "{$senderName} membagikan WO #{$workorder->nama_workorder} kepada Anda.",
+        (int) $workorder->id,
+        'wo_created',
+        $senderName
+      ));
+    } catch (\Throwable $e) {
+      Log::warning('notifySpvAssigned failed', [
+        'workorder_id' => $workorder->id,
+        'spv_user_id'  => $spvUserId,
+        'error'        => $e->getMessage(),
+      ]);
+    }
+  }
+
+  private function resolveSenderName(?int $userId, string $fallback): string
+  {
+    if (! $userId) {
+      return $fallback;
+    }
+    $user = User::with('pegawai:id,nama')->find($userId);
+    return optional($user?->pegawai)->nama ?? $user?->name ?? $fallback;
   }
 
   private function ensureDefaultActionExists(): int

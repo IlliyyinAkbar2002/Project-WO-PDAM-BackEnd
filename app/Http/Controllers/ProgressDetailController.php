@@ -5,15 +5,55 @@ namespace App\Http\Controllers;
 use App\Models\ProgressDetail;
 use App\Models\ProgressWorkorder;
 use App\Models\Status;
+use App\Models\User;
+use App\Notifications\WorkOrderNotification;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProgressDetailController extends Controller
 {
     private function statusId(string $kode): ?int
     {
         return Status::where('kode', $kode)->value('id');
+    }
+
+    /**
+     * Kirim notifikasi `wo_completed` ke pembuat WO (Superadmin) saat
+     * progres SELESAI di-approve. Best-effort: gagal notifikasi tidak
+     * boleh mempengaruhi response approval.
+     */
+    private function notifyWorkOrderCompleted($workorder, int $spvUserId): void
+    {
+        try {
+            $creatorId = $workorder->created_by_user_id;
+            if (! $creatorId) {
+                return;
+            }
+
+            $creator = User::find($creatorId);
+            if (! $creator) {
+                return;
+            }
+
+            $spv = User::with('pegawai:id,nama')->find($spvUserId);
+            $senderName = optional($spv?->pegawai)->nama ?? $spv?->name ?? 'SPV';
+
+            $creator->notify(new WorkOrderNotification(
+                'Work Order Selesai',
+                "{$senderName} telah menyelesaikan WO #{$workorder->nama_workorder}.",
+                (int) $workorder->id,
+                'wo_completed',
+                $senderName
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('notifyWorkOrderCompleted failed', [
+                'workorder_id' => $workorder->id,
+                'spv_user_id'  => $spvUserId,
+                'error'        => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -169,6 +209,10 @@ class ProgressDetailController extends Controller
             }
 
             DB::commit();
+
+            if ($tipeKode === 'SELESAI') {
+                $this->notifyWorkOrderCompleted($workorder, $userId);
+            }
 
             return response()->json([
                 'message' => 'Progress berhasil diapprove',

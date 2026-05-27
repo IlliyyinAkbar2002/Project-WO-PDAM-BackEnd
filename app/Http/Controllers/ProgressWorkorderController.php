@@ -8,8 +8,10 @@ use App\Models\ProgressDetail;
 use App\Models\ProgressWorkorder;
 use App\Models\Status;
 use App\Models\TipeProgress;
+use App\Models\User;
 use App\Models\Workorder;
 use App\Models\WorkorderAction;
+use App\Notifications\WorkOrderNotification;
 use App\Services\ProgressWorkorderService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -352,6 +354,10 @@ class ProgressWorkorderController extends Controller
 
             DB::commit();
 
+            if ($tipeProgressKode === 'SELESAI') {
+                $this->notifyWorkOrderReadyForReview($workorder, $userId);
+            }
+
             // Refresh workorder agar progres_persen terhitung ulang (termasuk cek kuota)
             $workorder->refresh();
             $workorder->load('status');
@@ -367,6 +373,43 @@ class ProgressWorkorderController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Kirim notifikasi `wo_ready_for_review` ke SPV yang menugaskan WO
+     * setelah PIC submit progres SELESAI (WO masuk status PENGECEKAN).
+     * Best-effort: gagal notifikasi tidak boleh mempengaruhi response submit.
+     */
+    private function notifyWorkOrderReadyForReview(Workorder $workorder, ?int $picUserId): void
+    {
+        try {
+            $spvId = $workorder->assigned_to;
+            if (! $spvId) {
+                return;
+            }
+
+            $spv = User::find($spvId);
+            if (! $spv) {
+                return;
+            }
+
+            $pic = $picUserId ? User::with('pegawai:id,nama')->find($picUserId) : null;
+            $senderName = optional(optional($pic)->pegawai)->nama ?? optional($pic)->name ?? 'Petugas';
+
+            $spv->notify(new WorkOrderNotification(
+                'Work Order Menunggu Review',
+                "{$senderName} telah menyelesaikan WO #{$workorder->nama_workorder} dan menunggu review Anda.",
+                (int) $workorder->id,
+                'wo_ready_for_review',
+                $senderName
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('notifyWorkOrderReadyForReview failed', [
+                'workorder_id' => $workorder->id,
+                'pic_user_id'  => $picUserId,
+                'error'        => $e->getMessage(),
+            ]);
         }
     }
 
