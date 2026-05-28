@@ -103,6 +103,7 @@ Route::prefix('v1')->group(function () {
         Route::get('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'index']);
         Route::post('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'pinjam']);
         Route::post('peminjaman-material/{id}/kembalikan', [WoPeminjamanMaterialController::class, 'kembalikan']);
+        Route::post('peminjaman-material/{id}/verify', [WoPeminjamanMaterialController::class, 'verify']);
 
         // [S] Notifikasi — Laravel Database Notification
         Route::get('notifications', [NotificationController::class, 'index']);

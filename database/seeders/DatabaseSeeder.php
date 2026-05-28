@@ -213,6 +213,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->call(TipeProgressSeeder::class);
+        $this->call(MaterialSeeder::class);
         JenisWorkorder::factory(10)->create();
     }
 }

@@ -26,6 +26,7 @@ class WoPeminjamanMaterial extends Model
     protected $casts = [
         'diajukan_at'     => 'datetime',
         'dikembalikan_at' => 'datetime',
+        'diverifikasi_at' => 'datetime',
     ];
 
     public function workorder()
@@ -41,6 +42,12 @@ class WoPeminjamanMaterial extends Model
     public function pengaju()
     {
         return $this->belongsTo(User::class, 'diajukan_oleh')
+            ->with(['pegawai:id,nama,nip']);
+    }
+
+    public function verifier()
+    {
+        return $this->belongsTo(User::class, 'diverifikasi_oleh')
             ->with(['pegawai:id,nama,nip']);
     }
 
