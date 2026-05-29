@@ -11,6 +11,9 @@ use App\Models\TipeProgress;
 use App\Models\User;
 use App\Models\Workorder;
 use App\Models\WorkorderAction;
+use App\Models\WoInfrastruktur;
+use App\Models\WoJaringan;
+use App\Models\WoMeter;
 use App\Notifications\WorkOrderNotification;
 use App\Services\ProgressWorkorderService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -253,7 +256,7 @@ class ProgressWorkorderController extends Controller
     {
         $this->hydrateInputFromBody($request);
 
-        $validated = $request->validate([
+        $rules = [
             'workorder_id' => 'required|exists:workorder,id',
             'tipe_progress_kode' => 'required_without:tipe_progress|nullable|in:PROGRESS,SELESAI',
             'tipe_progress' => 'required_without:tipe_progress_kode|nullable|in:PROGRESS,SELESAI',
@@ -263,7 +266,34 @@ class ProgressWorkorderController extends Controller
             'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
-        ]);
+        ];
+
+        // Saat SELESAI, FE mengirim field kategori (meter/jaringan/infrastruktur)
+        // untuk disimpan ke tabel wo_* terkait. Validasi rules ditambahkan secara
+        // dinamis sesuai kategori_form WO. Catatan: `kondisi_awal` (infrastruktur)
+        // sengaja TIDAK divalidasi di sini — kolom itu nullable & diisi SPV saat
+        // assign, bukan oleh petugas lapangan saat submit (lihat BE_handling.md).
+        $tipeProgressKode = $request->input('tipe_progress_kode') ?? $request->input('tipe_progress');
+        $kategoriForm = null;
+        if ($tipeProgressKode === 'SELESAI') {
+            $kategoriForm = optional(
+                optional(Workorder::find($request->input('workorder_id')))->jenisWorkorder
+            )->kategori_form;
+
+            if ($kategoriForm === 'meter') {
+                $rules['kondisi_meter_akhir'] = 'required|string';
+                $rules['hasil_kalibrasi'] = 'required|string';
+            } elseif ($kategoriForm === 'jaringan') {
+                $rules['tindakan_perbaikan'] = 'required|string';
+                $rules['hasil_inspeksi'] = 'required|string';
+            } elseif ($kategoriForm === 'infrastruktur') {
+                $rules['kondisi_akhir'] = 'required|string';
+                $rules['jadwal_pemeliharaan'] = 'required|date';
+                $rules['tindakan'] = 'required|string';
+            }
+        }
+
+        $validated = $request->validate($rules);
 
         $tipeProgressKode = $validated['tipe_progress_kode'] ?? $validated['tipe_progress'] ?? null;
 
@@ -334,6 +364,12 @@ class ProgressWorkorderController extends Controller
                     'status_id' => $this->statusId('PENGECEKAN'),
                     'tanggal_selesai' => now(),
                 ]);
+
+                // Simpan field hasil akhir kategori ke tabel wo_* terkait.
+                // Hanya update (tidak create): baris wo_* sudah dibuat SPV saat
+                // assign, dan kolom wajibnya (nomor_meter/jenis_pipa/nama_aset)
+                // tidak dikirim di payload submit ini.
+                $this->persistKategoriHasilAkhir($workorder, $kategoriForm, $validated);
             } else {
                 $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
             }
@@ -373,6 +409,35 @@ class ProgressWorkorderController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Simpan field hasil akhir kategori (meter/jaringan/infrastruktur) ke
+     * tabel wo_* saat petugas submit SELESAI.
+     *
+     * Update-only: baris wo_* dibuat oleh SPV saat assign. Jika belum ada
+     * (mis. data lama), submit tetap lolos tanpa error — hasil akhir hanya
+     * tidak tersimpan, alih-alih menggagalkan transaksi.
+     */
+    private function persistKategoriHasilAkhir(Workorder $workorder, ?string $kategoriForm, array $validated): void
+    {
+        if ($kategoriForm === 'meter') {
+            WoMeter::where('workorder_id', $workorder->id)->update([
+                'kondisi_meter_akhir' => $validated['kondisi_meter_akhir'],
+                'hasil_kalibrasi'     => $validated['hasil_kalibrasi'],
+            ]);
+        } elseif ($kategoriForm === 'jaringan') {
+            WoJaringan::where('workorder_id', $workorder->id)->update([
+                'tindakan_perbaikan' => $validated['tindakan_perbaikan'],
+                'hasil_inspeksi'     => $validated['hasil_inspeksi'],
+            ]);
+        } elseif ($kategoriForm === 'infrastruktur') {
+            WoInfrastruktur::where('workorder_id', $workorder->id)->update([
+                'kondisi_akhir'       => $validated['kondisi_akhir'],
+                'jadwal_pemeliharaan' => $validated['jadwal_pemeliharaan'],
+                'tindakan'            => $validated['tindakan'],
+            ]);
         }
     }
 
