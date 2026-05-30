@@ -1,0 +1,1 @@
+Aku ada kendalam mengenai current ERD ini. POV: `SPV` waktu untuk meng-assign WO nah hasil dari assign itu kan disimpan table (aku tidak tau untuk nama table). Nah setelah itu, itu akan masuk ke table `Workorder_action` jabatan `Senior Staff/Staff` meng-eksekusi wo di assign oleh SPV. Hasil dari eksekusi terus jadi progress, hasil dari progress itu disimpan di table mana?.
