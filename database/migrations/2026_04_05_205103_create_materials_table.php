@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateJenisWorkordersTable extends Migration
+class CreateMaterialsTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,15 +13,12 @@ class CreateJenisWorkordersTable extends Migration
      */
     public function up()
     {
-        Schema::create('m_jenis_workorder', function (Blueprint $table) {
-            $table->id();
+        Schema::create('m_material', function (Blueprint $table) {
+            $table->integer('kode_material')->primary();
             $table->string('nama');
-            $table->enum('kategori', [
-                'meter',
-                'jaringan',
-                'infrastruktur'
-            ]);
-            $table->boolean('is_active')->default(true);
+            $table->integer('jumlah_stok');
+            $table->integer('terpakai')->default(0);
+            $table->foreignId('pegawai_id')->constrained('m_pegawai');
             $table->timestamps();
         });
     }
@@ -33,6 +30,6 @@ class CreateJenisWorkordersTable extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('m_jenis_workorder');
+        Schema::dropIfExists('materials');
     }
 }

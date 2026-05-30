@@ -56,6 +56,11 @@ class User extends Authenticatable
         return $this->hasMany(Workorder::class, 'user_id');
     }
 
+    public function material()
+    {
+        return $this->hasMany(Material::class, 'kode_material');
+    }
+
     public function pegawai()
     {
         return $this->belongsTo(Pegawai::class, 'pegawai_id');

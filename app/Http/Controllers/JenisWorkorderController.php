@@ -31,38 +31,42 @@ class JenisWorkorderController extends Controller
             $sort = $request->query('sort', 'desc');
             $all = $request->query('all', false);
 
-            $query = JenisWorkorder::with([
-                'formWorkorder' => function ($q) {
-                    $q->orderByRaw('"order" ASC');
-                },
-                'formWorkorder.detailForm' => function ($q) {
-                    $q->orderByRaw('"order" ASC');
-                },
-                'formWorkorder.kpi'
-            ]);
+            $query = JenisWorkorder::query();
 
+            // Search
             if ($search) {
                 $query->where('nama', 'ILIKE', "%{$search}%");
             }
-
-            $query->orderBy('created_at', $sort)->orderBy('id', $sort);
-
+            // Sorting
+            $query->orderBy('created_at', $sort)
+                ->orderBy('id', $sort);
+            // Jika ambil semua
             if ($all) {
                 return response()->json([
+                    'success' => true,
+                    'message' => 'Data jenis workorder berhasil diambil',
                     'data' => $query->get(),
                 ]);
             }
-
-            $jenisworkorders = $query->paginate($limit, ['*'], 'page', $page);
+            // Pagination
+            $jenisworkorders = $query->paginate(
+                $limit,
+                ['*'],
+                'page',
+                $page
+            );
             return response()->json([
+                'success' => true,
+                'message' => 'Data jenis workorder berhasil diambil',
                 'data' => $jenisworkorders->items(),
                 'totalPages' => $jenisworkorders->lastPage(),
                 'currentPage' => $jenisworkorders->currentPage(),
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data jenis workorder',
-                'message' => $e->getMessage()
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data jenis workorder',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -76,32 +80,7 @@ class JenisWorkorderController extends Controller
      */
     public function store(Request $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'error' => 'Validation failed',
-                    'errors' => $validator->errors()->toArray()
-                ], 422);
-            }
-
-            $data = $request->all();
-            $jenisWorkorder = $this->jenisWorkorderService->store($data);
-
-            return response()->json([
-                'message' => 'Data jenis workorder berhasil dibuat',
-                'data' => $jenisWorkorder
-            ], 201);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat membuat data jenis workorder',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        
     }
 
     /**
@@ -113,20 +92,19 @@ class JenisWorkorderController extends Controller
     public function show($id)
     {
         try {
-            $jenisWorkorder = JenisWorkorder::with([
-                'formWorkorder' => function ($query) {
-                    $query->orderByRaw('"order" ASC');
-                },
-                'formWorkorder.detailForm' => function ($query) {
-                    $query->orderByRaw('"order" ASC');
-                },
-                'formWorkorder.kpi'
-            ])->findOrFail($id);
-            return response()->json($jenisWorkorder, 200);
+            $jenisWorkorder = JenisWorkorder::findOrFail($id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Detail jenis workorder berhasil diambil',
+                'data' => new JenisWorkorderResource($jenisWorkorder)
+            ], 200);
+
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data jenis workorder',
-                'message' => $e->getMessage()
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil detail jenis workorder',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -141,32 +119,22 @@ class JenisWorkorderController extends Controller
 
     public function update(Request $request, $id)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'nama' => 'sometimes|required|string',
-            ]);
+        
+    }
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'error' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $data = $request->all();
-            $jenisWorkorder = $this->jenisWorkorderService->update($id, $data);
-
-            return response()->json([
-                'message' => 'Data jenis workorder berhasil diupdate',
-                'data' => new JenisWorkorderResource($jenisWorkorder)
-            ], 200);
-            
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Gagal menyimpan data',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+    public function updateStatus(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+        $jenisWorkorder = JenisWorkorder::findOrFail($id);
+        $jenisWorkorder->update([
+            'is_active' => $validated['is_active'],
+        ]);
+        return response()->json([
+            'message' => 'Status berhasil diperbarui',
+            'data' => $jenisWorkorder,
+        ]);
     }
 
     /**
@@ -177,17 +145,6 @@ class JenisWorkorderController extends Controller
      */
     public function destroy($id)
     {
-        try {
-            $jenisWorkorder = JenisWorkorder::findOrFail($id);
-            $jenisWorkorder->delete();
-            return response()->json([
-                'message' => 'Data jenis workorder berhasil dihapus',
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat menghapus data jenis workorder',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        
     }
 }

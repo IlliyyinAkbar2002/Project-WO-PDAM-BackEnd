@@ -28,29 +28,34 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        MasterLocation::factory(1)->create([
-            'nama' => 'PDAM Surya Sembada Kota Surabaya',
-            'latitude' => -7.2654798,
-            'longitude' => 112.754074,
-            'radius_meter' => 100,
-        ]);
-        
-        MasterLocation::factory(1)->create([
-            'nama' => 'Ciputra World Surabaya',
-            'latitude' => -7.2925952,
-            'longitude' => 112.7200837,
-            'radius_meter' => 150,
-        ]);
-        
-        MasterLocation::factory(1)->create([
-            'nama' => 'Telkom Universitas Surabaya',
-            'latitude' => -7.3111665,
-            'longitude' => 112.728915,
-            'radius_meter' => 200,
-        ]);
+        MasterLocation::updateOrCreate(
+            ['nama' => 'PERUMDA Air Minum Surya Sembada Kota Surabaya'],
+            [
+                'latitude' => -7.2654798,
+                'longitude' => 112.754074,
+                'radius_meter' => 50,
+            ]
+        );
+        MasterLocation::updateOrCreate(
+            ['nama' => 'PDAM IPAM Karangpilang'],
+            [
+                'latitude' => -7.347395836428751,
+                'longitude' => 112.6821334744601,
+                'radius_meter' => 100,
+            ]
+        );
+        MasterLocation::updateOrCreate(
+            ['nama' => 'PDAM Ngagel Tirto'],
+            [
+                'latitude' => -7.299541498200452,
+                'longitude' => 112.74518509673882,
+                'radius_meter' => 150,
+            ]
+        );
+
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
-        Role::factory(3)->create();
+        Role::factory(4)->create();
         Status::factory(8)->create();
 
         Pegawai::updateOrCreate(['id' => 1], [
@@ -65,11 +70,22 @@ class DatabaseSeeder extends Seeder
         ]);
 
         Pegawai::updateOrCreate(['id' => 2], [
-        'nama' => 'Geo Anak baik',
+        'nama' => 'Admin Baik',
         'nip' => '4.99.70756',
         'tanggal_lahir' => '1985-02-02',
         'jenis_kelamin' => 'Perempuan',
         'alamat' => 'Jl. Surabaya No.2',
+        'telepon' => '081234567891',
+        'departemen_id' => 2,
+        'jabatan_id' => 2,
+        ]);
+
+        Pegawai::updateOrCreate(['id' => 3], [
+        'nama' => 'Manager Baik',
+        'nip' => '4.98.70756',
+        'tanggal_lahir' => '1985-03-02',
+        'jenis_kelamin' => 'Laki-laki',
+        'alamat' => 'Jl. Surabaya No.5',
         'telepon' => '081234567891',
         'departemen_id' => 2,
         'jabatan_id' => 2,
@@ -88,13 +104,13 @@ class DatabaseSeeder extends Seeder
         ]);
         User::updateOrCreate([
             'pegawai_id' => 2,
-            'role_id' => 1,
-            'email' => 'geo@gmail.com',
+            'role_id' => 2,
+            'email' => 'admin@gmail.com',
             'password' => bcrypt('password'),
         ]);
         User::updateOrCreate([
             'pegawai_id' => 3,
-            'role_id' => 2,
+            'role_id' => 3,
             'email' => 'manager@gmail.com',
             'password' => bcrypt('password'),
         ]);
@@ -120,8 +136,8 @@ class DatabaseSeeder extends Seeder
         MasterKpi::factory(10)->create();
         JenisLokasi::factory(2)->create();
         TipeWorkorder::factory(2)->create();
-        JenisWorkorder::factory(10)->create();
-        Workorder::factory(40)->create();
+        JenisWorkorder::factory(9)->create();
+        // Workorder::factory(40)->create();
         MasterAction::factory(4)->create();
     }
 }

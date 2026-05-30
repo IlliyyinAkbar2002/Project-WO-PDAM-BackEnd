@@ -13,7 +13,9 @@ use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\DetailProgressController;
 use App\Http\Controllers\MasterLocationController;
+use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
+use App\Http\Controllers\PengaduanController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -63,10 +65,13 @@ Route::prefix('v1')->group(function () {
         Route::post('lembur-spl', [LemburSplController::class, 'store']);
         Route::put('lembur-spl/{id}', [LemburSplController::class, 'update']);
 
+        // Pengaduan
+        Route::apiResource('pengaduan', PengaduanController::class);
+
         // Jenis Work Order
+        Route::apiResource('jenis-workorder', JenisWorkorderController::class);
         Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
-        Route::put('jenis-workorder/{id}', [JenisWorkorderController::class, 'update']);
-        Route::post('jenis-workorder', [JenisWorkorderController::class, 'store']);
+        Route::patch('jenis-workorder/{id}/status', [JenisWorkorderController::class, 'updateStatus']);
         
         // Form Workorder
         Route::get('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'index']);
@@ -84,7 +89,12 @@ Route::prefix('v1')->group(function () {
 
         // Workorder actions
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
-        
+
+        // Master Material
+        Route::apiResource('material', MaterialController::class);
+        Route::post('material', [MaterialController::class, 'store']);
+        Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
+        Route::put('material/{kode_material}/edit', [MaterialController::class, 'edit']);
     });
 });
 

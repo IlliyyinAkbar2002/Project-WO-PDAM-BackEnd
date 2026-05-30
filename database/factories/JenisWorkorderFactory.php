@@ -13,22 +13,52 @@ class JenisWorkorderFactory extends Factory
      */
     public function definition()
     {
-        static $names = [
-            "Perbaikan Pipa",
-            "Pemasangan Meteran",
-            "Inspeksi Jaringan",
-            "Penggantian Meteran",
-            "Pembersihan Saluran",
-            "Pemeliharaan Pompa",
-            "Pengaduan Pelanggan",
-            "Penanganan Kebocoran",
-            "Instalasi Baru",
-            "Kalibrasi Meteran",
+        static $jenisworkorders = [
+            [
+                'nama' => 'Kalibrasi Meteran',
+                'kategori' => 'meter',
+            ],
+            [
+                'nama' => 'Penggantian Meteran',
+                'kategori' => 'meter',
+            ],
+            [
+                'nama' => 'Pemasangan Meteran',
+                'kategori' => 'meter',
+            ],
+
+            [
+                'nama' => 'Penanganan Kebocoran',
+                'kategori' => 'jaringan',
+            ],
+            [
+                'nama' => 'Perbaikan Pipa',
+                'kategori' => 'jaringan',
+            ],
+            [
+                'nama' => 'Pembersihan Saluran',
+                'kategori' => 'jaringan',
+            ],
+            [
+                'nama' => 'Inspeksi Jaringan',
+                'kategori' => 'jaringan',
+            ],
+
+            [
+                'nama' => 'Pemeliharaan Pompa',
+                'kategori' => 'infrastruktur',
+            ],
+            [
+                'nama' => 'Instalasi Baru',
+                'kategori' => 'infrastruktur',
+            ],
         ];
-        $nama = array_shift($names);
+        $jenisworkorder = array_shift($jenisworkorders);
 
         return [
-            'nama' => $nama,
+            'nama' => $jenisworkorder['nama'],
+            'kategori' => $jenisworkorder['kategori'],
+            'is_active' => true,
         ];
     }
 }
