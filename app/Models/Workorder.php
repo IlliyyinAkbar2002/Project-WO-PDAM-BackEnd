@@ -19,8 +19,8 @@ class Workorder extends Model
         'kode_pengaduan',
         'departemen_id',
         'jenis_workorder_id',
-        'pic_id',
-        'user_id',
+        'assigned_to',
+        'created_by',
     ];
 
     protected $guarded = [];
@@ -81,7 +81,7 @@ class Workorder extends Model
     {
         return $this->belongsTo(
             Pengaduan::class,
-            'pengaduan_id',
+            'kode_pengaduan',
             'kode_pengaduan'
         );
     }
@@ -111,15 +111,15 @@ class Workorder extends Model
         return $this->belongsTo(JenisWorkorder::class);
     }
 
-    // SPV / PIC
-    public function pic()
+    // ditujukan ke SPV
+    public function assignedTo()
     {
-        return $this->belongsTo(User::class, 'pic_id');
+        return $this->belongsTo(Pegawai::class, 'assigned_to');
     }
 
     // Pembuat workorder
-    public function user()
+    public function createdBy()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

@@ -31,7 +31,11 @@ class AuthController extends Controller
                 'password' => 'required|string',
             ]);
             
-        $user = User::with(['role', 'pegawai'])
+        $user = User::with([
+            'role', 
+            'pegawai.departemen',
+            'pegawai.jabatan'
+            ])
         ->where('email', $data['email'])
         ->first();
             
@@ -67,10 +71,15 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => [
                 'id' => $user->id,
+                'pegawai_id' => $user->pegawai_id,
                 'name' => $user->pegawai->nama,
                 'email' => $user->email,
                 'role_id' => $user->role_id,
                 'role_name' => $user->role->nama,
+                'departemen_id' => $user->pegawai?->departemen_id,
+                'departemen_nama' => $user->pegawai?->departemen?->nama,
+                'jabatan_id' => $user->pegawai?->jabatan_id,
+                'jabatan_nama' => $user->pegawai?->jabatan?->nama,
             ],
         ], 200);
     }

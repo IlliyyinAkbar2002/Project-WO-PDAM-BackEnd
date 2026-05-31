@@ -3,10 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterKpi;
+use App\Services\KpiService;
 use Illuminate\Http\Request;
 
 class KpiController extends Controller
 {
+    protected $kpiService;
+
+    public function __construct(KpiService $kpiService)
+    {
+        $this->kpiService = $kpiService;
+    }
+
+
     /**
      * Display a listing of the resource.
      *
@@ -14,15 +23,19 @@ class KpiController extends Controller
      */
     public function index()
     {
-        try {
-            $kpi = MasterKpi::all();
-            return response()->json($kpi);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data kpi',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'data' => $this->kpiService->getSummary(),
+            'completion_rate' => $this->kpiService->completionRate()
+        ]);
+    }
+
+    public function departemen($id)
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->kpiService->getByDepartemen($id)
+        ]);
     }
 
     /**

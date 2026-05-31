@@ -40,9 +40,11 @@ Route::prefix('v1')->group(function () {
         // Workorder resources
         Route::apiResource('workorder', WorkorderController::class);
         Route::post('workorder', [WorkorderController::class, 'store']);
+        Route::patch('workorder/{id}/status', [WorkorderController::class, 'updateStatus']);
         
-        // KPI and reporting
+        // KPI
         Route::get('kpi', [KpiController::class, 'index']);
+        Route::get('kpi/departemen/{id}', [KpiController::class, 'departemen']);
         
         // Master data
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);
@@ -72,20 +74,6 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);
         Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
         Route::patch('jenis-workorder/{id}/status', [JenisWorkorderController::class, 'updateStatus']);
-        
-        // Form Workorder
-        Route::get('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'index']);
-        Route::post('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'store']);
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'show']);
-        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'update']);
-        Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'destroy']);
-
-        // Detail form (opsi dropdown)
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'index']);
-        Route::post('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'store']);
-        Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);
-        Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'update']);
-        Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'destroy']);
 
         // Workorder actions
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
@@ -108,3 +96,17 @@ Route::get('ping', function () {
         'timestamp' => now()->toISOString()
     ]);
 });
+
+// // Form Workorder
+        // Route::get('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'index']);
+        // Route::post('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'store']);
+        // Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'show']);
+        // Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'update']);
+        // Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'destroy']);
+
+        // // Detail form (opsi dropdown)
+        // Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'index']);
+        // Route::post('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'store']);
+        // Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);
+        // Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'update']);
+        // Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'destroy']);

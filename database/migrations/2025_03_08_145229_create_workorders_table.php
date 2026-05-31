@@ -17,21 +17,20 @@ class CreateWorkordersTable extends Migration
             $table->id();
             $table->string('nama_workorder');
             $table->text('deskripsi')->nullable();
-            $table->string('lokasi')->nullable();
+            $table->string('lokasi');
             $table->enum('prioritas', [
                 'Rendah',
                 'Sedang',
                 'Tinggi',
                 'Urgent'
-            ])->default('Sedang');
+            ]);
             $table->enum('status', [
-                'Open',
-                'Progress',
                 'Pending',
-                'Done',
-                'Cancel'
-            ])->default('Open');
-            $table->string('kode_pengaduan')->nullable();
+                'Proses',
+                'Selesai',
+                'Ditolak'
+            ])->default('Pending');
+            $table->string('kode_pengaduan');
 
             $table->foreignId('departemen_id')
                 ->constrained('m_departemen')
@@ -44,13 +43,13 @@ class CreateWorkordersTable extends Migration
                 ->restrictOnDelete();
 
             // Ditujukan kepada SPV/PIC
-            $table->foreignId('pic_id')
-                ->constrained('users')
+            $table->foreignId('assigned_to')
+                ->constrained('m_pegawai')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
             // User pembuat workorder
-            $table->foreignId('user_id')
+            $table->foreignId('created_by')
                 ->constrained('users')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();

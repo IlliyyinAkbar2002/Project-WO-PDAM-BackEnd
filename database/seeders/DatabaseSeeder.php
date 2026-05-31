@@ -133,11 +133,10 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
         ]);
         User::factory(7)->create();
-        MasterKpi::factory(10)->create();
+        // MasterKpi::factory(10)->create();
         JenisLokasi::factory(2)->create();
         TipeWorkorder::factory(2)->create();
         JenisWorkorder::factory(9)->create();
-        // Workorder::factory(40)->create();
         MasterAction::factory(4)->create();
     }
 }
