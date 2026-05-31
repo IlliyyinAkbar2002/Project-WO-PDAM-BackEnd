@@ -58,6 +58,13 @@ Route::prefix('v1')->group(function () {
         Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
         Route::get('progress-workorder/quota/{id}', [ProgressWorkorderController::class, 'quota']);
         Route::post('progress-workorder/manual-run', [ProgressWorkorderController::class, 'manualRun']);
+
+        // [M] Mobile - SPV view individual member progress
+        Route::get('progress-workorder/by-member/{workorderId}', [ProgressWorkorderController::class, 'progressByMember'])->whereNumber('workorderId');
+
+        // [W] Web Dashboard - member progress summary with statistics
+        Route::get('progress-workorder/member-summary/{workorderId}', [ProgressWorkorderController::class, 'memberSummary'])->whereNumber('workorderId');
+
         Route::match(['post', 'put', 'patch'], 'progress-workorder/start', [ProgressWorkorderController::class, 'start']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/submit', [ProgressWorkorderController::class, 'submit']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/review', [ProgressWorkorderController::class, 'review']);

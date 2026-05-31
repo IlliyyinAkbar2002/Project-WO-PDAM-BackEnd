@@ -159,8 +159,8 @@ class Workorder extends Model
      * Menghitung persentase progres secara dinamis menggunakan pendekatan hybrid:
      * state-based (dari status_id) + time-based clamping (untuk IN_PROGRESS).
      *
-     * Tambahan: jika kuota pelaporan harian (8x/hari) ATAU kuota total habis,
-     * langsung return 100% karena pekerjaan dianggap selesai secara operasional.
+     * Dengan sistem individual progress tracking, progres dihitung berdasarkan
+     * rata-rata progress seluruh anggota tim (kecuali untuk status final).
      */
     public function getProgresPersenAttribute(): int
     {
@@ -181,7 +181,7 @@ class Workorder extends Model
             return 90;
         }
 
-        // Quota-based: (total PROGRESS reports / max quota) * 100, capped at 90%
+        // Individual-based progress: rata-rata progress semua anggota tim
         if (in_array($statusKode, ['IN_PROGRESS', 'REVISI_REQUESTED', 'DITOLAK_SPV'])) {
             $assignment = $this->workorderAssignment;
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $this->tanggal_mulai;
@@ -195,14 +195,28 @@ class Workorder extends Model
             }
 
             $maxPelaporanTotal = $totalDays * 8;
-
             $mulaiTipeId = \App\Models\TipeProgress::where('kode', 'MULAI')->value('id');
-            $totalPelaporan = ProgressWorkorder::where('workorder_id', $this->id)
-                ->whereNotNull('waktu_submit')
-                ->where('tipe_progress_id', '!=', $mulaiTipeId)
-                ->count();
 
-            return (int) min(90, round(($totalPelaporan / $maxPelaporanTotal) * 100));
+            // Ambil semua anggota tim
+            $members = $this->assignmentMembers;
+
+            if ($members->isEmpty()) {
+                return 0;
+            }
+
+            // Hitung progress percentage setiap anggota
+            $memberProgressPercentages = $members->map(function ($member) use ($mulaiTipeId, $maxPelaporanTotal) {
+                $totalPelaporan = ProgressWorkorder::where('workorder_id', $this->id)
+                    ->where('submitted_by_user_id', $member->user_id)
+                    ->whereNotNull('waktu_submit')
+                    ->where('tipe_progress_id', '!=', $mulaiTipeId)
+                    ->count();
+
+                return min(90, round(($totalPelaporan / $maxPelaporanTotal) * 100));
+            });
+
+            // Rata-rata progress semua anggota, capped at 90%
+            return (int) min(90, round($memberProgressPercentages->avg()));
         }
 
         return 0;

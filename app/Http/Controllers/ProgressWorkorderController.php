@@ -118,13 +118,26 @@ class ProgressWorkorderController extends Controller
         return is_array($decoded) ? $decoded : [];
     }
 
-    private function validateProgressLimit(Workorder $workorder): ?\Illuminate\Http\JsonResponse
+    /**
+     * Validasi kuota pelaporan progress per user (individual-based).
+     *
+     * Setiap anggota tim memiliki kuota sendiri:
+     * - Maksimal 8 pelaporan per hari
+     * - Total maksimal = estimasi_hari * 8
+     *
+     * @param Workorder $workorder
+     * @param int $userId User yang akan submit progress
+     * @return \Illuminate\Http\JsonResponse|null
+     */
+    private function validateProgressLimit(Workorder $workorder, int $userId): ?\Illuminate\Http\JsonResponse
     {
         $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
 
+        // 1. Cek kuota harian per user (maksimal 8x per hari per user)
         $dailyQuotaEverExhausted = DB::table('progress_workorder')
             ->selectRaw('1')
             ->where('workorder_id', $workorder->id)
+            ->where('submitted_by_user_id', $userId)
             ->whereNotNull('waktu_submit')
             ->where('tipe_progress_id', '!=', $mulaiTipeId)
             ->groupByRaw('waktu_submit::date')
@@ -132,10 +145,10 @@ class ProgressWorkorderController extends Controller
             ->exists();
 
         if ($dailyQuotaEverExhausted) {
-            return response()->json(['error' => 'Limit pelaporan harian (maksimal 8x per hari) telah tercapai.'], 422);
+            return response()->json(['error' => 'Limit pelaporan harian Anda (maksimal 8x per hari) telah tercapai.'], 422);
         }
 
-        // 2. Cek sisa kuota pelaporan total berdasarkan estimasi hari
+        // 2. Cek sisa kuota pelaporan total per user berdasarkan estimasi hari
         $assignment = $workorder->workorderAssignment;
         $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
         $estimasiSelesai = optional($assignment)->estimasi_selesai;
@@ -150,13 +163,14 @@ class ProgressWorkorderController extends Controller
 
         $maxPelaporanTotal = $totalDays * 8;
         $totalPelaporan = ProgressWorkorder::where('workorder_id', $workorder->id)
+            ->where('submitted_by_user_id', $userId)
             ->whereNotNull('waktu_submit')
             ->where('tipe_progress_id', '!=', $mulaiTipeId)
             ->count();
 
         if ($totalPelaporan >= $maxPelaporanTotal) {
             return response()->json([
-                'error' => "Sisa kuota pelaporan habis. Limit total (maksimal {$maxPelaporanTotal} kali untuk {$totalDays} hari pengerjaan) telah tercapai."
+                'error' => "Sisa kuota pelaporan Anda habis. Limit total (maksimal {$maxPelaporanTotal} kali untuk {$totalDays} hari pengerjaan) telah tercapai."
             ], 422);
         }
 
@@ -327,7 +341,7 @@ class ProgressWorkorderController extends Controller
         }
 
         if ($tipeProgressKode !== 'SELESAI') {
-            if ($limitError = $this->validateProgressLimit($workorder)) {
+            if ($limitError = $this->validateProgressLimit($workorder, $userId)) {
                 return $limitError;
             }
         }
@@ -863,18 +877,231 @@ class ProgressWorkorderController extends Controller
     }
 
     /**
-     * Get the remaining quota for progress submission
+     * Get progress grouped by team member for a specific workorder.
+     *
+     * Endpoint untuk SPV melihat progress individual setiap anggota tim di mobile app.
+     * Mengembalikan daftar anggota tim beserta progress masing-masing.
      *
      * @param  int  $workorderId
      * @return \Illuminate\Http\Response
      */
-    public function quota($workorderId)
+    public function progressByMember($workorderId)
+    {
+        try {
+            $workorder = Workorder::with([
+                'assignmentMembers.user.pegawai.jabatan',
+                'workorderAssignment'
+            ])->findOrFail($workorderId);
+
+            $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
+
+            // Hitung estimasi hari untuk kuota
+            $assignment = $workorder->workorderAssignment;
+            $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
+            $estimasiSelesai = optional($assignment)->estimasi_selesai;
+
+            $totalDays = 1;
+            if ($tanggalMulai && $estimasiSelesai) {
+                $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
+                $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
+                $diff = max(0, (int) $start->diffInDays($end, false));
+                $totalDays = $diff + 1;
+            }
+
+            $maxPelaporanTotal = $totalDays * 8;
+
+            $members = $workorder->assignmentMembers->map(function ($member) use ($workorderId, $mulaiTipeId, $maxPelaporanTotal) {
+                $userId = $member->user_id;
+
+                // Ambil semua progress dari user ini untuk WO ini
+                $progressList = ProgressWorkorder::where('workorder_id', $workorderId)
+                    ->where('submitted_by_user_id', $userId)
+                    ->with(['tipeProgress', 'status', 'dokumentasiProgress'])
+                    ->orderBy('order', 'asc')
+                    ->get();
+
+                // Hitung statistik
+                $totalSubmissions = $progressList
+                    ->where('tipe_progress_id', '!=', $mulaiTipeId)
+                    ->whereNotNull('waktu_submit')
+                    ->count();
+
+                $todaySubmissions = $progressList
+                    ->where('tipe_progress_id', '!=', $mulaiTipeId)
+                    ->whereNotNull('waktu_submit')
+                    ->filter(function ($p) {
+                        return \Illuminate\Support\Carbon::parse($p->waktu_submit)->isToday();
+                    })
+                    ->count();
+
+                return [
+                    'user_id' => $userId,
+                    'nama' => optional($member->user->pegawai)->nama ?? optional($member->user)->name,
+                    'nip' => optional($member->user->pegawai)->nip,
+                    'jabatan' => optional(optional($member->user->pegawai)->jabatan)->nama,
+                    'is_pic' => $member->is_pic,
+                    'total_submissions' => $totalSubmissions,
+                    'today_submissions' => $todaySubmissions,
+                    'quota_remaining' => max(0, $maxPelaporanTotal - $totalSubmissions),
+                    'quota_total' => $maxPelaporanTotal,
+                    'progress_list' => $progressList,
+                ];
+            });
+
+            return response()->json([
+                'workorder_id' => $workorder->id,
+                'workorder_name' => $workorder->nama_workorder,
+                'estimasi_hari' => $totalDays,
+                'members' => $members,
+            ], 200);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['error' => 'Workorder not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get member progress summary for web dashboard.
+     *
+     * Endpoint untuk Web Dashboard menampilkan ringkasan progress individual
+     * setiap anggota tim dengan statistik lengkap.
+     *
+     * @param  int  $workorderId
+     * @return \Illuminate\Http\Response
+     */
+    public function memberSummary($workorderId)
+    {
+        try {
+            $workorder = Workorder::with([
+                'assignmentMembers.user.pegawai.jabatan',
+                'workorderAssignment',
+                'status'
+            ])->findOrFail($workorderId);
+
+            $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
+
+            // Hitung estimasi hari untuk kuota
+            $assignment = $workorder->workorderAssignment;
+            $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
+            $estimasiSelesai = optional($assignment)->estimasi_selesai;
+
+            $totalDays = 1;
+            if ($tanggalMulai && $estimasiSelesai) {
+                $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
+                $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
+                $diff = max(0, (int) $start->diffInDays($end, false));
+                $totalDays = $diff + 1;
+            }
+
+            $maxPelaporanTotal = $totalDays * 8;
+
+            $membersSummary = $workorder->assignmentMembers->map(function ($member) use ($workorderId, $mulaiTipeId, $maxPelaporanTotal, $totalDays) {
+                $userId = $member->user_id;
+
+                // Ambil semua progress dari user ini untuk WO ini
+                $progressList = ProgressWorkorder::where('workorder_id', $workorderId)
+                    ->where('submitted_by_user_id', $userId)
+                    ->whereNotNull('waktu_submit')
+                    ->where('tipe_progress_id', '!=', $mulaiTipeId)
+                    ->orderBy('waktu_submit', 'asc')
+                    ->get();
+
+                $totalSubmissions = $progressList->count();
+
+                // Hitung submission per hari
+                $submissionsByDate = $progressList->groupBy(function ($p) {
+                    return \Illuminate\Support\Carbon::parse($p->waktu_submit)->format('Y-m-d');
+                });
+
+                // Hitung rata-rata submission per hari
+                $avgSubmissionsPerDay = $submissionsByDate->count() > 0
+                    ? round($totalSubmissions / $submissionsByDate->count(), 2)
+                    : 0;
+
+                // Progress percentage individual (berdasarkan kuota mereka)
+                $progressPercentage = $maxPelaporanTotal > 0
+                    ? min(100, round(($totalSubmissions / $maxPelaporanTotal) * 100, 2))
+                    : 0;
+
+                // Waktu submission pertama dan terakhir
+                $firstSubmission = $progressList->first()?->waktu_submit;
+                $lastSubmission = $progressList->last()?->waktu_submit;
+
+                return [
+                    'user_id' => $userId,
+                    'nama' => optional($member->user->pegawai)->nama ?? optional($member->user)->name,
+                    'nip' => optional($member->user->pegawai)->nip,
+                    'jabatan' => optional(optional($member->user->pegawai)->jabatan)->nama,
+                    'jabatan_kode' => optional(optional($member->user->pegawai)->jabatan)->kode,
+                    'is_pic' => $member->is_pic,
+                    'statistics' => [
+                        'total_submissions' => $totalSubmissions,
+                        'quota_total' => $maxPelaporanTotal,
+                        'quota_remaining' => max(0, $maxPelaporanTotal - $totalSubmissions),
+                        'progress_percentage' => $progressPercentage,
+                        'avg_submissions_per_day' => $avgSubmissionsPerDay,
+                        'days_active' => $submissionsByDate->count(),
+                        'first_submission' => $firstSubmission,
+                        'last_submission' => $lastSubmission,
+                    ],
+                    'daily_breakdown' => $submissionsByDate->map(function ($items, $date) {
+                        return [
+                            'date' => $date,
+                            'count' => $items->count(),
+                        ];
+                    })->values(),
+                ];
+            });
+
+            // Hitung statistik keseluruhan tim
+            $teamStats = [
+                'total_members' => $workorder->assignmentMembers->count(),
+                'total_submissions_all' => $membersSummary->sum('statistics.total_submissions'),
+                'avg_progress_percentage' => $membersSummary->avg('statistics.progress_percentage'),
+            ];
+
+            return response()->json([
+                'workorder' => [
+                    'id' => $workorder->id,
+                    'nama_workorder' => $workorder->nama_workorder,
+                    'status' => $workorder->status,
+                    'tanggal_mulai' => $tanggalMulai,
+                    'estimasi_selesai' => $estimasiSelesai,
+                    'estimasi_hari' => $totalDays,
+                ],
+                'team_statistics' => $teamStats,
+                'members' => $membersSummary,
+            ], 200);
+
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['error' => 'Workorder not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get the remaining quota for progress submission (individual per user).
+     *
+     * Mengembalikan kuota individual user yang sedang login.
+     * Setiap anggota tim memiliki kuota sendiri: 8x/hari, total = estimasi_hari * 8.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $workorderId
+     * @return \Illuminate\Http\Response
+     */
+    public function quota(Request $request, $workorderId)
     {
         try {
             $workorder = Workorder::with('workorderAssignment')->findOrFail($workorderId);
+            $userId = optional($request->user())->id;
             $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
 
+            // Kuota harian user ini
             $countHariIni = ProgressWorkorder::where('workorder_id', $workorder->id)
+                ->where('submitted_by_user_id', $userId)
                 ->whereNotNull('waktu_submit')
                 ->where('tipe_progress_id', '!=', $mulaiTipeId)
                 ->whereDate('waktu_submit', now()->toDateString())
@@ -883,6 +1110,7 @@ class ProgressWorkorderController extends Controller
             $dailyQuotaEverExhausted = DB::table('progress_workorder')
                 ->selectRaw('1')
                 ->where('workorder_id', $workorder->id)
+                ->where('submitted_by_user_id', $userId)
                 ->whereNotNull('waktu_submit')
                 ->where('tipe_progress_id', '!=', $mulaiTipeId)
                 ->groupByRaw('waktu_submit::date')
@@ -891,7 +1119,7 @@ class ProgressWorkorderController extends Controller
 
             $sisaHariIni = $dailyQuotaEverExhausted ? 0 : max(0, 8 - $countHariIni);
 
-            // Sisa kuota pelaporan total berdasarkan estimasi hari
+            // Sisa kuota pelaporan total user ini berdasarkan estimasi hari
             $assignment = $workorder->workorderAssignment;
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
             $estimasiSelesai = optional($assignment)->estimasi_selesai;
@@ -906,6 +1134,7 @@ class ProgressWorkorderController extends Controller
 
             $maxPelaporanTotal = $totalDays * 8;
             $totalPelaporan = ProgressWorkorder::where('workorder_id', $workorder->id)
+                ->where('submitted_by_user_id', $userId)
                 ->whereNotNull('waktu_submit')
                 ->where('tipe_progress_id', '!=', $mulaiTipeId)
                 ->count();
@@ -913,6 +1142,7 @@ class ProgressWorkorderController extends Controller
             $sisaKuotaTotal = max(0, $maxPelaporanTotal - $totalPelaporan);
 
             $cancelableIds = ProgressWorkorder::where('workorder_id', $workorder->id)
+                ->where('submitted_by_user_id', $userId)
                 ->where('status_id', $this->statusId('SUBMITTED'))
                 ->whereNotNull('waktu_submit')
                 ->where('waktu_submit', '>=', now()->subMinutes(5))
@@ -920,6 +1150,7 @@ class ProgressWorkorderController extends Controller
 
             return response()->json([
                 'workorder_id' => $workorder->id,
+                'user_id' => $userId,
                 'sisa_kuota_hari_ini' => $sisaHariIni,
                 'sisa_kuota_total' => $sisaKuotaTotal,
                 'total_kuota_hari_ini' => 8,
