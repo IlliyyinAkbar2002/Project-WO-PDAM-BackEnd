@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LemburSpl;
 use App\Models\JenisWorkorder;
+use App\Models\Pengaduan;
 use App\Models\Workorder;
 use App\Models\WorkorderAction;
 
@@ -40,8 +41,8 @@ class WorkorderController extends Controller
             $query = Workorder::with([
                 'departemen',
                 'jenisWorkorder',
-                'pic',
-                'user',
+                'assignedTo',
+                'createdBy',
             ]);
             if ($search) {
                 $query->where(function ($q) use ($search) {
@@ -52,11 +53,11 @@ class WorkorderController extends Controller
 
                             $sub->where('nama', 'ILIKE', "%{$search}%");
                         })
-                        ->orWhereHas('pic', function ($sub) use ($search) {
+                        ->orWhereHas('assignedTo', function ($sub) use ($search) {
 
                             $sub->where('name', 'ILIKE', "%{$search}%");
                         })
-                        ->orWhereHas('user', function ($sub) use ($search) {
+                        ->orWhereHas('createdBy', function ($sub) use ($search) {
 
                             $sub->where('name', 'ILIKE', "%{$search}%");
                         });
@@ -99,48 +100,71 @@ class WorkorderController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
-{
-    $validatedData = $request->validate([
-        'nama_workorder' => 'required|string|max:255',
-        'deskripsi' => 'nullable|string',
-        'lokasi' => 'nullable|string|max:255',
-        'prioritas' => 'required|in:Rendah,Sedang,Tinggi,Urgent',
-        'status' => 'required|in:Open,Progress,Pending,Done,Cancel',
-        'kode_pengaduan' => 'nullable|string|max:255',
-        'departemen_id' => 'required|exists:m_departemen,id',
-        'jenis_workorder_id' => 'required|exists:m_jenis_workorder,id',
-        'pic_id' => 'required|exists:users,id',
-        'user_id' => 'required|exists:users,id',
-    ]);
+    {
+        $validatedData = $request->validate([
+            'nama_workorder' => 'required|string|max:255',
+            'deskripsi' => 'nullable|string',
+            'lokasi' => 'required|string|max:255',
+            'prioritas' => 'required|in:Rendah,Sedang,Tinggi,Urgent',
+            'status' => 'required|in:Pending,Proses,Selesai,Ditolak',
+            'kode_pengaduan' => 'required|exists:pengaduan,kode_pengaduan',
+            'departemen_id' => 'required|exists:m_departemen,id',
+            'jenis_workorder_id' => 'required|exists:m_jenis_workorder,id',
+            'assigned_to' => 'required|exists:m_pegawai,id',
+            'created_by' => 'required|exists:users,id',
+        ]);
 
-    try {
-        // ==================================================
-        // VALIDASI JENIS WORKORDER HARUS AKTIF
-        // ==================================================
-        $jenisWorkorder = JenisWorkorder::findOrFail(
-            $validatedData['jenis_workorder_id']
-        );
-        if (!$jenisWorkorder->is_active) {
+        DB::beginTransaction();
+        try {
+            // ==================================================
+            // VALIDASI JENIS WORKORDER HARUS AKTIF
+            // ==================================================
+            $jenisWorkorder = JenisWorkorder::findOrFail(
+                $validatedData['jenis_workorder_id']
+            );
+            if (!$jenisWorkorder->is_active) {
+                return response()->json([
+                    'message' => 'Jenis workorder nonaktif dan tidak dapat digunakan.'
+                ], 422);
+            }
+
+            // ==================================================
+            // AMBIL DATA PENGADUAN
+            // ==================================================
+            $pengaduan = Pengaduan::where('kode_pengaduan', $validatedData['kode_pengaduan'])->firstOrFail();
+
+            // ==================================================
+            // AUTO AMBIL LOKASI DARI PENGADUAN
+            // ==================================================
+            $validatedData['lokasi'] = $pengaduan->lokasi;
+
+            // FORCE STATUS INITIAL
+            $validatedData['status'] = 'Pending';
+
+            // ==================================================
+            // CREATE WORKORDER
+            // ==================================================
+            $workorder = (new WorkorderService())
+                ->createWorkorders($validatedData);
+
+            // ==================================================
+            // UPDATE STATUS PENGADUAN -> PROSES
+            // ==================================================
+            $pengaduan->update([
+                'status' => Pengaduan::STATUS_PROSES
+            ]);
+            DB::commit();
             return response()->json([
-                'message' => 'Jenis workorder nonaktif dan tidak dapat digunakan.'
-            ], 422);
+                'message' => 'Workorder berhasil disimpan',
+                'data' => $workorder,
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // ==================================================
-        // CREATE WORKORDER
-        // ==================================================
-        $workorder = (new WorkorderService())
-            ->createWorkorders($validatedData);
-        return response()->json([
-            'message' => 'Workorder berhasil disimpan',
-            'data' => $workorder,
-        ], 201);
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
     /**
      * Display the specified resource.
@@ -154,8 +178,8 @@ class WorkorderController extends Controller
             $workorder = Workorder::with([
                 'departemen',
                 'jenisWorkorder',
-                'pic',
-                'user',
+                'assignedTo',
+                'createdBy',
             ])->findOrFail($id);
             return response()->json([
                 'data' => $workorder
@@ -181,12 +205,12 @@ class WorkorderController extends Controller
         'deskripsi' => 'nullable|string',
         'lokasi' => 'nullable|string|max:255',
         'prioritas' => 'sometimes|in:Rendah,Sedang,Tinggi,Urgent',
-        'status' => 'sometimes|in:Open,Progress,Pending,Done,Cancel',
+        'status' => 'sometimes|in:Pending,Proses,Selesai,Ditolak',
         'kode_pengaduan' => 'nullable|string|max:255',
         'departemen_id' => 'sometimes|exists:m_departemen,id',
         'jenis_workorder_id' => 'sometimes|exists:m_jenis_workorder,id',
-        'pic_id' => 'sometimes|exists:users,id',
-        'user_id' => 'sometimes|exists:users,id',
+        'assigned_to' => 'sometimes|exists:m_pegawai,id',
+        'created_by' => 'sometimes|exists:users,id',
         ]);
         try {
             $workorder = Workorder::findOrFail($id);
@@ -198,6 +222,41 @@ class WorkorderController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:Pending,Proses,Selesai,Ditolak'
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $workorder = Workorder::with('pengaduan')->findOrFail($id);
+            $workorder->update([
+                'status' => $request->status
+            ]);
+
+            // SYNC KE PENGADUAN
+            if ($workorder->pengaduan) {
+                $workorder->pengaduan->update([
+                    'status' => $request->status
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Status berhasil diupdate',
+                'data' => $workorder
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => $e->getMessage()
             ], 500);
         }
     }

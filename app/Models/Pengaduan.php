@@ -23,6 +23,12 @@ class Pengaduan extends Model
 
     protected $guarded = [];
 
+    // status constants
+    public const STATUS_PENDING = 'Pending';
+    public const STATUS_PROSES = 'Proses';
+    public const STATUS_SELESAI = 'Selesai';
+    public const STATUS_DITOLAK = 'Ditolak';
+
     public function workorders()
     {
         return $this->hasMany(Workorder::class, 'pengaduan_id', 'kode_pengaduan');
