@@ -37,9 +37,14 @@ Route::prefix('v1')->group(function () {
         Route::post('login',    [AuthController::class, 'AuthLogin']);
         Route::post('register', [AuthController::class, 'AuthRegister']);
 
+        // Lupa password (publik, tanpa login) — alur sederhana: cek email lalu set password baru.
+        Route::post('forgot-password', [AuthController::class, 'forgot_password']);
+        Route::post('reset-password',  [AuthController::class, 'reset_password']);
+
         Route::middleware(['auth:sanctum', 'client.valid'])->group(function () {
-            Route::post('logout', [AuthController::class, 'AuthLogout']);
-            Route::get('me',      [AuthController::class, 'me']);
+            Route::post('logout',          [AuthController::class, 'AuthLogout']);
+            Route::get('me',               [AuthController::class, 'me']);
+            // Route::post('change-password', [AuthController::class, 'change_password']);
         });
     });
 
