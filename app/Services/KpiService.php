@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Material;
 use App\Models\Pengaduan;
 use App\Models\Workorder;
-use App\Models\Material;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class KpiService
 {
@@ -22,54 +23,102 @@ class KpiService
     // =========================
     private function isSuperAdmin(): bool
     {
-        return $this->user?->role === 'superadmin';
+        return $this->user?->role_id === 1;
     }
 
     // =========================
-    // SAFE DEPARTEMEN FILTER
+    // FILTER DEPARTEMEN
     // =========================
     private function applyDepartemenFilter(Builder $query): Builder
     {
+        // SUPERADMIN = semua data
         if ($this->isSuperAdmin()) {
             return $query;
         }
-        // IMPORTANT: pastikan kolom ada sebelum filter
-        if (in_array('departemen_id', $query->getModel()->getFillable())
-            || \Illuminate\Support\Facades\Schema::hasColumn($query->getModel()->getTable(), 'departemen_id')) {
 
-            return $query->where('departemen_id', $this->user->departemen_id);
+        $departemenId = $this->user?->pegawai?->departemen_id;
+
+        if (!$departemenId) {
+            return $query;
+        }
+        if (
+            in_array('departemen_id', $query->getModel()->getFillable()) ||
+            \Illuminate\Support\Facades\Schema::hasColumn(
+                $query->getModel()->getTable(),
+                'departemen_id'
+            )
+        ) {
+            return $query->where('departemen_id', $departemenId);
         }
         return $query;
     }
 
     // =========================
-    // SUMMARY KPI
+    // KPI SUMMARY
     // =========================
     public function getSummary(): array
     {
-        $pengaduan = $this->applyDepartemenFilter(Pengaduan::query());
-        $workorder = $this->applyDepartemenFilter(Workorder::query());
+        $pengaduanQuery = $this->applyDepartemenFilter(
+            Pengaduan::query()
+        );
+        $workorderQuery = $this->applyDepartemenFilter(
+            Workorder::query()
+        );
         return [
             // ================= PENGADUAN =================
-            'pengaduan_total'   => (clone $pengaduan)->count(),
-            'pengaduan_pending' => (clone $pengaduan)->where('status', 'Pending')->count(),
-            'pengaduan_proses'  => (clone $pengaduan)->where('status', 'Proses')->count(),
-            'pengaduan_selesai' => (clone $pengaduan)->where('status', 'Selesai')->count(),
-            'pengaduan_ditolak' => (clone $pengaduan)->where('status', 'Ditolak')->count(),
+            'pengaduan_total' =>
+                (clone $pengaduanQuery)->count(),
+
+            'pengaduan_pending' =>
+                (clone $pengaduanQuery)
+                    ->where('status', 'Pending')
+                    ->count(),
+
+            'pengaduan_proses' =>
+                (clone $pengaduanQuery)
+                    ->where('status', 'Proses')
+                    ->count(),
+
+            'pengaduan_selesai' =>
+                (clone $pengaduanQuery)
+                    ->where('status', 'Selesai')
+                    ->count(),
+
+            'pengaduan_ditolak' =>
+                (clone $pengaduanQuery)
+                    ->where('status', 'Ditolak')
+                    ->count(),
 
             // ================= WORKORDER =================
-            'workorder_total'   => (clone $workorder)->count(),
-            'workorder_pending' => (clone $workorder)->where('status', 'Pending')->count(),
-            'workorder_proses'  => (clone $workorder)->where('status', 'Proses')->count(),
-            'workorder_selesai' => (clone $workorder)->where('status', 'Selesai')->count(),
-            'workorder_ditolak' => (clone $workorder)->where('status', 'Ditolak')->count(),
+            'workorder_total' =>
+                (clone $workorderQuery)->count(),
 
-            // ================= MATERIAL (GLOBAL) =================
-            'material_total' => Material::query()->sum('jumlah_stok'),
-            'material_terpakai' => Material::query()->sum('terpakai'),
-            'material_tersedia' => Material::query()
-                ->selectRaw('COALESCE(SUM(jumlah_stok - terpakai), 0) as tersedia')
-                ->value('tersedia'),
+            'workorder_pending' =>
+                (clone $workorderQuery)
+                    ->where('status', 'Pending')
+                    ->count(),
+
+            'workorder_proses' =>
+                (clone $workorderQuery)
+                    ->where('status', 'Proses')
+                    ->count(),
+
+            'workorder_selesai' =>
+                (clone $workorderQuery)
+                    ->where('status', 'Selesai')
+                    ->count(),
+
+            'workorder_ditolak' =>
+                (clone $workorderQuery)
+                    ->where('status', 'Ditolak')
+                    ->count(),
+
+            // ================= MATERIAL =================
+            'material_total' => Material::sum('jumlah_stok'),
+            'material_terpakai' => Material::sum('terpakai'),
+            'material_tersedia' =>
+                Material::sum('jumlah_stok')
+                - Material::sum('terpakai'),
         ];
     }
 
@@ -78,10 +127,19 @@ class KpiService
     // =========================
     public function completionRate(): float
     {
-        $query = $this->applyDepartemenFilter(Workorder::query());
+        $query = $this->applyDepartemenFilter(
+            Workorder::query()
+        );
+
         $total = (clone $query)->count();
-        $done  = (clone $query)->where('status', 'Selesai')->count();
-        return $total === 0 ? 0 : round(($done / $total) * 100, 2);
+
+        $done = (clone $query)
+            ->where('status', 'Selesai')
+            ->count();
+
+        return $total === 0
+            ? 0
+            : round(($done / $total) * 100, 2);
     }
 
     // =========================
@@ -89,11 +147,27 @@ class KpiService
     // =========================
     public function getByDepartemen($departemenId): array
     {
+        $query = Workorder::query()
+            ->where('departemen_id', $departemenId);
+
         return [
-            'workorder_total' => Workorder::where('departemen_id', $departemenId)->count(),
-            'selesai'         => Workorder::where('departemen_id', $departemenId)->where('status', 'Selesai')->count(),
-            'proses'          => Workorder::where('departemen_id', $departemenId)->where('status', 'Proses')->count(),
-            'pending'         => Workorder::where('departemen_id', $departemenId)->where('status', 'Pending')->count(),
+            'workorder_total' =>
+                (clone $query)->count(),
+
+            'pending' =>
+                (clone $query)
+                    ->where('status', 'Pending')
+                    ->count(),
+
+            'proses' =>
+                (clone $query)
+                    ->where('status', 'Proses')
+                    ->count(),
+
+            'selesai' =>
+                (clone $query)
+                    ->where('status', 'Selesai')
+                    ->count(),
         ];
     }
 }
