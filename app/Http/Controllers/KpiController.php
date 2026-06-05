@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MasterKpi;
 use App\Services\KpiService;
-use Illuminate\Http\Request;
 
 class KpiController extends Controller
 {
-    protected $kpiService;
+    protected KpiService $kpiService;
 
     public function __construct(KpiService $kpiService)
     {
@@ -24,6 +22,12 @@ class KpiController extends Controller
     public function index()
     {
         return response()->json([
+            // 'auth_user' => auth()->user(),
+            // 'workorder_count' => \App\Models\Workorder::count(),
+            // 'workorder_departemen_count' => \App\Models\Workorder::where(
+            //     'departemen_id',
+            //     auth()->user()?->departemen_id
+            // )->count(),
             'success' => true,
             'data' => $this->kpiService->getSummary(),
             'completion_rate' => $this->kpiService->completionRate()
@@ -44,7 +48,7 @@ class KpiController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store()
     {
         //
     }
@@ -64,10 +68,10 @@ class KpiController extends Controller
      * Update the specified resource in storage.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
      * @return \Illuminate\Http\Response
+     * @param  int  $id
      */
-    public function update(Request $request, $id)
+    public function update()
     {
         //
     }
