@@ -187,15 +187,7 @@ class Workorder extends Model
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $this->tanggal_mulai;
             $estimasiSelesai = optional($assignment)->estimasi_selesai;
 
-            $totalDays = 1;
-            if ($tanggalMulai && $estimasiSelesai) {
-                $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
-                $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
-                $totalDays = max(1, (int) $start->diffInDays($end, false) + 1);
-            }
-
-            $maxPelaporanTotal = $totalDays * 8;
-            $mulaiTipeId = \App\Models\TipeProgress::where('kode', 'MULAI')->value('id');
+            $maxPelaporanTotal = \App\Support\WorkorderQuota::quotaTotal($tanggalMulai, $estimasiSelesai);
 
             // Ambil semua anggota tim
             $members = $this->assignmentMembers;
@@ -204,13 +196,11 @@ class Workorder extends Model
                 return 0;
             }
 
-            // Hitung progress percentage setiap anggota
-            $memberProgressPercentages = $members->map(function ($member) use ($mulaiTipeId, $maxPelaporanTotal) {
-                $totalPelaporan = ProgressWorkorder::where('workorder_id', $this->id)
-                    ->where('submitted_by_user_id', $member->user_id)
-                    ->whereNotNull('waktu_submit')
-                    ->where('tipe_progress_id', '!=', $mulaiTipeId)
-                    ->count();
+            // Hitung progress percentage setiap anggota — hanya laporan PROGRESS
+            // yang dihitung (SELESAI/REVISI/DITOLAK adalah transisi/sistem, bukan
+            // submission user). Lihat WorkorderQuota::countableSubmissions().
+            $memberProgressPercentages = $members->map(function ($member) use ($maxPelaporanTotal) {
+                $totalPelaporan = \App\Support\WorkorderQuota::countableSubmissions($this->id, $member->user_id)->count();
 
                 return min(90, round(($totalPelaporan / $maxPelaporanTotal) * 100));
             });
@@ -227,20 +217,21 @@ class Workorder extends Model
      *
      * Dipakai oleh dashboard superadmin untuk mengurutkan tim berdasarkan
      * kecepatan upload progres — semakin kecil nilai cadence, semakin cepat
-     * tim merespons. Tipe MULAI dikecualikan (sama dengan progres_persen dan
-     * validateProgressLimit) karena bukan submission lapor pekerjaan.
-     * Baris REVISI/DITOLAK auto-generated SPV tidak memiliki waktu_submit
-     * sehingga otomatis terfilter oleh whereNotNull('waktu_submit').
+     * tim merespons. Hanya tipe PROGRESS yang dihitung (selaras dengan
+     * progres_persen & validateProgressLimit): MULAI/SELESAI adalah transisi
+     * status, REVISI/DITOLAK adalah baris sistem — bukan laporan progres user.
+     * Filter positif PROGRESS lebih aman daripada mengandalkan asumsi bahwa
+     * REVISI/DITOLAK selalu ber-waktu_submit null.
      *
      * Return null jika data belum cukup (< 2 submission terhitung).
      */
     public function getAvgCadenceMinutesAttribute(): ?float
     {
-        $mulaiTipeId = \App\Models\TipeProgress::where('kode', 'MULAI')->value('id');
+        $progressTipeId = \App\Models\TipeProgress::where('kode', 'PROGRESS')->value('id');
 
         $submitTimes = ProgressWorkorder::where('workorder_id', $this->id)
             ->whereNotNull('waktu_submit')
-            ->where('tipe_progress_id', '!=', $mulaiTipeId)
+            ->where('tipe_progress_id', $progressTipeId)
             ->orderBy('waktu_submit', 'asc')
             ->pluck('waktu_submit');
 

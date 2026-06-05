@@ -131,15 +131,11 @@ class ProgressWorkorderController extends Controller
      */
     private function validateProgressLimit(Workorder $workorder, int $userId): ?\Illuminate\Http\JsonResponse
     {
-        $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
-
         // 1. Cek kuota harian per user (maksimal 8x per hari per user)
-        $dailyQuotaEverExhausted = DB::table('progress_workorder')
+        // selectRaw('1') dipertahankan: query ber-GROUP BY tidak boleh `select *`
+        // di Postgres. countableSubmissions() hanya menghitung tipe PROGRESS.
+        $dailyQuotaEverExhausted = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)
             ->selectRaw('1')
-            ->where('workorder_id', $workorder->id)
-            ->where('submitted_by_user_id', $userId)
-            ->whereNotNull('waktu_submit')
-            ->where('tipe_progress_id', '!=', $mulaiTipeId)
             ->groupByRaw('waktu_submit::date')
             ->havingRaw('COUNT(*) >= 8')
             ->exists();
@@ -153,20 +149,9 @@ class ProgressWorkorderController extends Controller
         $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
         $estimasiSelesai = optional($assignment)->estimasi_selesai;
 
-        $totalDays = 1;
-        if ($tanggalMulai && $estimasiSelesai) {
-            $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
-            $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
-            $diff = max(0, (int) $start->diffInDays($end, false));
-            $totalDays = $diff + 1;
-        }
-
-        $maxPelaporanTotal = $totalDays * 8;
-        $totalPelaporan = ProgressWorkorder::where('workorder_id', $workorder->id)
-            ->where('submitted_by_user_id', $userId)
-            ->whereNotNull('waktu_submit')
-            ->where('tipe_progress_id', '!=', $mulaiTipeId)
-            ->count();
+        $totalDays = \App\Support\WorkorderQuota::totalDays($tanggalMulai, $estimasiSelesai);
+        $maxPelaporanTotal = \App\Support\WorkorderQuota::quotaTotal($tanggalMulai, $estimasiSelesai);
+        $totalPelaporan = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)->count();
 
         if ($totalPelaporan >= $maxPelaporanTotal) {
             return response()->json([
@@ -893,45 +878,30 @@ class ProgressWorkorderController extends Controller
                 'workorderAssignment'
             ])->findOrFail($workorderId);
 
-            $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
-
             // Hitung estimasi hari untuk kuota
             $assignment = $workorder->workorderAssignment;
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
             $estimasiSelesai = optional($assignment)->estimasi_selesai;
 
-            $totalDays = 1;
-            if ($tanggalMulai && $estimasiSelesai) {
-                $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
-                $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
-                $diff = max(0, (int) $start->diffInDays($end, false));
-                $totalDays = $diff + 1;
-            }
+            $totalDays = \App\Support\WorkorderQuota::totalDays($tanggalMulai, $estimasiSelesai);
+            $maxPelaporanTotal = \App\Support\WorkorderQuota::quotaTotal($tanggalMulai, $estimasiSelesai);
 
-            $maxPelaporanTotal = $totalDays * 8;
-
-            $members = $workorder->assignmentMembers->map(function ($member) use ($workorderId, $mulaiTipeId, $maxPelaporanTotal) {
+            $members = $workorder->assignmentMembers->map(function ($member) use ($workorderId, $maxPelaporanTotal) {
                 $userId = $member->user_id;
 
-                // Ambil semua progress dari user ini untuk WO ini
+                // Ambil semua progress dari user ini untuk WO ini (untuk ditampilkan,
+                // semua tipe termasuk MULAI/SELESAI/REVISI/DITOLAK).
                 $progressList = ProgressWorkorder::where('workorder_id', $workorderId)
                     ->where('submitted_by_user_id', $userId)
                     ->with(['tipeProgress', 'status', 'dokumentasiProgress'])
                     ->orderBy('order', 'asc')
                     ->get();
 
-                // Hitung statistik
-                $totalSubmissions = $progressList
-                    ->where('tipe_progress_id', '!=', $mulaiTipeId)
-                    ->whereNotNull('waktu_submit')
-                    ->count();
+                // Statistik kuota: hanya laporan PROGRESS yang dihitung.
+                $totalSubmissions = \App\Support\WorkorderQuota::countableSubmissions($workorderId, $userId)->count();
 
-                $todaySubmissions = $progressList
-                    ->where('tipe_progress_id', '!=', $mulaiTipeId)
-                    ->whereNotNull('waktu_submit')
-                    ->filter(function ($p) {
-                        return \Illuminate\Support\Carbon::parse($p->waktu_submit)->isToday();
-                    })
+                $todaySubmissions = \App\Support\WorkorderQuota::countableSubmissions($workorderId, $userId)
+                    ->whereDate('waktu_submit', now()->toDateString())
                     ->count();
 
                 return [
@@ -980,31 +950,19 @@ class ProgressWorkorderController extends Controller
                 'status'
             ])->findOrFail($workorderId);
 
-            $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
-
             // Hitung estimasi hari untuk kuota
             $assignment = $workorder->workorderAssignment;
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
             $estimasiSelesai = optional($assignment)->estimasi_selesai;
 
-            $totalDays = 1;
-            if ($tanggalMulai && $estimasiSelesai) {
-                $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
-                $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
-                $diff = max(0, (int) $start->diffInDays($end, false));
-                $totalDays = $diff + 1;
-            }
+            $totalDays = \App\Support\WorkorderQuota::totalDays($tanggalMulai, $estimasiSelesai);
+            $maxPelaporanTotal = \App\Support\WorkorderQuota::quotaTotal($tanggalMulai, $estimasiSelesai);
 
-            $maxPelaporanTotal = $totalDays * 8;
-
-            $membersSummary = $workorder->assignmentMembers->map(function ($member) use ($workorderId, $mulaiTipeId, $maxPelaporanTotal, $totalDays) {
+            $membersSummary = $workorder->assignmentMembers->map(function ($member) use ($workorderId, $maxPelaporanTotal, $totalDays) {
                 $userId = $member->user_id;
 
-                // Ambil semua progress dari user ini untuk WO ini
-                $progressList = ProgressWorkorder::where('workorder_id', $workorderId)
-                    ->where('submitted_by_user_id', $userId)
-                    ->whereNotNull('waktu_submit')
-                    ->where('tipe_progress_id', '!=', $mulaiTipeId)
+                // Ambil submission terhitung (hanya PROGRESS) dari user ini untuk WO ini
+                $progressList = \App\Support\WorkorderQuota::countableSubmissions($workorderId, $userId)
                     ->orderBy('waktu_submit', 'asc')
                     ->get();
 
@@ -1097,22 +1055,15 @@ class ProgressWorkorderController extends Controller
         try {
             $workorder = Workorder::with('workorderAssignment')->findOrFail($workorderId);
             $userId = optional($request->user())->id;
-            $mulaiTipeId = TipeProgress::where('kode', 'MULAI')->value('id');
 
-            // Kuota harian user ini
-            $countHariIni = ProgressWorkorder::where('workorder_id', $workorder->id)
-                ->where('submitted_by_user_id', $userId)
-                ->whereNotNull('waktu_submit')
-                ->where('tipe_progress_id', '!=', $mulaiTipeId)
+            // Kuota harian user ini (hanya laporan PROGRESS yang dihitung)
+            $countHariIni = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)
                 ->whereDate('waktu_submit', now()->toDateString())
                 ->count();
 
-            $dailyQuotaEverExhausted = DB::table('progress_workorder')
+            // selectRaw('1') dipertahankan: query ber-GROUP BY tidak boleh `select *` di Postgres.
+            $dailyQuotaEverExhausted = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)
                 ->selectRaw('1')
-                ->where('workorder_id', $workorder->id)
-                ->where('submitted_by_user_id', $userId)
-                ->whereNotNull('waktu_submit')
-                ->where('tipe_progress_id', '!=', $mulaiTipeId)
                 ->groupByRaw('waktu_submit::date')
                 ->havingRaw('COUNT(*) >= 8')
                 ->exists();
@@ -1124,20 +1075,9 @@ class ProgressWorkorderController extends Controller
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
             $estimasiSelesai = optional($assignment)->estimasi_selesai;
 
-            $totalDays = 1;
-            if ($tanggalMulai && $estimasiSelesai) {
-                $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
-                $end = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
-                $diff = max(0, (int) $start->diffInDays($end, false));
-                $totalDays = $diff + 1;
-            }
-
-            $maxPelaporanTotal = $totalDays * 8;
-            $totalPelaporan = ProgressWorkorder::where('workorder_id', $workorder->id)
-                ->where('submitted_by_user_id', $userId)
-                ->whereNotNull('waktu_submit')
-                ->where('tipe_progress_id', '!=', $mulaiTipeId)
-                ->count();
+            $totalDays = \App\Support\WorkorderQuota::totalDays($tanggalMulai, $estimasiSelesai);
+            $maxPelaporanTotal = \App\Support\WorkorderQuota::quotaTotal($tanggalMulai, $estimasiSelesai);
+            $totalPelaporan = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)->count();
 
             $sisaKuotaTotal = max(0, $maxPelaporanTotal - $totalPelaporan);
 

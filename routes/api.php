@@ -53,7 +53,7 @@ Route::prefix('v1')->group(function () {
     // =========================================================
     Route::middleware('auth:sanctum')->group(function () {
 
-        Route::apiResource('workorder', WorkorderController::class);
+        // ROUTE FOR MOBILE
         Route::get('workorder/{id}/assignment', [AssignmentWorkorder::class, 'show']);
         Route::post('workorder/{id}/assign-staff', [AssignmentWorkorder::class, 'assignStaff']);
 
@@ -66,9 +66,6 @@ Route::prefix('v1')->group(function () {
 
         // [M] Mobile - SPV view individual member progress
         Route::get('progress-workorder/by-member/{workorderId}', [ProgressWorkorderController::class, 'progressByMember'])->whereNumber('workorderId');
-
-        // [W] Web Dashboard - member progress summary with statistics
-        Route::get('progress-workorder/member-summary/{workorderId}', [ProgressWorkorderController::class, 'memberSummary'])->whereNumber('workorderId');
 
         Route::match(['post', 'put', 'patch'], 'progress-workorder/start', [ProgressWorkorderController::class, 'start']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/submit', [ProgressWorkorderController::class, 'submit']);
@@ -120,6 +117,12 @@ Route::prefix('v1')->group(function () {
         // [S] Notifikasi — Laravel Database Notification
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::match(['put', 'post'], 'notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+
+        // ROUTE FOR WEB NEXTJS
+        Route::apiResource('workorder', WorkorderController::class);
+
+        // [W] Web Dashboard - member progress summary with statistics
+        Route::get('progress-workorder/member-summary/{workorderId}', [ProgressWorkorderController::class, 'memberSummary'])->whereNumber('workorderId');
     });
 });
 
