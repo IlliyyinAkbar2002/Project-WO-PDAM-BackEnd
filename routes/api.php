@@ -45,13 +45,19 @@ Route::prefix('v1')->group(function () {
         // KPI
         Route::get('kpi', [KpiController::class, 'index']);
         Route::get('kpi/departemen/{id}', [KpiController::class, 'departemen']);
-        
-        // Master data
-        Route::apiResource('jenis-workorder', JenisWorkorderController::class);
+
         Route::apiResource('jenis-lokasi', JenisLokasiController::class);
-        Route::get('user', [UserController::class, 'index']);
+
+        // User & Pegawai
+        Route::get('users', [UserController::class, 'index']);
+        Route::post('users/{id}/reset-password',[UserController::class, 'resetPassword']);
+        Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleAccountStatus']);
+        Route::apiResource('pegawai', PegawaiController::class);
+        Route::post('pegawai', [PegawaiController::class, 'store']);
         Route::get('pegawai', [PegawaiController::class, 'index']);
         Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
+        Route::get('pegawai/meta', [PegawaiController::class, 'meta']);
+        Route::get('pegawai/meta/filter-options', [PegawaiController::class, 'filterOptions']);
         
         // Location management
         Route::get('master-location', [MasterLocationController::class, 'index']);

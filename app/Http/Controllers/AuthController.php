@@ -45,6 +45,13 @@ class AuthController extends Controller
                 'message' => 'Email salah'
             ], 401);
         }
+
+        if (!$user->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun telah dinonaktifkan. Mohon hubungi SuperAdmin!.'
+            ], 403);
+        }
             
         if (!Hash::check($data['password'], $user->password)) {
             return response()->json([
@@ -72,9 +79,10 @@ class AuthController extends Controller
             'user' => [
                 'id' => $user->id,
                 'pegawai_id' => $user->pegawai_id,
-                'name' => $user->pegawai->nama,
+                'name' => $user->pegawai?->nama,
                 'email' => $user->email,
                 'role_id' => $user->role_id,
+                'is_active' => $user->is_active,
                 'role_name' => $user->role->nama,
                 'departemen_id' => $user->pegawai?->departemen_id,
                 'departemen_nama' => $user->pegawai?->departemen?->nama,
@@ -113,7 +121,6 @@ class AuthController extends Controller
                 // 'pegawai_id' => $validatedData['pegawai_id'],
                 'role_id' => $validatedData['role_id'],
             ]);
-            
             return response()->json([
                 'success' => true,
                 'message' => 'Registrasi berhasil',
@@ -124,7 +131,6 @@ class AuthController extends Controller
                     'role_id' => $user->role_id,
                 ]
             ], 201);
-            
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -142,7 +148,6 @@ class AuthController extends Controller
 
     public function me(Request $request) {
         return response()->json($request->user(), 200);
-
     }
 
     public function getUser(Request $request)
@@ -156,7 +161,6 @@ class AuthController extends Controller
                     'message' => 'User tidak ditemukan'
                 ], 401);
             }
-            
             return response()->json([
                 'success' => true,
                 'message' => 'Data user berhasil diambil',
@@ -169,7 +173,6 @@ class AuthController extends Controller
                     'updated_at' => $user->updated_at,
                 ]
             ]);
-            
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

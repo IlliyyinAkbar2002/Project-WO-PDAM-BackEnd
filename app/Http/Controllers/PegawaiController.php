@@ -2,8 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Departemen;
+use App\Models\Jabatan;
 use App\Models\Pegawai;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class PegawaiController extends Controller
 {
@@ -16,54 +22,94 @@ class PegawaiController extends Controller
      */
     public function index(Request $request)
     {
+        logger($request->all());
         try {
             $query = Pegawai::with([
-                'user:id,pegawai_id,email,role_id',
+                'user:id,pegawai_id,email,role_id,is_active',
                 'departemen:id,nama',
                 'jabatan:id,nama'
             ]);
 
+            // Search
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where(DB::raw('LOWER(nama)'), 'LIKE', '%' . strtolower($search) . '%')
+                    ->orWhere(DB::raw('LOWER(nip)'), 'LIKE', '%' . strtolower($search) . '%');
+                });
+            }
+
             // Filter berdasarkan departemen
-            if ($request->has('departemen_id')) {
-                $query->where('departemen_id', $request->departemen_id);
+            if ($request->filled('departemen_id')) {
+                $query->where('m_pegawai.departemen_id', (int) $request->departemen_id);
             }
 
             // Filter berdasarkan jabatan
-            if ($request->has('jabatan_id')) {
-                $query->where('jabatan_id', $request->jabatan_id);
+            if ($request->filled('jabatan_id')) {
+                $query->where('m_pegawai.jabatan_id', (int) $request->jabatan_id);
             }
 
             // Eager load user relationship to avoid N+1 queries
-            $pegawaiList = $query->get();
+            $pegawaiList = $query->paginate($request->per_page ?? 10);
             
             // Transform pegawai data to User format with nested employee data
-            $transformedData = $pegawaiList->map(function ($pegawai) {
+            $transformedData = collect($pegawaiList->items())->map(function ($pegawai) {
                 return [
                     'id' => $pegawai->id,
                     'pegawai_id' => $pegawai->id,
+                    'user_id' => $pegawai->user?->id,
                     'name' => $pegawai->nama,
                     'email' => $pegawai->user->email ?? null,
                     'role_id' => $pegawai->user->role_id ?? null,
+                    'role' => $pegawai->user?->role?->nama,
+                    'is_active' => $pegawai->user?->is_active ?? false,
                     'created_at' => $pegawai->created_at,
                     'updated_at' => $pegawai->updated_at,
+                    'departemen_id' => $pegawai->departemen_id,
+                    'jabatan_id' => $pegawai->jabatan_id,
                     'pegawai' => [
                         'id' => $pegawai->id,
                         'nama' => $pegawai->nama,
                         'nip' => $pegawai->nip,
-                        'departemen' => $pegawai->departemen->nama ?? null,
-                        'jabatan' => $pegawai->jabatan->nama ?? null,
+                        'jenis_kelamin' => $pegawai->jenis_kelamin,
+                        'tanggal_lahir' => $pegawai->tanggal_lahir,
+                        'alamat' => $pegawai->alamat,
+                        'telepon' => $pegawai->telepon,
+                        'departemen' => $pegawai->departemen?->nama,
+                        'jabatan' => $pegawai->jabatan?->nama,
                     ]
                 ];
             });
-            
             return response()->json([
-                'data' => $transformedData]);
+                'data' => $transformedData,
+                'current_page' => $pegawaiList->currentPage(),
+                'last_page' => $pegawaiList->lastPage(),
+                'per_page' => $pegawaiList->perPage(),
+                'total' => $pegawaiList->total(),
+                ]);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Terjadi kesalahan saat mengambil data pegawai',
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function meta()
+    {
+        return response()->json([
+            'departemen' => Departemen::select('id', 'nama')->get(),
+            'jabatan' => Jabatan::select('id', 'nama')->get(),
+            'role' => Role::select('id', 'nama')->get(),
+        ]);
+    }
+
+    public function filterOptions()
+    {
+        return response()->json([
+            'departemen' => Departemen::select('id', 'nama')->get(),
+            'jabatan' => Jabatan::select('id', 'nama')->get(),
+        ]);
     }
 
     /**
@@ -109,12 +155,14 @@ class PegawaiController extends Controller
                     'role_id' => $pegawai->user->role_id ?? null,
                     'created_at' => $pegawai->created_at,
                     'updated_at' => $pegawai->updated_at,
+                    'departemen_id' => $pegawai->departemen_id,
+                    'jabatan_id' => $pegawai->jabatan_id,
                     'pegawai' => [
                         'id' => $pegawai->id,
                         'nama' => $pegawai->nama,
                         'nip' => $pegawai->nip,
-                        'departemen' => $pegawai->departemen->nama ?? null,
-                        'jabatan' => $pegawai->jabatan->nama ?? null,
+                        'departemen' => $pegawai->departemen->nama,
+                        'jabatan' => $pegawai->jabatan->nama,
                     ]
                 ];
             });
@@ -138,7 +186,57 @@ class PegawaiController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            // USER
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
+            'role_id' => 'required|exists:m_role,id',
+            // PEGAWAI (core)
+            'nama' => 'required|string',
+            'departemen_id' => 'required|exists:m_departemen,id',
+            'jabatan_id' => 'required|exists:m_jabatan,id',
+            // OPTIONAL
+            'nip' => 'nullable|string',
+            'tanggal_lahir' => 'nullable|date',
+            'jenis_kelamin' => 'nullable|string',
+            'alamat' => 'nullable|string',
+            'telepon' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $pegawai = Pegawai::create([
+                'nama' => $validated['nama'],
+                'departemen_id' => $validated['departemen_id'],
+                'jabatan_id' => $validated['jabatan_id'],
+                'nip' => $validated['nip'] ?? null,
+                'tanggal_lahir' => $validated['tanggal_lahir'] ?? null,
+                'jenis_kelamin' => $validated['jenis_kelamin'] ?? null,
+                'alamat' => $validated['alamat'] ?? null,
+                'telepon' => $validated['telepon'] ?? null,
+            ]);
+            $user = User::create([
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'is_active' => true,
+                'role_id' => $validated['role_id'],
+                'pegawai_id' => $pegawai->id,
+            ]);
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Akun pegawai berhasil dibuat',
+                'pegawai' => $pegawai,
+                'user' => $user,
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal membuat akun pegawai',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -149,7 +247,38 @@ class PegawaiController extends Controller
      */
     public function show($id)
     {
-        //
+        try {
+            $pegawai = Pegawai::with([
+                'departemen:id,nama',
+                'jabatan:id,nama',
+                'user.role:id,nama'
+            ])->findOrFail($id);
+            return response()->json([
+                'id' => $pegawai->id,
+                'nama' => $pegawai->nama,
+                'nip' => $pegawai->nip,
+                'tanggal_lahir' => $pegawai->tanggal_lahir,
+                'jenis_kelamin' => $pegawai->jenis_kelamin,
+                'alamat' => $pegawai->alamat,
+                'telepon' => $pegawai->telepon,
+                'departemen_id' => $pegawai->departemen_id,
+                'departemen' => $pegawai->departemen?->nama,
+                'jabatan_id' => $pegawai->jabatan_id,
+                'jabatan' => $pegawai->jabatan?->nama,
+                'user' => [
+                    'id' => $pegawai->user?->id,
+                    'email' => $pegawai->user?->email,
+                    'role_id' => $pegawai->user?->role_id,
+                    'role' => $pegawai->user?->role?->nama,
+                    'is_active' => $pegawai->user?->is_active,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Terjadi kesalahan',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -161,7 +290,49 @@ class PegawaiController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        DB::beginTransaction();
+        try {
+            $pegawai = Pegawai::with('user')->findOrFail($id);
+            $validated = $request->validate([
+                'nama' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email,' . $pegawai->user->id,
+                'role_id' => 'required|exists:m_role,id',
+                'departemen_id' => 'required|exists:m_departemen,id',
+                'jabatan_id' => 'required|exists:m_jabatan,id',
+                'nip' => 'nullable|string|max:50',
+                'tanggal_lahir' => 'nullable|date',
+                'jenis_kelamin' => 'nullable|string',
+                'alamat' => 'nullable|string',
+                'telepon' => 'nullable|string|max:20',
+            ]);
+            $pegawai->update([
+                'nama' => $validated['nama'],
+                'nip' => $validated['nip'] ?? null,
+                'tanggal_lahir' => $validated['tanggal_lahir'] ?? null,
+                'jenis_kelamin' => $validated['jenis_kelamin'] ?? null,
+                'alamat' => $validated['alamat'] ?? null,
+                'telepon' => $validated['telepon'] ?? null,
+                'departemen_id' => $validated['departemen_id'],
+                'jabatan_id' => $validated['jabatan_id'],
+            ]);
+
+            $pegawai->user->update([
+                'email' => $validated['email'],
+                'role_id' => $validated['role_id'],
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Data pegawai berhasil diperbarui'
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Gagal memperbarui data pegawai',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -172,6 +343,6 @@ class PegawaiController extends Controller
      */
     public function destroy($id)
     {
-        //
+        // 
     }
 }
