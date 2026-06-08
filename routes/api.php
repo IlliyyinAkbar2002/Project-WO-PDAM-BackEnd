@@ -52,13 +52,21 @@ Route::prefix('v1')->group(function () {
         Route::get('users', [UserController::class, 'index']);
         Route::post('users/{id}/reset-password',[UserController::class, 'resetPassword']);
         Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleAccountStatus']);
-        Route::apiResource('pegawai', PegawaiController::class);
-        Route::post('pegawai', [PegawaiController::class, 'store']);
+        
         Route::get('pegawai', [PegawaiController::class, 'index']);
-        Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
+        Route::post('pegawai-user-create', [PegawaiController::class, 'store']);
         Route::get('pegawai/meta', [PegawaiController::class, 'meta']);
         Route::get('pegawai/meta/filter-options', [PegawaiController::class, 'filterOptions']);
-        
+        Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
+        Route::get('pegawai/{pegawai}', [PegawaiController::class, 'show'])
+            ->whereNumber('pegawai');
+
+        Route::put('pegawai/{pegawai}', [PegawaiController::class, 'update'])
+            ->whereNumber('pegawai');
+
+        Route::delete('pegawai/{pegawai}', [PegawaiController::class, 'destroy'])
+            ->whereNumber('pegawai');
+
         // Location management
         Route::get('master-location', [MasterLocationController::class, 'index']);
         Route::post('master-location', [MasterLocationController::class, 'store']);

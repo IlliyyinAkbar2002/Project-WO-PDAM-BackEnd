@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Throwable;
 
 class PegawaiController extends Controller
 {
@@ -97,6 +98,7 @@ class PegawaiController extends Controller
 
     public function meta()
     {
+        logger('META CALLED');
         return response()->json([
             'departemen' => Departemen::select('id', 'nama')->get(),
             'jabatan' => Jabatan::select('id', 'nama')->get(),
@@ -186,19 +188,20 @@ class PegawaiController extends Controller
      */
     public function store(Request $request)
     {
+        logger()->info('PAYLOAD PEGAWAI STORE', $request->all());
         $validated = $request->validate([
             // USER
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
-            'role_id' => 'required|exists:m_role,id',
+            'password' => 'required|min:8',
+            'role_id' => 'required|integer|exists:m_role,id',
             // PEGAWAI (core)
             'nama' => 'required|string',
-            'departemen_id' => 'required|exists:m_departemen,id',
-            'jabatan_id' => 'required|exists:m_jabatan,id',
+            'nip' => 'required|string|max:50|unique:m_pegawai,nip',
+            'departemen_id' => 'required|integer|exists:m_departemen,id',
+            'jabatan_id' => 'required|integer|exists:m_jabatan,id',
             // OPTIONAL
-            'nip' => 'nullable|string',
             'tanggal_lahir' => 'nullable|date',
-            'jenis_kelamin' => 'nullable|string',
+            'jenis_kelamin' => 'nullable|in:Laki-laki,Perempuan',
             'alamat' => 'nullable|string',
             'telepon' => 'nullable|string',
         ]);
@@ -208,32 +211,31 @@ class PegawaiController extends Controller
         try {
             $pegawai = Pegawai::create([
                 'nama' => $validated['nama'],
+                'nip' => $validated['nip'],
                 'departemen_id' => $validated['departemen_id'],
                 'jabatan_id' => $validated['jabatan_id'],
-                'nip' => $validated['nip'] ?? null,
-                'tanggal_lahir' => $validated['tanggal_lahir'] ?? null,
-                'jenis_kelamin' => $validated['jenis_kelamin'] ?? null,
-                'alamat' => $validated['alamat'] ?? null,
-                'telepon' => $validated['telepon'] ?? null,
             ]);
             $user = User::create([
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
-                'is_active' => true,
                 'role_id' => $validated['role_id'],
                 'pegawai_id' => $pegawai->id,
+                'is_active' => true,
             ]);
             DB::commit();
-
             return response()->json([
+                'success' => true,
                 'message' => 'Akun pegawai berhasil dibuat',
-                'pegawai' => $pegawai,
-                'user' => $user,
+                'data' => [
+                    'pegawai_id' => $pegawai->id,
+                    'email' => $validated['email'],
+                ]
             ], 201);
-        } catch (\Exception $e) {
+        } catch (Throwable $e) {
             DB::rollBack();
             return response()->json([
-                'message' => 'Gagal membuat akun pegawai',
+                'success' => false,
+                'message' => 'Gagal membuat data pegawai',
                 'error' => $e->getMessage()
             ], 500);
         }
