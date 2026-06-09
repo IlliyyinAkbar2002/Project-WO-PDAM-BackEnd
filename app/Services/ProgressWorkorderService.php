@@ -34,40 +34,6 @@ class ProgressWorkorderService
         return $cache[$kode];
     }
 
-    public function createInitialProgress(int $workOrderId): void
-    {
-        // ✅ Fix B5: cek duplikat
-        if (ProgressWorkorder::where('workorder_id', $workOrderId)->exists()) {
-            Log::info("createInitialProgress: skip, sudah ada.", ['workorder_id' => $workOrderId]);
-            return;
-        }
-
-        $statusDraftId = $this->statusId('DRAFT');
-        $tipeMulaiId   = $this->tipeProgressId('MULAI');
-        $tipeSelesaiId = $this->tipeProgressId('SELESAI');
-
-        // ✅ Fix B2: null guard
-        throw_if(
-            $statusDraftId === null || $tipeMulaiId === null || $tipeSelesaiId === null,
-            new \RuntimeException('Master data (status/tipe_progress) belum lengkap.')
-        );
-
-        DB::transaction(function () use ($workOrderId, $statusDraftId, $tipeMulaiId, $tipeSelesaiId) {
-            ProgressWorkorder::create([
-                'workorder_id'     => $workOrderId,
-                'tipe_progress_id' => $tipeMulaiId,
-                'status_id'        => $statusDraftId,
-                'order'            => 0,
-            ]);
-            ProgressWorkorder::create([
-                'workorder_id'     => $workOrderId,
-                'tipe_progress_id' => $tipeSelesaiId,
-                'status_id'        => $statusDraftId,
-                'order'            => 1,
-            ]);
-        });
-    }
-
     public function addWorkorderProgress(int $workOrderId): void
     {
         $tipeProgressId = $this->tipeProgressId('PROGRESS');

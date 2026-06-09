@@ -4,11 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\LemburSpl;
 use App\Models\LemburSplMember;
-use App\Models\MasterAction;
 use App\Models\Status;
+use App\Models\Workorder;
 
-use App\Services\ProgressWorkorderService;
-use App\Services\WorkorderActionService;
+use App\Services\LemburApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -49,23 +48,32 @@ class LemburSplController extends Controller
      * Store a newly created resource in storage.
      *
      * Endpoint ini dipakai mobile (Flutter) untuk submit form
-     * "Pengajuan Lembur":
-     *   - judul_pekerjaan
-     *   - jenis_pekerjaan (free text, contoh: "Emergency Maintainance")
+     * "Pengajuan Lembur" oleh SPV terhadap WO yang sudah ditugaskan
+     * kepadanya (status DITUGASKAN_KE_SPV). Ini adalah alur "assign staff
+     * via lembur": staff baru benar-benar ditugaskan setelah pengajuan ini
+     * di-approve atasan (lihat update()).
+     *
+     *   - workorder_id    (WO yang sedang dipegang SPV — di-link ke pengajuan)
+     *   - judul_pekerjaan  (FE boleh prefill dari WO — lihat red box di form)
+     *   - jenis_pekerjaan  (free text, contoh: "Emergency Maintainance")
      *   - tanggal_lembur
      *   - jam_mulai (opsional, jam mulai lembur)
      *   - estimasi_jam (Estimasi Waktu Lembur, jam)
-     *   - members (Anggota Tim — array of user_id)
+     *   - members (Anggota Tim — array of user_id, lock-to-request)
      *   - alasan_lembur
      *
+     * Link ke WO disimpan dua arah: `lembur_spl.workorder_id` (FK forward,
+     * unik + cascade — selaras konvensi wo_meter/laporan_workorder) dan
+     * `workorder.lembur_spl_id` (penanda "WO ini lembur"). Keduanya di-set
+     * bersamaan di sini agar selalu sinkron.
+     *
      * Sisi web (FE Next.js) cukup melakukan PUT/PATCH ke endpoint update
-     * untuk verifikasi (approve/reject). Field verifikasi (`verifikator_id`,
-     * `status_id`, `waktu_verifikasi`, `alasan_ditolak`) tetap diisi di
-     * sana — TIDAK diubah oleh kontrak ini.
+     * untuk verifikasi (approve/reject).
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'workorder_id'       => ['required', Rule::exists('workorder', 'id')],
             'judul_pekerjaan'    => 'required|string|max:255',
             'jenis_pekerjaan'    => 'required|string|max:255',
             'tanggal_lembur'     => 'required|date',
@@ -78,12 +86,33 @@ class LemburSplController extends Controller
             'members.*'          => ['integer', 'distinct', Rule::exists('users', 'id')],
         ]);
 
+        $workorder = Workorder::with('status')->findOrFail($validated['workorder_id']);
+
+        // Guard state WO — mirror AssignmentService::guardAssignability,
+        // tapi untuk alur lembur (sebelum assignment dibuat).
+        if ((int) $workorder->assigned_to !== (int) $request->user()->id) {
+            return response()->json([
+                'error' => 'Hanya SPV yang ditugaskan pada WO ini yang bisa mengajukan lembur.',
+            ], 403);
+        }
+        if (optional($workorder->status)->kode !== 'DITUGASKAN_KE_SPV') {
+            return response()->json([
+                'error' => 'WO tidak pada status DITUGASKAN_KE_SPV (belum bisa diajukan lembur atau sudah ditugaskan).',
+            ], 422);
+        }
+        if ($workorder->lembur_spl_id) {
+            return response()->json([
+                'error' => 'WO ini sudah memiliki pengajuan lembur.',
+            ], 422);
+        }
+
         $statusAwalId = Status::where('kode', 'BELUM_DISETUJUI')->value('id')
             ?? Status::query()->min('id');
 
         DB::beginTransaction();
         try {
             $lemburSpl = LemburSpl::create([
+                'workorder_id'       => $workorder->id,
                 'pemohon_id'         => $request->user()->id,
                 'jenis_pekerjaan'    => $validated['jenis_pekerjaan'],
                 'judul_pekerjaan'    => $validated['judul_pekerjaan'],
@@ -108,6 +137,9 @@ class LemburSplController extends Controller
             if (! empty($rows)) {
                 LemburSplMember::insert($rows);
             }
+
+            // Link WO → pengajuan lembur. Inilah penanda "WO ini lembur".
+            $workorder->update(['lembur_spl_id' => $lemburSpl->id]);
 
             DB::commit();
 
@@ -146,7 +178,19 @@ class LemburSplController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * Verifikasi pengajuan lembur oleh atasan (superadmin/manager) dari web.
+     *
+     * - APPROVE (status DISETUJUI): pengajuan diterima, lalu staff benar-benar
+     *   ditugaskan ke WO via LemburApprovalService — membangun
+     *   workorder_assignment + wo_assignment_member, transisi WO →
+     *   DITUGASKAN_KE_STAFF, seed progress awal, dan catat audit trail.
+     *   Identik dengan hasil AssignmentService::assignStaff (alur normal).
+     * - REJECT (status DITOLAK): pengajuan ditolak. WO tetap di
+     *   DITUGASKAN_KE_SPV sehingga SPV bisa mengajukan ulang; tidak ada
+     *   assignment yang dibuat.
+     *
+     * Status WO TIDAK lagi disalin mentah dari status_id pengajuan — itu dua
+     * domain status berbeda (lembur vs workorder).
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
@@ -159,39 +203,41 @@ class LemburSplController extends Controller
             'status_id' => 'required|exists:m_status,id',
             'alasan_ditolak' => 'nullable|string'
         ]);
+
+        $disetujuiId = Status::where('kode', 'DISETUJUI')->value('id');
+
         DB::beginTransaction();
         try {
-            $lemburSpl = LemburSpl::with('workorder')->findOrFail($id);
+            $lemburSpl = LemburSpl::with(['workorder.workorderAssignment', 'members'])->findOrFail($id);
             $previousStatusId = $lemburSpl->status_id;
+
             $lemburSpl->update([
                 'verifikator_id' => $validatedData['verifikator_id'],
                 'status_id' => $validatedData['status_id'],
                 'waktu_verifikasi' => now(),
                 'alasan_ditolak' => $validatedData['alasan_ditolak'] ?? null,
             ]);
-            if ($lemburSpl->workorder) {
-                $lemburSpl->workorder->update([
-                    'status_id' => $validatedData['status_id']
-                ]);
 
-                if ((int) $validatedData['status_id'] === 2 && (int) $previousStatusId !== 2) {
-                    (new ProgressWorkorderService())->createInitialProgress($lemburSpl->workorder->id);
-                    $penugasanActionId = MasterAction::where('kode', 'PENUGASAN')->value('id');
-                    (new WorkorderActionService())->createAction([
-                        'workorder_id' => $lemburSpl->workorder->id,
-                        'action_id' => $penugasanActionId,
-                        'actor_id' => $lemburSpl->workorder->assigned_to,
-                        'keterangan' => 'Penugasan awal',
-                        'waktu_mulai' => $lemburSpl->workorder->tanggal_mulai,
-                        'estimasi_selesai' => optional($lemburSpl->workorder->workorderAssignment)->estimasi_selesai,
-                    ]);
-                }
+            // APPROVE (transisi baru ke DISETUJUI) → tugaskan staff ke WO.
+            $isNewApproval = $disetujuiId !== null
+                && (int) $validatedData['status_id'] === (int) $disetujuiId
+                && (int) $previousStatusId !== (int) $disetujuiId;
+
+            if ($isNewApproval) {
+                (new LemburApprovalService())->approveAndAssign($lemburSpl);
             }
+
             DB::commit();
+
+            $lemburSpl->load($this->defaultWith);
+
             return response()->json([
                 'message' => 'Data lembur SPL berhasil diupdate',
                 'data' => $lemburSpl
             ], 200);
+        } catch (\LogicException $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 422);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);

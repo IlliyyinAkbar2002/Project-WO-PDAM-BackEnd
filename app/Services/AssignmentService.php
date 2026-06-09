@@ -57,7 +57,14 @@ class AssignmentService
                 throw new \LogicException('kategori_form tidak valid: ' . ($kategori ?? 'null'));
             }
 
-            $this->createKategoriForm($kategori, $workorder->id, $data['form_kategori']);
+            // Field kategori "awal" kini diisi staff saat MULAI, bukan SPV saat
+            // assign (lihat BE_pindah_form_awal_ke_mulai.md). Jadi baris wo_*
+            // hanya dibuat di sini bila FE memang masih mengirim datanya (klien
+            // lama). Bila form_kategori kosong/{}, dilewati — baris dibuat saat start.
+            $formKategori = $data['form_kategori'] ?? [];
+            if (! empty($formKategori)) {
+                $this->createKategoriForm($kategori, $workorder->id, $formKategori);
+            }
 
             $locationId = $this->resolveLocation($workorder, $data);
 

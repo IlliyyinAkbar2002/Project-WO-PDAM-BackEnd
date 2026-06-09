@@ -21,7 +21,7 @@ class LemburSpl extends Model
 
     public function workorder()
     {
-        return $this->hasOne(Workorder::class, 'lembur_spl_id');
+        return $this->belongsTo(Workorder::class, 'workorder_id');
     }
 
     public function status()

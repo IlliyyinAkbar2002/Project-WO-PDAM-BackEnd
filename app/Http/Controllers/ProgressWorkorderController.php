@@ -34,10 +34,30 @@ class ProgressWorkorderController extends Controller
     }
 
     /**
+     * Guard: WO ber-status DITOLAK_SPV bersifat FINAL/terminal. Tidak ada
+     * endpoint yang boleh memindahkannya keluar ke alur kerja (mulai, submit,
+     * resubmit, review, update). Mengembalikan response 422 bila WO terminal,
+     * atau null bila masih boleh diproses.
+     */
+    private function rejectIfWorkorderFinal(Workorder $workorder): ?\Illuminate\Http\JsonResponse
+    {
+        if ((int) $workorder->status_id === $this->statusId('DITOLAK_SPV')) {
+            return response()->json([
+                'error' => 'WO sudah ditolak final (DITOLAK_SPV) dan tidak dapat dilanjutkan.'
+            ], 422);
+        }
+
+        return null;
+    }
+
+    /**
      * Kompatibilitas FE: beberapa client lama kirim multipart/json dengan method
      * yang tidak konsisten. Pastikan field non-file tetap terbaca sebelum validasi.
+     *
+     * protected: dipakai ulang oleh ProgressLemburController::review() untuk
+     * menerjemahkan decision (reject→revisi) sebelum delegasi ke parent.
      */
-    private function hydrateInputFromBody(Request $request): void
+    protected function hydrateInputFromBody(Request $request): void
     {
         if ($request->request->count() > 0) {
             return;
@@ -166,7 +186,7 @@ class ProgressWorkorderController extends Controller
     {
         $this->hydrateInputFromBody($request);
 
-        $validated = $request->validate([
+        $rules = [
             'workorder_id' => 'required|exists:workorder,id',
             'hasil_pengerjaan' => 'nullable|string|max:255',
             'latitude'  => 'required|numeric',
@@ -174,7 +194,32 @@ class ProgressWorkorderController extends Controller
             'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
-        ]);
+        ];
+
+        // Field kategori "awal" kini diisi staff saat MULAI (lihat
+        // BE_pindah_form_awal_ke_mulai.md). Field dikirim datar (flat,
+        // snake_case) sesuai kategori_form WO. Hanya kolom NOT NULL di tabel
+        // wo_* yang divalidasi required; sisanya nullable (disimpan apa adanya).
+        $kategoriForm = optional(
+            optional(Workorder::find($request->input('workorder_id')))->jenisWorkorder
+        )->kategori_form;
+
+        if ($kategoriForm === 'meter') {
+            $rules['nomor_meter']        = 'required|string|max:64';
+            $rules['kondisi_meter_awal'] = 'nullable|string';
+        } elseif ($kategoriForm === 'jaringan') {
+            $rules['jenis_pipa']        = 'required|string|max:64';
+            $rules['diameter_pipa']     = 'nullable|numeric';
+            $rules['panjang_pipa']      = 'nullable|numeric';
+            $rules['tingkat_kerusakan'] = 'nullable|string|max:32';
+        } elseif ($kategoriForm === 'infrastruktur') {
+            $rules['nama_aset']    = 'required|string|max:255';
+            $rules['jenis_aset']   = 'required|string|max:64';
+            $rules['kapasitas']    = 'nullable|string|max:64';
+            $rules['kondisi_awal'] = 'nullable|string';
+        }
+
+        $validated = $request->validate($rules);
 
         $userId = optional($request->user())->id;
         $workorder = Workorder::with('assignmentMembers')->findOrFail($validated['workorder_id']);
@@ -185,6 +230,10 @@ class ProgressWorkorderController extends Controller
 
         if (! $workorder->assignmentMembers->pluck('user_id')->contains($userId)) {
             return response()->json(['error' => 'User bukan petugas WO ini'], 403);
+        }
+
+        if ($finalError = $this->rejectIfWorkorderFinal($workorder)) {
+            return $finalError;
         }
 
         if (! in_array($workorder->status_id, $allowedStatuses, true)) {
@@ -219,6 +268,11 @@ class ProgressWorkorderController extends Controller
             }
 
             $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
+
+            // Simpan data kategori "awal" yang diisi staff saat MULAI ke tabel
+            // wo_* terkait. updateOrCreate: idempoten bila staff menekan MULAI
+            // ulang & menghindari pelanggaran unique nomor_meter.
+            $this->persistKategoriAwal($workorder, $kategoriForm, $validated);
 
             $mulaiActionId = MasterAction::where('kode', 'MULAI_KERJA')->value('id');
             if ($mulaiActionId) {
@@ -307,6 +361,10 @@ class ProgressWorkorderController extends Controller
 
         if (! $workorder->assignmentMembers->pluck('user_id')->contains($userId)) {
             return response()->json(['error' => 'User bukan petugas WO ini'], 403);
+        }
+
+        if ($finalError = $this->rejectIfWorkorderFinal($workorder)) {
+            return $finalError;
         }
 
         if ($tipeProgressKode === 'SELESAI') {
@@ -412,6 +470,232 @@ class ProgressWorkorderController extends Controller
     }
 
     /**
+     * Petugas mengirim ulang (resubmit) progres yang diminta revisi oleh SPV.
+     *
+     * Berbeda dari versi lama (yang hanya membalik status tanpa data), endpoint
+     * ini menangkap payload penuh seperti submit(): deskripsi, lokasi, foto, dan
+     * — bila baris yang direvisi bertipe SELESAI — field kategori hasil akhir.
+     *
+     * Perilaku:
+     * - Baris progres yang direvisi di-update in-place (order tidak berubah).
+     * - Foto baru DITAMBAHKAN ke dokumentasi lama (append), foto lama tetap.
+     * - Dibuat satu siklus review baru (progress_detail status 'pending').
+     * - Bila tipe SELESAI: WO kembali ke PENGECEKAN + notifikasi SPV; selain itu
+     *   WO kembali ke IN_PROGRESS.
+     *
+     * Guard utama: hanya boleh untuk progres berstatus REVISI_REQUESTED. Ini
+     * mencegah "menghidupkan" WO yang sudah DITOLAK_SPV (terminal) — keduanya
+     * sama-sama meninggalkan progress_detail 'rejected', sehingga cek berbasis
+     * progress_detail saja tidak cukup membedakannya.
+     *
+     * Menerima `progress_id` atau `progress_workorder_id` (kompat klien lama).
+     */
+    public function resubmit(Request $request)
+    {
+        $this->hydrateInputFromBody($request);
+
+        $progressId = $request->input('progress_id') ?? $request->input('progress_workorder_id');
+        $request->merge(['progress_id' => $progressId]);
+
+        $request->validate([
+            'progress_id' => 'required|exists:progress_workorder,id',
+        ]);
+
+        $progress = ProgressWorkorder::with([
+            'workorder.assignmentMembers',
+            'workorder.jenisWorkorder',
+            'tipeProgress',
+        ])->findOrFail($progressId);
+        $workorder = $progress->workorder;
+        $tipeKode = optional($progress->tipeProgress)->kode;
+
+        $rules = [
+            'hasil_pengerjaan' => 'required|string|max:255',
+            'latitude'  => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'accuracy'  => 'nullable|numeric',
+            'foto' => 'nullable|array',
+            'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+        ];
+
+        // Tipe progres diambil dari baris yang direvisi (bukan dari payload).
+        // Bila SELESAI, terima & validasi field hasil akhir sesuai kategori,
+        // sama persis seperti submit() SELESAI.
+        $kategoriForm = null;
+        if ($tipeKode === 'SELESAI') {
+            $kategoriForm = optional($workorder->jenisWorkorder)->kategori_form;
+
+            if ($kategoriForm === 'meter') {
+                $rules['kondisi_meter_akhir'] = 'required|string';
+                $rules['hasil_kalibrasi'] = 'required|string';
+            } elseif ($kategoriForm === 'jaringan') {
+                $rules['tindakan_perbaikan'] = 'required|string';
+                $rules['hasil_inspeksi'] = 'required|string';
+            } elseif ($kategoriForm === 'infrastruktur') {
+                $rules['kondisi_akhir'] = 'required|string';
+                $rules['jadwal_pemeliharaan'] = 'required|date';
+                $rules['tindakan'] = 'required|string';
+            }
+        }
+
+        $validated = $request->validate($rules);
+
+        $userId = optional($request->user())->id;
+
+        if (! $workorder->assignmentMembers->pluck('user_id')->contains($userId)) {
+            return response()->json(['error' => 'User bukan petugas WO ini'], 403);
+        }
+
+        if ($finalError = $this->rejectIfWorkorderFinal($workorder)) {
+            return $finalError;
+        }
+
+        // Baris penanda aksi SPV (tipe REVISI/DITOLAK) bukan submission petugas
+        // dan tidak boleh diresubmit, walau statusnya REVISI_REQUESTED.
+        if (in_array($tipeKode, ['REVISI', 'DITOLAK'], true)) {
+            return response()->json(['error' => 'Baris ini bukan laporan petugas dan tidak dapat diresubmit'], 422);
+        }
+
+        if ((int) $progress->status_id !== $this->statusId('REVISI_REQUESTED')) {
+            return response()->json(['error' => 'Progress tidak dalam status revisi'], 422);
+        }
+
+        if ($tipeKode === 'SELESAI') {
+            $isPicForThisWO = $workorder->assignmentMembers
+                ->where('user_id', $userId)
+                ->where('is_pic', true)
+                ->isNotEmpty();
+
+            $request->user()->loadMissing('pegawai.jabatan');
+            $jabatanKode = optional(optional($request->user()->pegawai)->jabatan)->kode;
+
+            if (! $isPicForThisWO || $jabatanKode !== 'SENIOR_STAFF') {
+                return response()->json([
+                    'error' => 'Hanya PIC dengan jabatan Senior Staff yang dapat submit SELESAI'
+                ], 403);
+            }
+        }
+
+        DB::beginTransaction();
+        try {
+            // Update baris yang direvisi in-place. submitted_by_user_id sengaja
+            // tidak diubah agar baris tetap milik petugas pelapor aslinya.
+            $progress->update([
+                'status_id'        => $this->statusId('SUBMITTED'),
+                'hasil_pengerjaan' => $validated['hasil_pengerjaan'],
+                'waktu_submit'     => now(),
+                'latitude'         => $validated['latitude'],
+                'longitude'        => $validated['longitude'],
+                'accuracy'         => $validated['accuracy'] ?? null,
+            ]);
+
+            if ($request->hasFile('foto')) {
+                foreach ($request->file('foto') as $file) {
+                    $path = $file->store('dokumentasi_progress', 'public');
+                    $progress->dokumentasiProgress()->create([
+                        'url' => $path,
+                        'jenis' => 'HASIL_KERJA',
+                    ]);
+                }
+            }
+
+            // Siklus review baru untuk hasil perbaikan ini.
+            ProgressDetail::create([
+                'progress_workorder_id' => $progress->id,
+                'status' => 'pending',
+            ]);
+
+            if ($tipeKode === 'SELESAI') {
+                $workorder->update([
+                    'status_id' => $this->statusId('PENGECEKAN'),
+                    'tanggal_selesai' => now(),
+                ]);
+
+                $this->persistKategoriHasilAkhir($workorder, $kategoriForm, $validated);
+            } else {
+                $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
+            }
+
+            $actionKode = $tipeKode === 'SELESAI' ? 'SELESAI_KERJA' : 'SUBMIT_PROGRESS';
+            $submitActionId = MasterAction::where('kode', $actionKode)->value('id');
+            if ($submitActionId) {
+                WorkorderAction::create([
+                    'workorder_id' => $workorder->id,
+                    'action_id'    => $submitActionId,
+                    'actor_id'     => $userId,
+                    'keterangan'   => $tipeKode === 'SELESAI'
+                        ? 'Petugas mengirim ulang hasil pekerjaan (revisi)'
+                        : 'Petugas mengirim ulang progres (revisi)',
+                    'waktu_mulai'  => now(),
+                ]);
+            }
+
+            DB::commit();
+
+            if ($tipeKode === 'SELESAI') {
+                $this->notifyWorkOrderReadyForReview($workorder, $userId);
+            }
+
+            $workorder->refresh();
+            $workorder->load('status');
+
+            return response()->json([
+                'message' => 'Resubmit progress berhasil',
+                'progress' => $progress->load('dokumentasiProgress'),
+                'workorder' => [
+                    'id' => $workorder->id,
+                    'progres_persen' => $workorder->progres_persen,
+                    'status' => $workorder->status,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Simpan field kategori "awal" (meter/jaringan/infrastruktur) ke tabel
+     * wo_* saat staff submit MULAI.
+     *
+     * updateOrCreate berdasarkan workorder_id: idempoten bila MULAI diulang dan
+     * aman terhadap kemungkinan baris sudah dibuat klien lama saat assign.
+     * Hanya field "awal" yang di-set; field hasil akhir tetap diisi saat SELESAI.
+     */
+    private function persistKategoriAwal(Workorder $workorder, ?string $kategoriForm, array $validated): void
+    {
+        if ($kategoriForm === 'meter') {
+            WoMeter::updateOrCreate(
+                ['workorder_id' => $workorder->id],
+                [
+                    'nomor_meter'        => $validated['nomor_meter'],
+                    'kondisi_meter_awal' => $validated['kondisi_meter_awal'] ?? null,
+                ]
+            );
+        } elseif ($kategoriForm === 'jaringan') {
+            WoJaringan::updateOrCreate(
+                ['workorder_id' => $workorder->id],
+                [
+                    'jenis_pipa'        => $validated['jenis_pipa'],
+                    'diameter_pipa'     => $validated['diameter_pipa'] ?? null,
+                    'panjang_pipa'      => $validated['panjang_pipa'] ?? null,
+                    'tingkat_kerusakan' => $validated['tingkat_kerusakan'] ?? null,
+                ]
+            );
+        } elseif ($kategoriForm === 'infrastruktur') {
+            WoInfrastruktur::updateOrCreate(
+                ['workorder_id' => $workorder->id],
+                [
+                    'nama_aset'    => $validated['nama_aset'],
+                    'jenis_aset'   => $validated['jenis_aset'],
+                    'kapasitas'    => $validated['kapasitas'] ?? null,
+                    'kondisi_awal' => $validated['kondisi_awal'] ?? null,
+                ]
+            );
+        }
+    }
+
+    /**
      * Simpan field hasil akhir kategori (meter/jaringan/infrastruktur) ke
      * tabel wo_* saat petugas submit SELESAI.
      *
@@ -495,6 +779,10 @@ class ProgressWorkorderController extends Controller
 
         if ((int) $workorder->assigned_to !== (int) $userId) {
             return response()->json(['error' => 'Hanya SPV yang membuat WO ini yang bisa review'], 403);
+        }
+
+        if ($finalError = $this->rejectIfWorkorderFinal($workorder)) {
+            return $finalError;
         }
 
         $allowedStatuses = array_filter([
@@ -592,7 +880,10 @@ class ProgressWorkorderController extends Controller
                 ProgressWorkorder::create([
                     'workorder_id' => $workorder->id,
                     'tipe_progress_id' => $this->tipeId('REVISI'),
-                    'status_id' => $this->statusId('SUBMITTED'),
+                    // Baris penanda aksi SPV (bukan submission petugas). Diberi
+                    // status REVISI_REQUESTED, bukan SUBMITTED, agar query yang
+                    // menghitung baris SUBMITTED tidak ikut keliru.
+                    'status_id' => $this->statusId('REVISI_REQUESTED'),
                     'submitted_by_user_id' => $userId,
                     'hasil_pengerjaan' => 'SPV meminta revisi',
                     'order' => $nextOrder,
@@ -616,7 +907,10 @@ class ProgressWorkorderController extends Controller
                 ProgressWorkorder::create([
                     'workorder_id' => $workorder->id,
                     'tipe_progress_id' => $this->tipeId('DITOLAK'),
-                    'status_id' => $this->statusId('SUBMITTED'),
+                    // Baris penanda aksi SPV (bukan submission petugas). Diberi
+                    // status DITOLAK_SPV, bukan SUBMITTED, agar query yang
+                    // menghitung baris SUBMITTED tidak ikut keliru.
+                    'status_id' => $this->statusId('DITOLAK_SPV'),
                     'submitted_by_user_id' => $userId,
                     'hasil_pengerjaan' => 'SPV menolak hasil pekerjaan',
                     'order' => $nextOrder,
@@ -775,6 +1069,10 @@ class ProgressWorkorderController extends Controller
 
         if ((int) $progressWorkorder->workorder->assigned_to !== (int) $userId) {
             return response()->json(['error' => 'Hanya petugas assigned yang bisa update progress'], 403);
+        }
+
+        if ($finalError = $this->rejectIfWorkorderFinal($progressWorkorder->workorder)) {
+            return $finalError;
         }
 
     DB::beginTransaction();

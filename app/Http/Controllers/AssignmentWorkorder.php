@@ -56,7 +56,11 @@ class AssignmentWorkorder extends Controller
 
         $validated = $request->validate([
             'kategori_form'          => 'nullable|string|in:meter,jaringan,infrastruktur',
-            'form_kategori'          => 'required|array',
+            // Field kategori "awal" kini diisi staff saat MULAI (lihat
+            // BE_pindah_form_awal_ke_mulai.md), jadi form_kategori boleh kosong/{}
+            // di tahap assign. 'required|array' akan menolak {} (Laravel
+            // menganggap array kosong = tidak terisi), karena itu pakai nullable.
+            'form_kategori'          => 'nullable|array',
             'petugas'                => 'required|array|min:1',
             'petugas.*.user_id'      => 'required|exists:users,id',
             'petugas.*.peran'        => 'nullable|in:koordinator,anggota',

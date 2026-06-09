@@ -11,6 +11,8 @@ use App\Http\Controllers\WorkorderActionController;
 use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\ProgressDetailController;
+use App\Http\Controllers\ProgressLemburController;
+use App\Http\Controllers\ProgressDetailLemburController;
 use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\NotificationController;
@@ -70,6 +72,7 @@ Route::prefix('v1')->group(function () {
         Route::match(['post', 'put', 'patch'], 'progress-workorder/start', [ProgressWorkorderController::class, 'start']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/submit', [ProgressWorkorderController::class, 'submit']);
         Route::match(['post', 'put', 'patch'], 'progress-workorder/review', [ProgressWorkorderController::class, 'review']);
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/resubmit', [ProgressWorkorderController::class, 'resubmit']);
 
         Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show'])->whereNumber('id');
         Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
@@ -78,9 +81,31 @@ Route::prefix('v1')->group(function () {
         // Progress Detail - review history tracking
         Route::get('progress-detail', [ProgressDetailController::class, 'index']);
         Route::get('progress-detail/{id}', [ProgressDetailController::class, 'show'])->whereNumber('id');
-        Route::post('progress-detail/resubmit', [ProgressDetailController::class, 'resubmit']);
         Route::post('progress-detail/{id}/approve', [ProgressDetailController::class, 'approve'])->whereNumber('id');
         Route::post('progress-detail/{id}/reject', [ProgressDetailController::class, 'reject'])->whereNumber('id');
+
+        // =========================================================
+        // [M/W] PROGRESS LEMBUR (overtime) — flow identik progress-workorder,
+        // beda hanya REVIEW: hanya accept|reject (reject = minta revisi, WO
+        // balik IN_PROGRESS). Backed by ProgressLemburController (extends
+        // ProgressWorkorderController), jadi start/submit/dll diwarisi apa adanya.
+        // =========================================================
+        Route::match(['post', 'put', 'patch'], 'progress-lembur/start', [ProgressLemburController::class, 'start']);
+        Route::match(['post', 'put', 'patch'], 'progress-lembur/submit', [ProgressLemburController::class, 'submit']);
+        Route::match(['post', 'put', 'patch'], 'progress-lembur/review', [ProgressLemburController::class, 'review']);
+        Route::match(['post', 'put', 'patch'], 'progress-lembur/resubmit', [ProgressLemburController::class, 'resubmit']);
+
+        Route::get('progress-lembur/by-member/{workorderId}', [ProgressLemburController::class, 'progressByMember'])->whereNumber('workorderId');
+        Route::get('progress-lembur/member-summary/{workorderId}', [ProgressLemburController::class, 'memberSummary'])->whereNumber('workorderId');
+        Route::get('progress-lembur/quota/{id}', [ProgressLemburController::class, 'quota'])->whereNumber('id');
+
+        Route::get('progress-lembur/{id}', [ProgressLemburController::class, 'show'])->whereNumber('id');
+        Route::match(['post', 'put', 'patch'], 'progress-lembur/{id}', [ProgressLemburController::class, 'update'])->whereNumber('id');
+        Route::post('progress-lembur/{id}/cancel', [ProgressLemburController::class, 'cancel'])->whereNumber('id');
+
+        // Riwayat review progress lembur (read-only) — SPV melihat siklus review
+        Route::get('progress-detail-lembur', [ProgressDetailLemburController::class, 'index']);
+        Route::get('progress-detail-lembur/{id}', [ProgressDetailLemburController::class, 'show'])->whereNumber('id');
 
         // Laporan Workorder
         Route::apiResource('laporan-workorder', LaporanWorkorderController::class)->only(['index', 'show', 'store']);

@@ -4,58 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\ProgressDetail;
 use App\Models\ProgressWorkorder;
-use App\Models\Status;
-use App\Models\User;
-use App\Notifications\WorkOrderNotification;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class ProgressDetailController extends Controller
 {
-    private function statusId(string $kode): ?int
-    {
-        return Status::where('kode', $kode)->value('id');
-    }
-
-    /**
-     * Kirim notifikasi `wo_completed` ke pembuat WO (Superadmin) saat
-     * progres SELESAI di-approve. Best-effort: gagal notifikasi tidak
-     * boleh mempengaruhi response approval.
-     */
-    private function notifyWorkOrderCompleted($workorder, int $spvUserId): void
-    {
-        try {
-            $creatorId = $workorder->created_by_user_id;
-            if (! $creatorId) {
-                return;
-            }
-
-            $creator = User::find($creatorId);
-            if (! $creator) {
-                return;
-            }
-
-            $spv = User::with('pegawai:id,nama')->find($spvUserId);
-            $senderName = optional($spv?->pegawai)->nama ?? $spv?->name ?? 'SPV';
-
-            $creator->notify(new WorkOrderNotification(
-                'Work Order Selesai',
-                "{$senderName} telah menyelesaikan WO #{$workorder->nama_workorder}.",
-                (int) $workorder->id,
-                'wo_completed',
-                $senderName
-            ));
-        } catch (\Throwable $e) {
-            Log::warning('notifyWorkOrderCompleted failed', [
-                'workorder_id' => $workorder->id,
-                'spv_user_id'  => $spvUserId,
-                'error'        => $e->getMessage(),
-            ]);
-        }
-    }
-
     /**
      * Auto-create progress_detail when staff submits progress.
      * Called internally after ProgressWorkorder is created/updated.
@@ -115,169 +68,38 @@ class ProgressDetailController extends Controller
     }
 
     /**
-     * Staff resubmits after rejection.
-     * Creates new progress_detail with status='pending'.
+     * DEPRECATED — review WO sekarang satu sumber kebenaran lewat Sistem A:
+     * `POST /api/v1/progress-workorder/review` (decision=accept|revisi|tolak).
      *
-     * POST /api/v1/progress-detail/resubmit
-     * Body: { progress_workorder_id: int }
-     */
-    public function resubmit(Request $request)
-    {
-        $validated = $request->validate([
-            'progress_workorder_id' => 'required|exists:progress_workorder,id',
-        ]);
-
-        $userId = optional($request->user())->id;
-        $progress = ProgressWorkorder::with('workorder.assignmentMembers')->findOrFail($validated['progress_workorder_id']);
-
-        // Verify user is assigned to this workorder
-        if (!$progress->workorder->assignmentMembers->pluck('user_id')->contains($userId)) {
-            return response()->json(['error' => 'User bukan petugas WO ini'], 403);
-        }
-
-        // Check latest detail is rejected
-        $latestDetail = $progress->progressDetails()->latest()->first();
-        if (!$latestDetail || $latestDetail->status !== 'rejected') {
-            return response()->json(['error' => 'Progress tidak dalam status rejected'], 422);
-        }
-
-        DB::beginTransaction();
-        try {
-            $newDetail = ProgressDetail::create([
-                'progress_workorder_id' => $progress->id,
-                'status' => 'pending',
-            ]);
-
-            // Update progress status back to SUBMITTED
-            $progress->update(['status_id' => $this->statusId('SUBMITTED')]);
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Progress berhasil diresubmit',
-                'detail' => $newDetail->load('progressWorkorder'),
-            ], 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * SPV approves progress detail.
+     * Endpoint ini dulu menggandakan logika accept dan ikut mengubah status WO,
+     * sehingga ada dua sistem review paralel. Untuk menghilangkan ambiguitas,
+     * penulisan status via Sistem B dimatikan. progress_detail tetap dipakai
+     * sebagai riwayat review (GET index/show), diisi otomatis oleh Sistem A.
      *
      * POST /api/v1/progress-detail/{id}/approve
      */
     public function approve(Request $request, $id)
     {
-        $detail = ProgressDetail::with('progressWorkorder.workorder')->findOrFail($id);
-        $userId = optional($request->user())->id;
-        $workorder = $detail->progressWorkorder->workorder;
-
-        // Verify user is SPV who created this WO
-        if ((int) $workorder->assigned_to !== (int) $userId) {
-            return response()->json(['error' => 'Hanya SPV yang membuat WO ini yang bisa approve'], 403);
-        }
-
-        if ($detail->status !== 'pending') {
-            return response()->json(['error' => 'Detail sudah direview'], 422);
-        }
-
-        DB::beginTransaction();
-        try {
-            $detail->update([
-                'status' => 'approved',
-                'reviewed_by_user_id' => $userId,
-                'reviewed_at' => now(),
-            ]);
-
-            // reviewed_by_user_id sudah dipindah sepenuhnya ke progress_detail.
-            // progress_workorder hanya update status_id.
-            $detail->progressWorkorder->update([
-                'status_id' => $this->statusId('VERIFIED'),
-            ]);
-
-            // If this is SELESAI type, mark workorder as SELESAI
-            $tipeKode = optional($detail->progressWorkorder->tipeProgress)->kode;
-            if ($tipeKode === 'SELESAI') {
-                $workorder->update([
-                    'status_id' => $this->statusId('SELESAI'),
-                    'approved_by_user_id' => $userId,
-                    'approved_at' => now(),
-                    'tanggal_selesai' => now(),
-                ]);
-            }
-
-            DB::commit();
-
-            if ($tipeKode === 'SELESAI') {
-                $this->notifyWorkOrderCompleted($workorder, $userId);
-            }
-
-            return response()->json([
-                'message' => 'Progress berhasil diapprove',
-                'detail' => $detail->fresh(['progressWorkorder', 'reviewer']),
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+        return $this->deprecatedReviewResponse();
     }
 
     /**
-     * SPV rejects progress detail.
+     * DEPRECATED — lihat catatan pada approve(). Endpoint `reject` ini sebenarnya
+     * berperilaku "revisi" (WO balik ke IN_PROGRESS), bukan penolakan final.
+     * Gunakan Sistem A: `decision=revisi` untuk minta perbaikan, atau
+     * `decision=tolak` untuk penolakan FINAL (DITOLAK_SPV, terminal).
      *
      * POST /api/v1/progress-detail/{id}/reject
-     * Body: { alasan_penolakan: string, field_to_revise: string }
      */
     public function reject(Request $request, $id)
     {
-        $validated = $request->validate([
-            'alasan_penolakan' => 'required|string',
-            'field_to_revise' => 'nullable|string',
-        ]);
+        return $this->deprecatedReviewResponse();
+    }
 
-        $detail = ProgressDetail::with('progressWorkorder.workorder')->findOrFail($id);
-        $userId = optional($request->user())->id;
-        $workorder = $detail->progressWorkorder->workorder;
-
-        // Verify user is SPV who created this WO
-        if ((int) $workorder->assigned_to !== (int) $userId) {
-            return response()->json(['error' => 'Hanya SPV yang membuat WO ini yang bisa reject'], 403);
-        }
-
-        if ($detail->status !== 'pending') {
-            return response()->json(['error' => 'Detail sudah direview'], 422);
-        }
-
-        DB::beginTransaction();
-        try {
-            $detail->update([
-                'status' => 'rejected',
-                'reviewed_by_user_id' => $userId,
-                'reviewed_at' => now(),
-                'alasan_penolakan' => $validated['alasan_penolakan'],
-                'field_to_revise' => $validated['field_to_revise'] ?? null,
-            ]);
-
-            // reviewed_by_user_id sudah dipindah sepenuhnya ke progress_detail.
-            // progress_workorder hanya update status_id.
-            $detail->progressWorkorder->update([
-                'status_id' => $this->statusId('REVISI_REQUESTED'),
-            ]);
-
-            // Update workorder status
-            $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Progress berhasil ditolak',
-                'detail' => $detail->fresh(['progressWorkorder', 'reviewer']),
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+    private function deprecatedReviewResponse()
+    {
+        return response()->json([
+            'error' => 'Endpoint ini sudah tidak dipakai. Gunakan POST /api/v1/progress-workorder/review dengan field decision (accept|revisi|tolak).',
+        ], 410);
     }
 }
