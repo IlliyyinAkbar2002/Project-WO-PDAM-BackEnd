@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -87,18 +88,24 @@ class UserController extends Controller
     {
         try {
             $user = User::findOrFail($id);
+            if ($user->id === auth()->id()) {
+                return response()->json([
+                    'error' => 'Anda tidak dapat menonaktifkan akun sendiri.'
+                ], 422);
+            }
             $user->is_active = !$user->is_active;
             $user->save();
             return response()->json([
                 'message' => $user->is_active
                     ? 'Akun berhasil diaktifkan'
                     : 'Akun berhasil dinonaktifkan',
-                'is_active' => $user->is_active
+                'is_active' => $user->is_active,
+                'user_id' => $user->id,
             ]);
         } catch (\Exception $e) {
+            Log::error($e);
             return response()->json([
-                'error' => 'Terjadi kesalahan saat mengubah status akun',
-                'message' => $e->getMessage()
+                'error' => 'Terjadi kesalahan saat mengubah status akun'
             ], 500);
         }
     }
