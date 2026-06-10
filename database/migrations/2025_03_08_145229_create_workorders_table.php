@@ -30,6 +30,7 @@ class CreateWorkordersTable extends Migration
                 'Selesai',
                 'Ditolak'
             ])->default('Pending');
+            $table->boolean('is_active')->default(true);
             $table->string('kode_pengaduan');
 
             $table->foreignId('departemen_id')

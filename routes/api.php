@@ -41,6 +41,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('workorder', WorkorderController::class);
         Route::post('workorder', [WorkorderController::class, 'store']);
         Route::patch('workorder/{id}/status', [WorkorderController::class, 'updateStatus']);
+        Route::patch('workorder/{id}/toggle-status',[WorkorderController::class, 'toggleStatus']);
         
         // KPI
         Route::get('kpi', [KpiController::class, 'index']);
@@ -97,6 +98,7 @@ Route::prefix('v1')->group(function () {
         Route::post('material', [MaterialController::class, 'store']);
         Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
         Route::put('material/{kode_material}/edit', [MaterialController::class, 'edit']);
+        Route::get('material/generate-code', [MaterialController::class, 'generateCode']);
     });
 });
 
