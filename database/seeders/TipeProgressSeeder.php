@@ -25,6 +25,8 @@ class TipeProgressSeeder extends Seeder
             ['id' => 3, 'kode' => 'SELESAI',  'nama' => 'Selesai'],
             ['id' => 4, 'kode' => 'REVISI',   'nama' => 'Revisi'],
             ['id' => 5, 'kode' => 'DITOLAK',  'nama' => 'Ditolak'],
+            // id=6 eksplisit: FE mobile hardcode tipe_progress_id=6 untuk inspeksi.
+            ['id' => 6, 'kode' => 'INSPEKSI', 'nama' => 'Inspeksi'],
         ];
 
         foreach ($rows as $row) {

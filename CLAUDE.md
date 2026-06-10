@@ -41,9 +41,10 @@ The core workflow is a multi-stage work order lifecycle:
 
 1. **Superadmin** creates a WO and assigns it to a **SPV** (status: `DITUGASKAN_KE_SPV`)
 2. **SPV** fills a category-specific form (meter/jaringan/infrastruktur) and assigns **Staff** members (status: `DITUGASKAN_KE_STAFF`)
-3. **Staff** reports progress with geolocation + photos (status: `IN_PROGRESS`)
-4. **Staff** marks work complete (status: `PENGECEKAN`)
-5. **SPV** reviews: accept → `SELESAI`, revisi → back to `IN_PROGRESS`, tolak → `DITOLAK_SPV`
+3. **Staff** submits an inspection (INSPEKSI, description + min. 1 photo) — required before the first "Mulai"; does NOT change WO status or consume quota
+4. **Staff** starts work ("Mulai") and reports progress with geolocation + photos (status: `IN_PROGRESS`)
+5. **Staff** marks work complete (status: `PENGECEKAN`)
+6. **SPV** reviews: accept → `SELESAI`, revisi → back to `IN_PROGRESS`, tolak → `DITOLAK_SPV`
 
 Progress reporting has a quota system: max 8 submissions per day, total quota = estimated_days * 8.
 
@@ -66,7 +67,7 @@ Business logic lives in `app/Services/`, not controllers:
 
 ### Status & Master Data
 
-Statuses are looked up by `kode` column (e.g., `Status::where('kode', 'IN_PROGRESS')`), not by hardcoded IDs. The `StatusSeeder` defines all 18 canonical statuses. `TipeProgress` codes: MULAI, PROGRESS, SELESAI, REVISI, DITOLAK.
+Statuses are looked up by `kode` column (e.g., `Status::where('kode', 'IN_PROGRESS')`), not by hardcoded IDs. The `StatusSeeder` defines all 18 canonical statuses. `TipeProgress` codes: MULAI, PROGRESS, SELESAI, REVISI, DITOLAK, INSPEKSI (id=6, hardcoded by the mobile FE).
 
 ### Authentication & Authorization
 

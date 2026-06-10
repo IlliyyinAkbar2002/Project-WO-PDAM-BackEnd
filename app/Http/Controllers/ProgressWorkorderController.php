@@ -240,6 +240,29 @@ class ProgressWorkorderController extends Controller
             return response()->json(['error' => 'Status WO tidak valid untuk mulai kerja'], 422);
         }
 
+        // INSPEKSI wajib sebelum MULAI pertama. Scope per-WO: inspeksi oleh
+        // anggota tim mana pun membuka MULAI untuk semua (berlaku juga untuk
+        // WO lembur via ProgressLemburController). Hanya diberlakukan saat
+        // first-start (DITUGASKAN_KE_STAFF) agar WO legacy yang sudah
+        // IN_PROGRESS sebelum fitur ini tetap bisa re-start.
+        if ((int) $workorder->status_id === $this->statusId('DITUGASKAN_KE_STAFF')) {
+            $dibatalkanId = $this->statusId('DIBATALKAN');
+            $hasInspeksi = ProgressWorkorder::where('workorder_id', $workorder->id)
+                ->where('tipe_progress_id', $this->tipeId('INSPEKSI'))
+                // Inspeksi yang dibatalkan (cancel() men-null-kan waktu_submit
+                // dan men-set DIBATALKAN) tidak membuka MULAI. Inspeksi yang
+                // diminta revisi tetap dihitung — inspeksinya sudah terjadi.
+                ->whereNotNull('waktu_submit')
+                ->when($dibatalkanId !== null, fn ($q) => $q->where('status_id', '!=', $dibatalkanId))
+                ->exists();
+
+            if (! $hasInspeksi) {
+                return response()->json([
+                    'error' => 'Lakukan dan submit inspeksi terlebih dahulu sebelum mulai kerja.'
+                ], 422);
+            }
+        }
+
         DB::beginTransaction();
         try {
             $order = ((int) ProgressWorkorder::where('workorder_id', $workorder->id)->max('order')) + 1;
@@ -309,10 +332,23 @@ class ProgressWorkorderController extends Controller
     {
         $this->hydrateInputFromBody($request);
 
+        // Kompat FE: klien inspeksi mengirim tipe_progress_id numerik (id=6),
+        // bukan kode string. Terjemahkan id → kode sebelum validasi. Kode hasil
+        // lookup tetap melewati whitelist `in:` di bawah, jadi tipe yang bukan
+        // submission petugas (MULAI/REVISI/DITOLAK) tetap tertolak 422.
+        if ($request->filled('tipe_progress_id')
+            && ! $request->filled('tipe_progress_kode')
+            && ! $request->filled('tipe_progress')) {
+            $kodeFromId = TipeProgress::where('id', $request->input('tipe_progress_id'))->value('kode');
+            if ($kodeFromId !== null) {
+                $request->merge(['tipe_progress_kode' => $kodeFromId]);
+            }
+        }
+
         $rules = [
             'workorder_id' => 'required|exists:workorder,id',
-            'tipe_progress_kode' => 'required_without:tipe_progress|nullable|in:PROGRESS,SELESAI',
-            'tipe_progress' => 'required_without:tipe_progress_kode|nullable|in:PROGRESS,SELESAI',
+            'tipe_progress_kode' => 'required_without:tipe_progress|nullable|in:PROGRESS,SELESAI,INSPEKSI',
+            'tipe_progress' => 'required_without:tipe_progress_kode|nullable|in:PROGRESS,SELESAI,INSPEKSI',
             'hasil_pengerjaan' => 'required|string|max:255',
             'latitude'  => 'required|numeric',
             'longitude' => 'required|numeric',
@@ -346,13 +382,20 @@ class ProgressWorkorderController extends Controller
             }
         }
 
+        // Inspeksi: catatan (hasil_pengerjaan, sudah required di base rules)
+        // + minimal 1 foto dokumentasi. TIDAK ada field form kategori
+        // (meter/jaringan/infrastruktur) — itu domain MULAI dan SELESAI.
+        if ($tipeProgressKode === 'INSPEKSI') {
+            $rules['foto'] = 'required|array|min:1';
+        }
+
         $validated = $request->validate($rules);
 
         $tipeProgressKode = $validated['tipe_progress_kode'] ?? $validated['tipe_progress'] ?? null;
 
         if ($tipeProgressKode === null) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'tipe_progress_kode' => ['Harus mengisi tipe_progress_kode atau tipe_progress (PROGRESS / SELESAI).'],
+                'tipe_progress_kode' => ['Harus mengisi tipe_progress_kode atau tipe_progress (PROGRESS / SELESAI / INSPEKSI).'],
             ]);
         }
 
@@ -365,6 +408,27 @@ class ProgressWorkorderController extends Controller
 
         if ($finalError = $this->rejectIfWorkorderFinal($workorder)) {
             return $finalError;
+        }
+
+        if ($tipeProgressKode === 'INSPEKSI') {
+            // Jaring pengaman bila master data belum di-seed (deploy tanpa
+            // `php artisan db:seed`): beri pesan jelas, bukan 500 NOT NULL.
+            if ($this->tipeId('INSPEKSI') === null) {
+                return response()->json([
+                    'error' => 'Tipe progress INSPEKSI belum tersedia di database. Jalankan: php artisan db:seed'
+                ], 422);
+            }
+
+            // Inspeksi hanya relevan saat WO siap/sedang dikerjakan. Boleh saat
+            // IN_PROGRESS juga (inspeksi ulang); status lain (PENGECEKAN,
+            // SELESAI, dll) ditolak.
+            $allowedForInspeksi = array_filter([
+                $this->statusId('DITUGASKAN_KE_STAFF'),
+                $this->statusId('IN_PROGRESS'),
+            ]);
+            if (! in_array((int) $workorder->status_id, $allowedForInspeksi, true)) {
+                return response()->json(['error' => 'Status WO tidak valid untuk inspeksi'], 422);
+            }
         }
 
         if ($tipeProgressKode === 'SELESAI') {
@@ -383,7 +447,11 @@ class ProgressWorkorderController extends Controller
             }
         }
 
-        if ($tipeProgressKode !== 'SELESAI') {
+        // Kuota pelaporan hanya membatasi tipe PROGRESS. SELESAI memang bebas
+        // kuota sejak awal; INSPEKSI juga dibebaskan — countableSubmissions()
+        // hanya menghitung PROGRESS sehingga inspeksi tidak pernah mengonsumsi
+        // kuota, dan cek harian yang "sticky" tidak boleh memblokir inspeksi.
+        if ($tipeProgressKode === 'PROGRESS') {
             if ($limitError = $this->validateProgressLimit($workorder, $userId)) {
                 return $limitError;
             }
@@ -411,7 +479,9 @@ class ProgressWorkorderController extends Controller
                     $path = $file->store('dokumentasi_progress', 'public');
                     $progress->dokumentasiProgress()->create([
                         'url' => $path,
-                        'jenis' => 'HASIL_KERJA',
+                        // Foto inspeksi diberi jenis tersendiri agar FE/dashboard
+                        // bisa membedakannya dari foto hasil kerja.
+                        'jenis' => $tipeProgressKode === 'INSPEKSI' ? 'INSPEKSI' : 'HASIL_KERJA',
                     ]);
                 }
             }
@@ -427,20 +497,29 @@ class ProgressWorkorderController extends Controller
                 // assign, dan kolom wajibnya (nomor_meter/jenis_pipa/nama_aset)
                 // tidak dikirim di payload submit ini.
                 $this->persistKategoriHasilAkhir($workorder, $kategoriForm, $validated);
-            } else {
+            } elseif ($tipeProgressKode === 'PROGRESS') {
                 $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
             }
+            // INSPEKSI: status WO sengaja TIDAK diubah — WO tetap
+            // DITUGASKAN_KE_STAFF sampai petugas benar-benar menekan MULAI
+            // (start()). Inspeksi saat IN_PROGRESS juga tidak mengubah apa pun.
 
-            $actionKode = $tipeProgressKode === 'SELESAI' ? 'SELESAI_KERJA' : 'SUBMIT_PROGRESS';
+            $actionKode = match (true) {
+                $tipeProgressKode === 'SELESAI'  => 'SELESAI_KERJA',
+                $tipeProgressKode === 'INSPEKSI' => 'INSPEKSI',
+                default                          => 'SUBMIT_PROGRESS',
+            };
             $submitActionId = MasterAction::where('kode', $actionKode)->value('id');
             if ($submitActionId) {
                 WorkorderAction::create([
                     'workorder_id' => $workorder->id,
                     'action_id'    => $submitActionId,
                     'actor_id'     => $userId,
-                    'keterangan'   => $tipeProgressKode === 'SELESAI'
-                        ? 'Petugas menandai pekerjaan selesai'
-                        : 'Petugas melaporkan progres',
+                    'keterangan'   => match (true) {
+                        $tipeProgressKode === 'SELESAI'  => 'Petugas menandai pekerjaan selesai',
+                        $tipeProgressKode === 'INSPEKSI' => 'Petugas melakukan inspeksi awal',
+                        default                          => 'Petugas melaporkan progres',
+                    },
                     'waktu_mulai'  => now(),
                 ]);
             }
@@ -612,20 +691,28 @@ class ProgressWorkorderController extends Controller
                 ]);
 
                 $this->persistKategoriHasilAkhir($workorder, $kategoriForm, $validated);
-            } else {
+            } elseif ($tipeKode !== 'INSPEKSI') {
+                // INSPEKSI dikecualikan: resubmit inspeksi tidak boleh menggeser
+                // status WO (mis. memajukan WO yang belum MULAI ke IN_PROGRESS).
                 $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
             }
 
-            $actionKode = $tipeKode === 'SELESAI' ? 'SELESAI_KERJA' : 'SUBMIT_PROGRESS';
+            $actionKode = match (true) {
+                $tipeKode === 'SELESAI'  => 'SELESAI_KERJA',
+                $tipeKode === 'INSPEKSI' => 'INSPEKSI',
+                default                  => 'SUBMIT_PROGRESS',
+            };
             $submitActionId = MasterAction::where('kode', $actionKode)->value('id');
             if ($submitActionId) {
                 WorkorderAction::create([
                     'workorder_id' => $workorder->id,
                     'action_id'    => $submitActionId,
                     'actor_id'     => $userId,
-                    'keterangan'   => $tipeKode === 'SELESAI'
-                        ? 'Petugas mengirim ulang hasil pekerjaan (revisi)'
-                        : 'Petugas mengirim ulang progres (revisi)',
+                    'keterangan'   => match (true) {
+                        $tipeKode === 'SELESAI'  => 'Petugas mengirim ulang hasil pekerjaan (revisi)',
+                        $tipeKode === 'INSPEKSI' => 'Petugas mengirim ulang inspeksi (revisi)',
+                        default                  => 'Petugas mengirim ulang progres (revisi)',
+                    },
                     'waktu_mulai'  => now(),
                 ]);
             }

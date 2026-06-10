@@ -203,6 +203,7 @@ class DatabaseSeeder extends Seeder
             ['kode' => 'RESUME',          'nama' => 'Dilanjut',        'keterangan' => 'Pekerjaan dilanjutkan'],
             ['kode' => 'EXTEND',          'nama' => 'Perpanjangan',    'keterangan' => 'Perpanjangan waktu tugas'],
             ['kode' => 'MULAI_KERJA',     'nama' => 'Mulai Kerja',     'keterangan' => 'Petugas memulai pekerjaan'],
+            ['kode' => 'INSPEKSI',        'nama' => 'Inspeksi',        'keterangan' => 'Petugas melakukan inspeksi awal'],
             ['kode' => 'SUBMIT_PROGRESS', 'nama' => 'Submit Progress', 'keterangan' => 'Petugas melaporkan progres'],
             ['kode' => 'SELESAI_KERJA',   'nama' => 'Selesai Kerja',   'keterangan' => 'Petugas menandai pekerjaan selesai'],
             ['kode' => 'APPROVE',         'nama' => 'Persetujuan',     'keterangan' => 'SPV menyetujui hasil pekerjaan'],
