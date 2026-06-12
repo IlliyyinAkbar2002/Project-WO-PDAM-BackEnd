@@ -97,7 +97,7 @@ Route::prefix('v1')->group(function () {
 
         Route::get('progress-lembur/by-member/{workorderId}', [ProgressLemburController::class, 'progressByMember'])->whereNumber('workorderId');
         Route::get('progress-lembur/member-summary/{workorderId}', [ProgressLemburController::class, 'memberSummary'])->whereNumber('workorderId');
-        Route::get('progress-lembur/quota/{id}', [ProgressLemburController::class, 'quota'])->whereNumber('id');
+
 
         Route::get('progress-lembur/{id}', [ProgressLemburController::class, 'show'])->whereNumber('id');
         Route::match(['post', 'put', 'patch'], 'progress-lembur/{id}', [ProgressLemburController::class, 'update'])->whereNumber('id');
