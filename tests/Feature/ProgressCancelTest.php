@@ -142,48 +142,4 @@ class ProgressCancelTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_selesai_bypasses_quota()
-    {
-        for ($i = 0; $i < 8; $i++) {
-            $this->createProgress([
-                'waktu_submit' => now(),
-                'order' => $i + 1,
-            ]);
-        }
-
-        $response = $this->actingAs($this->staff, 'sanctum')
-            ->postJson('/api/v1/progress-workorder/submit', [
-                'workorder_id' => $this->workorder->id,
-                'tipe_progress_kode' => 'SELESAI',
-                'hasil_pengerjaan' => 'Pekerjaan selesai',
-                'latitude' => -6.2,
-                'longitude' => 106.8,
-            ]);
-
-        $response->assertStatus(201);
-    }
-
-    public function test_cancelled_progress_does_not_count_toward_quota()
-    {
-        for ($i = 0; $i < 7; $i++) {
-            $this->createProgress(['waktu_submit' => now(), 'order' => $i + 1]);
-        }
-
-        $cancelled = $this->createProgress([
-            'waktu_submit' => null,
-            'status_id' => Status::where('kode', 'DIBATALKAN')->value('id'),
-            'order' => 8,
-        ]);
-
-        $response = $this->actingAs($this->staff, 'sanctum')
-            ->postJson('/api/v1/progress-workorder/submit', [
-                'workorder_id' => $this->workorder->id,
-                'tipe_progress_kode' => 'PROGRESS',
-                'hasil_pengerjaan' => 'Laporan ke-8 setelah cancel',
-                'latitude' => -6.2,
-                'longitude' => 106.8,
-            ]);
-
-        $response->assertStatus(201);
-    }
 }

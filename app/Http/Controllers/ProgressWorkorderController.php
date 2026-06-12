@@ -16,6 +16,7 @@ use App\Models\WoJaringan;
 use App\Models\WoMeter;
 use App\Notifications\WorkOrderNotification;
 use App\Services\ProgressWorkorderService;
+use App\Constants\TahapanWorkorder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,12 +34,6 @@ class ProgressWorkorderController extends Controller
         return TipeProgress::where('kode', $kode)->value('id');
     }
 
-    /**
-     * Guard: WO ber-status DITOLAK_SPV bersifat FINAL/terminal. Tidak ada
-     * endpoint yang boleh memindahkannya keluar ke alur kerja (mulai, submit,
-     * resubmit, review, update). Mengembalikan response 422 bila WO terminal,
-     * atau null bila masih boleh diproses.
-     */
     private function rejectIfWorkorderFinal(Workorder $workorder): ?\Illuminate\Http\JsonResponse
     {
         if ((int) $workorder->status_id === $this->statusId('DITOLAK_SPV')) {
@@ -50,13 +45,6 @@ class ProgressWorkorderController extends Controller
         return null;
     }
 
-    /**
-     * Kompatibilitas FE: beberapa client lama kirim multipart/json dengan method
-     * yang tidak konsisten. Pastikan field non-file tetap terbaca sebelum validasi.
-     *
-     * protected: dipakai ulang oleh ProgressLemburController::review() untuk
-     * menerjemahkan decision (reject→revisi) sebelum delegasi ke parent.
-     */
     protected function hydrateInputFromBody(Request $request): void
     {
         if ($request->request->count() > 0) {
@@ -138,49 +126,6 @@ class ProgressWorkorderController extends Controller
         return is_array($decoded) ? $decoded : [];
     }
 
-    /**
-     * Validasi kuota pelaporan progress per user (individual-based).
-     *
-     * Setiap anggota tim memiliki kuota sendiri:
-     * - Maksimal 8 pelaporan per hari
-     * - Total maksimal = estimasi_hari * 8
-     *
-     * @param Workorder $workorder
-     * @param int $userId User yang akan submit progress
-     * @return \Illuminate\Http\JsonResponse|null
-     */
-    private function validateProgressLimit(Workorder $workorder, int $userId): ?\Illuminate\Http\JsonResponse
-    {
-        // 1. Cek kuota harian per user (maksimal 8x per hari per user)
-        // selectRaw('1') dipertahankan: query ber-GROUP BY tidak boleh `select *`
-        // di Postgres. countableSubmissions() hanya menghitung tipe PROGRESS.
-        $dailyQuotaEverExhausted = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)
-            ->selectRaw('1')
-            ->groupByRaw('waktu_submit::date')
-            ->havingRaw('COUNT(*) >= 8')
-            ->exists();
-
-        if ($dailyQuotaEverExhausted) {
-            return response()->json(['error' => 'Limit pelaporan harian Anda (maksimal 8x per hari) telah tercapai.'], 422);
-        }
-
-        // 2. Cek sisa kuota pelaporan total per user berdasarkan estimasi hari
-        $assignment = $workorder->workorderAssignment;
-        $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
-        $estimasiSelesai = optional($assignment)->estimasi_selesai;
-
-        $totalDays = \App\Support\WorkorderQuota::totalDays($tanggalMulai, $estimasiSelesai);
-        $maxPelaporanTotal = \App\Support\WorkorderQuota::quotaTotal($tanggalMulai, $estimasiSelesai);
-        $totalPelaporan = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)->count();
-
-        if ($totalPelaporan >= $maxPelaporanTotal) {
-            return response()->json([
-                'error' => "Sisa kuota pelaporan Anda habis. Limit total (maksimal {$maxPelaporanTotal} kali untuk {$totalDays} hari pengerjaan) telah tercapai."
-            ], 422);
-        }
-
-        return null;
-    }
 
     public function start(Request $request)
     {
@@ -196,10 +141,6 @@ class ProgressWorkorderController extends Controller
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
         ];
 
-        // Field kategori "awal" kini diisi staff saat MULAI (lihat
-        // BE_pindah_form_awal_ke_mulai.md). Field dikirim datar (flat,
-        // snake_case) sesuai kategori_form WO. Hanya kolom NOT NULL di tabel
-        // wo_* yang divalidasi required; sisanya nullable (disimpan apa adanya).
         $kategoriForm = optional(
             optional(Workorder::find($request->input('workorder_id')))->jenisWorkorder
         )->kategori_form;
@@ -240,16 +181,10 @@ class ProgressWorkorderController extends Controller
             return response()->json(['error' => 'Status WO tidak valid untuk mulai kerja'], 422);
         }
 
-        // INSPEKSI wajib sebelum MULAI pertama. Scope per-WO: inspeksi oleh
-        // anggota tim mana pun membuka MULAI untuk semua (berlaku juga untuk
-        // WO lembur via ProgressLemburController). Hanya diberlakukan saat
-        // first-start (DITUGASKAN_KE_STAFF) agar WO legacy yang sudah
-        // IN_PROGRESS sebelum fitur ini tetap bisa re-start.
         if ((int) $workorder->status_id === $this->statusId('DITUGASKAN_KE_STAFF')) {
             $dibatalkanId = $this->statusId('DIBATALKAN');
             $hasInspeksi = ProgressWorkorder::where('workorder_id', $workorder->id)
                 ->where('tipe_progress_id', $this->tipeId('INSPEKSI'))
-                // Inspeksi yang dibatalkan (cancel() men-null-kan waktu_submit
                 // dan men-set DIBATALKAN) tidak membuka MULAI. Inspeksi yang
                 // diminta revisi tetap dihitung — inspeksinya sudah terjadi.
                 ->whereNotNull('waktu_submit')
@@ -278,6 +213,7 @@ class ProgressWorkorderController extends Controller
                 'latitude'  => $validated['latitude'],
                 'longitude' => $validated['longitude'],
                 'accuracy'  => $validated['accuracy'] ?? null,
+                'tahapan'   => TahapanWorkorder::PERSIAPAN,
             ]);
 
             if ($request->hasFile('foto')) {
@@ -292,9 +228,7 @@ class ProgressWorkorderController extends Controller
 
             $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
 
-            // Simpan data kategori "awal" yang diisi staff saat MULAI ke tabel
-            // wo_* terkait. updateOrCreate: idempoten bila staff menekan MULAI
-            // ulang & menghindari pelanggaran unique nomor_meter.
+        
             $this->persistKategoriAwal($workorder, $kategoriForm, $validated);
 
             $mulaiActionId = MasterAction::where('kode', 'MULAI_KERJA')->value('id');
@@ -314,12 +248,18 @@ class ProgressWorkorderController extends Controller
             $workorder->refresh();
             $workorder->load('status');
 
+            $tahapanTertinggi = ProgressWorkorder::where('workorder_id', $workorder->id)
+                ->whereNotNull('waktu_submit')
+                ->when($this->statusId('DIBATALKAN') !== null, fn ($q) => $q->where('status_id', '!=', $this->statusId('DIBATALKAN')))
+                ->max('tahapan');
+
             return response()->json([
                 'progress' => $progress->load('dokumentasiProgress'),
                 'workorder' => [
                     'id' => $workorder->id,
                     'progres_persen' => $workorder->progres_persen,
                     'status' => $workorder->status,
+                    'tahapan_tertinggi' => $tahapanTertinggi,
                 ],
             ], 201);
         } catch (\Exception $e) {
@@ -332,10 +272,6 @@ class ProgressWorkorderController extends Controller
     {
         $this->hydrateInputFromBody($request);
 
-        // Kompat FE: klien inspeksi mengirim tipe_progress_id numerik (id=6),
-        // bukan kode string. Terjemahkan id → kode sebelum validasi. Kode hasil
-        // lookup tetap melewati whitelist `in:` di bawah, jadi tipe yang bukan
-        // submission petugas (MULAI/REVISI/DITOLAK) tetap tertolak 422.
         if ($request->filled('tipe_progress_id')
             && ! $request->filled('tipe_progress_kode')
             && ! $request->filled('tipe_progress')) {
@@ -355,13 +291,10 @@ class ProgressWorkorderController extends Controller
             'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+            'tahapan' => 'nullable|integer|between:1,4',
         ];
 
-        // Saat SELESAI, FE mengirim field kategori (meter/jaringan/infrastruktur)
-        // untuk disimpan ke tabel wo_* terkait. Validasi rules ditambahkan secara
-        // dinamis sesuai kategori_form WO. Catatan: `kondisi_awal` (infrastruktur)
-        // sengaja TIDAK divalidasi di sini — kolom itu nullable & diisi SPV saat
-        // assign, bukan oleh petugas lapangan saat submit (lihat BE_handling.md).
+        
         $tipeProgressKode = $request->input('tipe_progress_kode') ?? $request->input('tipe_progress');
         $kategoriForm = null;
         if ($tipeProgressKode === 'SELESAI') {
@@ -382,9 +315,7 @@ class ProgressWorkorderController extends Controller
             }
         }
 
-        // Inspeksi: catatan (hasil_pengerjaan, sudah required di base rules)
-        // + minimal 1 foto dokumentasi. TIDAK ada field form kategori
-        // (meter/jaringan/infrastruktur) — itu domain MULAI dan SELESAI.
+        
         if ($tipeProgressKode === 'INSPEKSI') {
             $rules['foto'] = 'required|array|min:1';
         }
@@ -411,17 +342,14 @@ class ProgressWorkorderController extends Controller
         }
 
         if ($tipeProgressKode === 'INSPEKSI') {
-            // Jaring pengaman bila master data belum di-seed (deploy tanpa
-            // `php artisan db:seed`): beri pesan jelas, bukan 500 NOT NULL.
+
             if ($this->tipeId('INSPEKSI') === null) {
                 return response()->json([
                     'error' => 'Tipe progress INSPEKSI belum tersedia di database. Jalankan: php artisan db:seed'
                 ], 422);
             }
 
-            // Inspeksi hanya relevan saat WO siap/sedang dikerjakan. Boleh saat
-            // IN_PROGRESS juga (inspeksi ulang); status lain (PENGECEKAN,
-            // SELESAI, dll) ditolak.
+            
             $allowedForInspeksi = array_filter([
                 $this->statusId('DITUGASKAN_KE_STAFF'),
                 $this->statusId('IN_PROGRESS'),
@@ -447,19 +375,17 @@ class ProgressWorkorderController extends Controller
             }
         }
 
-        // Kuota pelaporan hanya membatasi tipe PROGRESS. SELESAI memang bebas
-        // kuota sejak awal; INSPEKSI juga dibebaskan — countableSubmissions()
-        // hanya menghitung PROGRESS sehingga inspeksi tidak pernah mengonsumsi
-        // kuota, dan cek harian yang "sticky" tidak boleh memblokir inspeksi.
-        if ($tipeProgressKode === 'PROGRESS') {
-            if ($limitError = $this->validateProgressLimit($workorder, $userId)) {
-                return $limitError;
-            }
-        }
 
         DB::beginTransaction();
         try {
             $order = ((int) ProgressWorkorder::where('workorder_id', $workorder->id)->max('order')) + 1;
+
+            $tahapan = $validated['tahapan'] ?? null;
+            if ($tipeProgressKode === 'SELESAI') {
+                $tahapan = TahapanWorkorder::DOKUMENTASI;
+            } elseif ($tipeProgressKode === 'INSPEKSI') {
+                $tahapan = TahapanWorkorder::PERSIAPAN;
+            }
 
             $progress = ProgressWorkorder::create([
                 'workorder_id' => $workorder->id,
@@ -472,6 +398,7 @@ class ProgressWorkorderController extends Controller
                 'latitude'  => $validated['latitude'],
                 'longitude' => $validated['longitude'],
                 'accuracy'  => $validated['accuracy'] ?? null,
+                'tahapan'   => $tahapan,
             ]);
 
             if ($request->hasFile('foto')) {
@@ -492,17 +419,12 @@ class ProgressWorkorderController extends Controller
                     'tanggal_selesai' => now(),
                 ]);
 
-                // Simpan field hasil akhir kategori ke tabel wo_* terkait.
-                // Hanya update (tidak create): baris wo_* sudah dibuat SPV saat
-                // assign, dan kolom wajibnya (nomor_meter/jenis_pipa/nama_aset)
-                // tidak dikirim di payload submit ini.
+
                 $this->persistKategoriHasilAkhir($workorder, $kategoriForm, $validated);
             } elseif ($tipeProgressKode === 'PROGRESS') {
                 $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
             }
-            // INSPEKSI: status WO sengaja TIDAK diubah — WO tetap
-            // DITUGASKAN_KE_STAFF sampai petugas benar-benar menekan MULAI
-            // (start()). Inspeksi saat IN_PROGRESS juga tidak mengubah apa pun.
+
 
             $actionKode = match (true) {
                 $tipeProgressKode === 'SELESAI'  => 'SELESAI_KERJA',
@@ -534,12 +456,18 @@ class ProgressWorkorderController extends Controller
             $workorder->refresh();
             $workorder->load('status');
 
+            $tahapanTertinggi = ProgressWorkorder::where('workorder_id', $workorder->id)
+                ->whereNotNull('waktu_submit')
+                ->when($this->statusId('DIBATALKAN') !== null, fn ($q) => $q->where('status_id', '!=', $this->statusId('DIBATALKAN')))
+                ->max('tahapan');
+
             return response()->json([
                 'progress' => $progress->load('dokumentasiProgress'),
                 'workorder' => [
                     'id' => $workorder->id,
                     'progres_persen' => $workorder->progres_persen,
                     'status' => $workorder->status,
+                    'tahapan_tertinggi' => $tahapanTertinggi,
                 ],
             ], 201);
         } catch (\Exception $e) {
@@ -548,27 +476,7 @@ class ProgressWorkorderController extends Controller
         }
     }
 
-    /**
-     * Petugas mengirim ulang (resubmit) progres yang diminta revisi oleh SPV.
-     *
-     * Berbeda dari versi lama (yang hanya membalik status tanpa data), endpoint
-     * ini menangkap payload penuh seperti submit(): deskripsi, lokasi, foto, dan
-     * — bila baris yang direvisi bertipe SELESAI — field kategori hasil akhir.
-     *
-     * Perilaku:
-     * - Baris progres yang direvisi di-update in-place (order tidak berubah).
-     * - Foto baru DITAMBAHKAN ke dokumentasi lama (append), foto lama tetap.
-     * - Dibuat satu siklus review baru (progress_detail status 'pending').
-     * - Bila tipe SELESAI: WO kembali ke PENGECEKAN + notifikasi SPV; selain itu
-     *   WO kembali ke IN_PROGRESS.
-     *
-     * Guard utama: hanya boleh untuk progres berstatus REVISI_REQUESTED. Ini
-     * mencegah "menghidupkan" WO yang sudah DITOLAK_SPV (terminal) — keduanya
-     * sama-sama meninggalkan progress_detail 'rejected', sehingga cek berbasis
-     * progress_detail saja tidak cukup membedakannya.
-     *
-     * Menerima `progress_id` atau `progress_workorder_id` (kompat klien lama).
-     */
+   
     public function resubmit(Request $request)
     {
         $this->hydrateInputFromBody($request);
@@ -595,11 +503,9 @@ class ProgressWorkorderController extends Controller
             'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
             'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+            'tahapan' => 'nullable|integer|between:1,4',
         ];
 
-        // Tipe progres diambil dari baris yang direvisi (bukan dari payload).
-        // Bila SELESAI, terima & validasi field hasil akhir sesuai kategori,
-        // sama persis seperti submit() SELESAI.
         $kategoriForm = null;
         if ($tipeKode === 'SELESAI') {
             $kategoriForm = optional($workorder->jenisWorkorder)->kategori_form;
@@ -657,6 +563,13 @@ class ProgressWorkorderController extends Controller
 
         DB::beginTransaction();
         try {
+            $tahapan = $validated['tahapan'] ?? null;
+            if ($tipeKode === 'SELESAI') {
+                $tahapan = TahapanWorkorder::DOKUMENTASI;
+            } elseif ($tipeKode === 'INSPEKSI') {
+                $tahapan = TahapanWorkorder::PERSIAPAN;
+            }
+
             // Update baris yang direvisi in-place. submitted_by_user_id sengaja
             // tidak diubah agar baris tetap milik petugas pelapor aslinya.
             $progress->update([
@@ -666,6 +579,7 @@ class ProgressWorkorderController extends Controller
                 'latitude'         => $validated['latitude'],
                 'longitude'        => $validated['longitude'],
                 'accuracy'         => $validated['accuracy'] ?? null,
+                'tahapan'          => $tahapan,
             ]);
 
             if ($request->hasFile('foto')) {
@@ -692,8 +606,6 @@ class ProgressWorkorderController extends Controller
 
                 $this->persistKategoriHasilAkhir($workorder, $kategoriForm, $validated);
             } elseif ($tipeKode !== 'INSPEKSI') {
-                // INSPEKSI dikecualikan: resubmit inspeksi tidak boleh menggeser
-                // status WO (mis. memajukan WO yang belum MULAI ke IN_PROGRESS).
                 $workorder->update(['status_id' => $this->statusId('IN_PROGRESS')]);
             }
 
@@ -726,6 +638,11 @@ class ProgressWorkorderController extends Controller
             $workorder->refresh();
             $workorder->load('status');
 
+            $tahapanTertinggi = ProgressWorkorder::where('workorder_id', $workorder->id)
+                ->whereNotNull('waktu_submit')
+                ->when($this->statusId('DIBATALKAN') !== null, fn ($q) => $q->where('status_id', '!=', $this->statusId('DIBATALKAN')))
+                ->max('tahapan');
+
             return response()->json([
                 'message' => 'Resubmit progress berhasil',
                 'progress' => $progress->load('dokumentasiProgress'),
@@ -733,6 +650,7 @@ class ProgressWorkorderController extends Controller
                     'id' => $workorder->id,
                     'progres_persen' => $workorder->progres_persen,
                     'status' => $workorder->status,
+                    'tahapan_tertinggi' => $tahapanTertinggi,
                 ],
             ], 200);
         } catch (\Exception $e) {
@@ -741,14 +659,7 @@ class ProgressWorkorderController extends Controller
         }
     }
 
-    /**
-     * Simpan field kategori "awal" (meter/jaringan/infrastruktur) ke tabel
-     * wo_* saat staff submit MULAI.
-     *
-     * updateOrCreate berdasarkan workorder_id: idempoten bila MULAI diulang dan
-     * aman terhadap kemungkinan baris sudah dibuat klien lama saat assign.
-     * Hanya field "awal" yang di-set; field hasil akhir tetap diisi saat SELESAI.
-     */
+    
     private function persistKategoriAwal(Workorder $workorder, ?string $kategoriForm, array $validated): void
     {
         if ($kategoriForm === 'meter') {
@@ -782,14 +693,7 @@ class ProgressWorkorderController extends Controller
         }
     }
 
-    /**
-     * Simpan field hasil akhir kategori (meter/jaringan/infrastruktur) ke
-     * tabel wo_* saat petugas submit SELESAI.
-     *
-     * Update-only: baris wo_* dibuat oleh SPV saat assign. Jika belum ada
-     * (mis. data lama), submit tetap lolos tanpa error — hasil akhir hanya
-     * tidak tersimpan, alih-alih menggagalkan transaksi.
-     */
+ 
     private function persistKategoriHasilAkhir(Workorder $workorder, ?string $kategoriForm, array $validated): void
     {
         if ($kategoriForm === 'meter') {
@@ -811,11 +715,7 @@ class ProgressWorkorderController extends Controller
         }
     }
 
-    /**
-     * Kirim notifikasi `wo_ready_for_review` ke SPV yang menugaskan WO
-     * setelah PIC submit progres SELESAI (WO masuk status PENGECEKAN).
-     * Best-effort: gagal notifikasi tidak boleh mempengaruhi response submit.
-     */
+
     private function notifyWorkOrderReadyForReview(Workorder $workorder, ?int $picUserId): void
     {
         try {
@@ -882,9 +782,7 @@ class ProgressWorkorderController extends Controller
 
         DB::beginTransaction();
         try {
-            // Catat hasil review ke progress_detail (1 progres bisa punya
-            // banyak siklus review). Kolom alasan_penolakan/field_to_revise/
-            // reviewed_at sudah tidak lagi disimpan di progress_workorder.
+
             $fieldToReviseArr = $validated['field_to_revise'] ?? null;
             $fieldToReviseStr = is_array($fieldToReviseArr)
                 ? implode(',', array_map('strval', $fieldToReviseArr))
@@ -967,9 +865,6 @@ class ProgressWorkorderController extends Controller
                 ProgressWorkorder::create([
                     'workorder_id' => $workorder->id,
                     'tipe_progress_id' => $this->tipeId('REVISI'),
-                    // Baris penanda aksi SPV (bukan submission petugas). Diberi
-                    // status REVISI_REQUESTED, bukan SUBMITTED, agar query yang
-                    // menghitung baris SUBMITTED tidak ikut keliru.
                     'status_id' => $this->statusId('REVISI_REQUESTED'),
                     'submitted_by_user_id' => $userId,
                     'hasil_pengerjaan' => 'SPV meminta revisi',
@@ -994,9 +889,6 @@ class ProgressWorkorderController extends Controller
                 ProgressWorkorder::create([
                     'workorder_id' => $workorder->id,
                     'tipe_progress_id' => $this->tipeId('DITOLAK'),
-                    // Baris penanda aksi SPV (bukan submission petugas). Diberi
-                    // status DITOLAK_SPV, bukan SUBMITTED, agar query yang
-                    // menghitung baris SUBMITTED tidak ikut keliru.
                     'status_id' => $this->statusId('DITOLAK_SPV'),
                     'submitted_by_user_id' => $userId,
                     'hasil_pengerjaan' => 'SPV menolak hasil pekerjaan',
@@ -1372,6 +1264,15 @@ class ProgressWorkorderController extends Controller
                 $firstSubmission = $progressList->first()?->waktu_submit;
                 $lastSubmission = $progressList->last()?->waktu_submit;
 
+                $dibatalkanId = \App\Models\Status::where('kode', 'DIBATALKAN')->value('id');
+                $memberMaxTahapan = ProgressWorkorder::where('workorder_id', $workorderId)
+                    ->where('submitted_by_user_id', $userId)
+                    ->whereNotNull('waktu_submit')
+                    ->when($dibatalkanId !== null, fn ($q) => $q->where('status_id', '!=', $dibatalkanId))
+                    ->max('tahapan');
+                
+                $memberProgressTahapan = $memberMaxTahapan !== null ? (int) round(($memberMaxTahapan / 4) * 100) : null;
+
                 return [
                     'user_id' => $userId,
                     'nama' => optional($member->user->pegawai)->nama ?? optional($member->user)->name,
@@ -1388,6 +1289,8 @@ class ProgressWorkorderController extends Controller
                         'days_active' => $submissionsByDate->count(),
                         'first_submission' => $firstSubmission,
                         'last_submission' => $lastSubmission,
+                        'tahapan_tertinggi' => $memberMaxTahapan,
+                        'progress_tahapan' => $memberProgressTahapan,
                     ],
                     'daily_breakdown' => $submissionsByDate->map(function ($items, $date) {
                         return [
@@ -1428,8 +1331,12 @@ class ProgressWorkorderController extends Controller
     /**
      * Get the remaining quota for progress submission (individual per user).
      *
-     * Mengembalikan kuota individual user yang sedang login.
+     * @deprecated Display-only legacy endpoint retained for mobile compatibility.
+     *             The server no longer enforces any daily or total submission limit.
+     *
+     * Mengembalikan batas pelaporan individual user yang sedang login.
      * Setiap anggota tim memiliki kuota sendiri: 8x/hari, total = estimasi_hari * 8.
+     * Ini adalah batas pelaporan (rate limit) dan BUKAN sumber persentase progres.
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  int  $workorderId
@@ -1441,12 +1348,10 @@ class ProgressWorkorderController extends Controller
             $workorder = Workorder::with('workorderAssignment')->findOrFail($workorderId);
             $userId = optional($request->user())->id;
 
-            // Kuota harian user ini (hanya laporan PROGRESS yang dihitung)
             $countHariIni = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)
                 ->whereDate('waktu_submit', now()->toDateString())
                 ->count();
 
-            // selectRaw('1') dipertahankan: query ber-GROUP BY tidak boleh `select *` di Postgres.
             $dailyQuotaEverExhausted = \App\Support\WorkorderQuota::countableSubmissions($workorder->id, $userId)
                 ->selectRaw('1')
                 ->groupByRaw('waktu_submit::date')

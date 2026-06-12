@@ -22,16 +22,15 @@ class JenisWorkorderFactory extends Factory
      * @var array<int, array{nama: string, kategori_form: string}>
      */
     private static array $starter = [
-        ['nama' => 'Pemasangan Meter Baru',  'kategori_form' => 'meter'],
-        ['nama' => 'Pergantian Meter',       'kategori_form' => 'meter'],
-        ['nama' => 'Kalibrasi Meteran',      'kategori_form' => 'meter'],
-        ['nama' => 'Perbaikan Pipa Bocor',   'kategori_form' => 'jaringan'],
-        ['nama' => 'Pemasangan Pipa Baru',   'kategori_form' => 'jaringan'],
-        ['nama' => 'Pergantian Pipa Lama',   'kategori_form' => 'jaringan'],
+        ['nama' => 'Kalibrasi Meteran',  'kategori_form' => 'meter'],
+        ['nama' => 'Pergantian Meteran',       'kategori_form' => 'meter'],
+        ['nama' => 'Pemasangan Meteran',      'kategori_form' => 'meter'],
+        ['nama' => 'Penanganan Kebocoran',  'kategori_form' => 'jaringan'],
+        ['nama' => 'Perbaikan Pipa',         'kategori_form' => 'jaringan'],
         ['nama' => 'Pembersihan Saluran',    'kategori_form' => 'jaringan'],
+        ['nama' => 'Inspeksi Jaringan',      'kategori_form' => 'jaringan'],
         ['nama' => 'Pemeliharaan Pompa',     'kategori_form' => 'infrastruktur'],
-        ['nama' => 'Pemeliharaan Reservoir', 'kategori_form' => 'infrastruktur'],
-        ['nama' => 'Inspeksi Rutin Aset',    'kategori_form' => 'infrastruktur'],
+        ['nama' => 'Instalasi Baru',         'kategori_form' => 'infrastruktur'],
     ];
 
     public function definition()

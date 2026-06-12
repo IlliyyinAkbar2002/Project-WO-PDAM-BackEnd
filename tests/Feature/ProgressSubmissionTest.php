@@ -17,9 +17,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Integration test untuk batas kuota harian submit progress.
- * Memastikan hanya laporan PROGRESS yang dihitung terhadap limit harian (8x),
- * dan submission ke-9 ditolak 422.
+ * Integration test untuk submit progress harian.
+ * Kuota/limit pelaporan sudah dihapus sehingga submission ke-9+ tetap sukses (201).
  */
 class ProgressSubmissionTest extends TestCase
 {
@@ -109,7 +108,7 @@ class ProgressSubmissionTest extends TestCase
         }
     }
 
-    public function test_ninth_progress_in_one_day_is_rejected_422(): void
+    public function test_ninth_progress_in_one_day_is_accepted_201(): void
     {
         $this->seedProgressRows('PROGRESS', 8);
 
@@ -122,7 +121,7 @@ class ProgressSubmissionTest extends TestCase
                 'longitude' => 106.8,
             ]);
 
-        $response->assertStatus(422);
+        $response->assertStatus(201);
     }
 
     public function test_eighth_progress_in_one_day_is_accepted(): void
