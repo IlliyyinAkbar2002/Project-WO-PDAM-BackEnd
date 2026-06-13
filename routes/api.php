@@ -63,7 +63,6 @@ Route::prefix('v1')->group(function () {
         Route::post('workorder-action', [WorkorderActionController::class, 'store']);
 
         Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
-        Route::get('progress-workorder/quota/{id}', [ProgressWorkorderController::class, 'quota']);
         Route::post('progress-workorder/manual-run', [ProgressWorkorderController::class, 'manualRun']);
 
         // [M] Mobile - SPV view individual member progress
@@ -84,12 +83,6 @@ Route::prefix('v1')->group(function () {
         Route::post('progress-detail/{id}/approve', [ProgressDetailController::class, 'approve'])->whereNumber('id');
         Route::post('progress-detail/{id}/reject', [ProgressDetailController::class, 'reject'])->whereNumber('id');
 
-        // =========================================================
-        // [M/W] PROGRESS LEMBUR (overtime) — flow identik progress-workorder,
-        // beda hanya REVIEW: hanya accept|reject (reject = minta revisi, WO
-        // balik IN_PROGRESS). Backed by ProgressLemburController (extends
-        // ProgressWorkorderController), jadi start/submit/dll diwarisi apa adanya.
-        // =========================================================
         Route::match(['post', 'put', 'patch'], 'progress-lembur/start', [ProgressLemburController::class, 'start']);
         Route::match(['post', 'put', 'patch'], 'progress-lembur/submit', [ProgressLemburController::class, 'submit']);
         Route::match(['post', 'put', 'patch'], 'progress-lembur/review', [ProgressLemburController::class, 'review']);
@@ -145,7 +138,6 @@ Route::prefix('v1')->group(function () {
 
         // ROUTE FOR WEB NEXTJS
         Route::apiResource('workorder', WorkorderController::class);
-
         // [W] Web Dashboard - member progress summary with statistics
         Route::get('progress-workorder/member-summary/{workorderId}', [ProgressWorkorderController::class, 'memberSummary'])->whereNumber('workorderId');
     });

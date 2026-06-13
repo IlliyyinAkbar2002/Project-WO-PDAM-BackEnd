@@ -10,33 +10,7 @@ use App\Models\WorkorderAssignment;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-/**
- * LemburApprovalService
- *
- * Menangani sisi APPROVAL pengajuan lembur (SPL) oleh atasan
- * (superadmin/manager). Ini adalah versi "via lembur" dari
- * AssignmentService::assignStaff:
- *
- *   - Alur normal : SPV langsung assign staff ke WO (AssignmentService).
- *   - Alur lembur : SPV mengajukan lembur (LemburSplController@store) →
- *                   atasan approve di sini → staff baru benar-benar
- *                   ditugaskan ke WO.
- *
- * Begitu di-approve, service ini membangun assignment yang identik dengan
- * alur normal:
- *   1. Buat workorder_assignment (timeline diturunkan dari field lembur).
- *   2. Salin lembur_spl_member → wo_assignment_member (lock-to-request).
- *   3. Transisi status WO → DITUGASKAN_KE_STAFF.
- *   4. Catat workorder_action PENUGASAN (audit trail).
- *
- * Tidak ada progress yang di-seed di sini: sama seperti alur normal
- * (AssignmentService::assignStaff), baris progress MULAI dibuat oleh staff
- * sendiri saat menekan "Mulai kerja". Menyemai progress awal menimbulkan
- * baris "Mulai"/"Selesai" hantu (DRAFT, tanpa pemilik) di tampilan staff.
- *
- * Penanda "WO ini lembur" = kolom workorder.lembur_spl_id (sudah diisi saat
- * store). Tidak ada tabel/kolom baru yang dibutuhkan.
- */
+
 class LemburApprovalService
 {
     /**
