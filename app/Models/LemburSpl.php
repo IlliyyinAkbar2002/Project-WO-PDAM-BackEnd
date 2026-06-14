@@ -17,11 +17,19 @@ class LemburSpl extends Model
         'waktu_verifikasi'  => 'datetime',
         'tanggal_lembur'    => 'date',
         'estimasi_jam'      => 'integer',
+        'latitude'          => 'decimal:7',
+        'longitude'         => 'decimal:7',
+        'location_id'       => 'integer',
     ];
 
     public function workorder()
     {
         return $this->belongsTo(Workorder::class, 'workorder_id');
+    }
+
+    public function location()
+    {
+        return $this->belongsTo(MasterLocation::class, 'location_id');
     }
 
     public function status()

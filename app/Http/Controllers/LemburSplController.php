@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LemburSpl;
 use App\Models\LemburSplMember;
+use App\Models\MasterLocation;
 use App\Models\Status;
 use App\Models\Workorder;
 
@@ -14,10 +15,6 @@ use Illuminate\Validation\Rule;
 
 class LemburSplController extends Controller
 {
-    /**
-     * Eager-load default untuk endpoint listing & detail.
-     * Dipusatkan agar response konsisten antara index & show.
-     */
     private array $defaultWith = [
         'workorder',
         'status',
@@ -44,32 +41,6 @@ class LemburSplController extends Controller
         }
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * Endpoint ini dipakai mobile (Flutter) untuk submit form
-     * "Pengajuan Lembur" oleh SPV terhadap WO yang sudah ditugaskan
-     * kepadanya (status DITUGASKAN_KE_SPV). Ini adalah alur "assign staff
-     * via lembur": staff baru benar-benar ditugaskan setelah pengajuan ini
-     * di-approve atasan (lihat update()).
-     *
-     *   - workorder_id    (WO yang sedang dipegang SPV — di-link ke pengajuan)
-     *   - judul_pekerjaan  (FE boleh prefill dari WO — lihat red box di form)
-     *   - jenis_pekerjaan  (free text, contoh: "Emergency Maintainance")
-     *   - tanggal_lembur
-     *   - jam_mulai (opsional, jam mulai lembur)
-     *   - estimasi_jam (Estimasi Waktu Lembur, jam)
-     *   - members (Anggota Tim — array of user_id, lock-to-request)
-     *   - alasan_lembur
-     *
-     * Link ke WO disimpan dua arah: `lembur_spl.workorder_id` (FK forward,
-     * unik + cascade — selaras konvensi wo_meter/laporan_workorder) dan
-     * `workorder.lembur_spl_id` (penanda "WO ini lembur"). Keduanya di-set
-     * bersamaan di sini agar selalu sinkron.
-     *
-     * Sisi web (FE Next.js) cukup melakukan PUT/PATCH ke endpoint update
-     * untuk verifikasi (approve/reject).
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -80,16 +51,23 @@ class LemburSplController extends Controller
             'jam_mulai'          => 'nullable|date_format:H:i',
             'estimasi_jam'       => 'required|integer|min:1|max:24',
             'alasan_lembur'      => 'required|string',
+            'latitude'           => 'nullable|numeric',
+            'longitude'          => 'nullable|numeric',
+            'nama_lokasi'        => 'nullable|string',
+            'location_id'        => 'nullable|integer',
 
-            // Anggota tim — minimal 1, harus user yang valid, tidak boleh duplikat.
+            // Anggota tim — minimal 1, harus user yang valid dan role petugas (3), tidak boleh duplikat.
             'members'            => 'required|array|min:1',
-            'members.*'          => ['integer', 'distinct', Rule::exists('users', 'id')],
+            'members.*'          => [
+                'integer',
+                'distinct',
+                Rule::exists('users', 'id')->where('role_id', 3),
+            ],
         ]);
 
         $workorder = Workorder::with('status')->findOrFail($validated['workorder_id']);
 
-        // Guard state WO — mirror AssignmentService::guardAssignability,
-        // tapi untuk alur lembur (sebelum assignment dibuat).
+
         if ((int) $workorder->assigned_to !== (int) $request->user()->id) {
             return response()->json([
                 'error' => 'Hanya SPV yang ditugaskan pada WO ini yang bisa mengajukan lembur.',
@@ -111,6 +89,22 @@ class LemburSplController extends Controller
 
         DB::beginTransaction();
         try {
+            $locationId = $validated['location_id'] ?? null;
+            if (!empty($validated['latitude']) && !empty($validated['longitude'])) {
+                $namaLokasi = $validated['nama_lokasi'] 
+                    ?? $workorder->lokasi 
+                    ?? $workorder->nama_workorder
+                    ?? 'Lokasi Lembur SPL';
+
+                $location = MasterLocation::create([
+                    'nama'         => $namaLokasi,
+                    'latitude'     => $validated['latitude'],
+                    'longitude'    => $validated['longitude'],
+                    'radius_meter' => 100,
+                ]);
+                $locationId = $location->id;
+            }
+
             $lemburSpl = LemburSpl::create([
                 'workorder_id'       => $workorder->id,
                 'pemohon_id'         => $request->user()->id,
@@ -120,6 +114,9 @@ class LemburSplController extends Controller
                 'jam_mulai'          => $validated['jam_mulai'] ?? null,
                 'estimasi_jam'       => $validated['estimasi_jam'],
                 'alasan_lembur'      => $validated['alasan_lembur'],
+                'latitude'           => $validated['latitude'] ?? null,
+                'longitude'          => $validated['longitude'] ?? null,
+                'location_id'        => $locationId,
                 'status_id'          => $statusAwalId,
                 'waktu_pengajuan'    => now(),
             ]);
@@ -177,25 +174,7 @@ class LemburSplController extends Controller
         }
     }
 
-    /**
-     * Verifikasi pengajuan lembur oleh atasan (superadmin/manager) dari web.
-     *
-     * - APPROVE (status DISETUJUI): pengajuan diterima, lalu staff benar-benar
-     *   ditugaskan ke WO via LemburApprovalService — membangun
-     *   workorder_assignment + wo_assignment_member, transisi WO →
-     *   DITUGASKAN_KE_STAFF, seed progress awal, dan catat audit trail.
-     *   Identik dengan hasil AssignmentService::assignStaff (alur normal).
-     * - REJECT (status DITOLAK): pengajuan ditolak. WO tetap di
-     *   DITUGASKAN_KE_SPV sehingga SPV bisa mengajukan ulang; tidak ada
-     *   assignment yang dibuat.
-     *
-     * Status WO TIDAK lagi disalin mentah dari status_id pengajuan — itu dua
-     * domain status berbeda (lembur vs workorder).
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
+
     public function update(Request $request, $id)
     {
         $validatedData = $request->validate([

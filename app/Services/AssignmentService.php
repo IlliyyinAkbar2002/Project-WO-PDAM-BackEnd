@@ -16,21 +16,6 @@ use App\Notifications\WorkOrderNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-/**
- * AssignmentService
- *
- * Menangani proses assign WO oleh SPV ke Staff.
- * Dipisahkan dari WorkorderService karena:
- *   - WorkorderService = domain Superadmin (create WO + assign SPV)
- *   - AssignmentService = domain SPV (isi form kategori + assign Staff)
- *
- * Operasi utama:
- *   1. Validasi state WO (harus DITUGASKAN_KE_SPV, belum pernah di-assign)
- *   2. Insert form kategori (wo_meter / wo_jaringan / wo_infrastruktur)
- *   3. Insert workorder_assignment + wo_assignment_member
- *   4. Transisi status WO → DITUGASKAN_KE_STAFF
- *   5. Catat workorder_action (audit trail)
- */
 class AssignmentService
 {
 
@@ -57,10 +42,7 @@ class AssignmentService
                 throw new \LogicException('kategori_form tidak valid: ' . ($kategori ?? 'null'));
             }
 
-            // Field kategori "awal" kini diisi staff saat MULAI, bukan SPV saat
-            // assign (lihat BE_pindah_form_awal_ke_mulai.md). Jadi baris wo_*
-            // hanya dibuat di sini bila FE memang masih mengirim datanya (klien
-            // lama). Bila form_kategori kosong/{}, dilewati — baris dibuat saat start.
+       
             $formKategori = $data['form_kategori'] ?? [];
             if (! empty($formKategori)) {
                 $this->createKategoriForm($kategori, $workorder->id, $formKategori);
@@ -97,10 +79,7 @@ class AssignmentService
         });
     }
 
-    /**
-     * Kirim notifikasi `wo_assigned` ke setiap staff yang baru di-assign.
-     * Best-effort: gagal notifikasi tidak membatalkan transaksi.
-     */
+    
     private function notifyStaffAssigned(Workorder $workorder, array $petugasList, int $spvUserId): void
     {
         try {
@@ -129,17 +108,7 @@ class AssignmentService
         }
     }
 
-    // ------------------------------------------------------------------
-    // GUARD
-    // ------------------------------------------------------------------
-
-    /**
-     * Validasi bahwa WO bisa di-assign:
-     *   - SPV yang assign = SPV yang ditugaskan di WO
-     *   - Status WO = DITUGASKAN_KE_SPV
-     *   - Belum pernah di-assign ke staff
-     *   - kategori_form valid
-     */
+    
     private function guardAssignability(Workorder $workorder, int $spvUserId): void
     {
         if ((int) $workorder->assigned_to !== $spvUserId) {
@@ -156,9 +125,6 @@ class AssignmentService
         }
     }
 
-    // ------------------------------------------------------------------
-    // FORM KATEGORI
-    // ------------------------------------------------------------------
 
     private function createKategoriForm(string $kategori, int $workorderId, array $payload): void
     {
@@ -210,9 +176,6 @@ class AssignmentService
         ]);
     }
 
-    // ------------------------------------------------------------------
-    // MEMBERS
-    // ------------------------------------------------------------------
 
     private function attachMembers(WorkorderAssignment $assignment, array $petugasList): void
     {
@@ -225,18 +188,6 @@ class AssignmentService
         }
     }
 
-    // ------------------------------------------------------------------
-    // LOCATION
-    // ------------------------------------------------------------------
-
-    /**
-     * Auto-create m_location dari lat/lng jika dikirim FE.
-     *
-     * Prioritas nama lokasi:
-     *   1. payload FE `nama_lokasi`
-     *   2. `workorder.lokasi` (judul lokasi yang diisi pelapor)
-     *   3. `workorder.nama_workorder` (fallback terakhir)
-     */
     private function resolveLocation(Workorder $workorder, array $data): ?int
     {
         if (empty($data['latitude']) || empty($data['longitude'])) {
@@ -257,9 +208,6 @@ class AssignmentService
         return $location->id;
     }
 
-    // ------------------------------------------------------------------
-    // AUDIT TRAIL
-    // ------------------------------------------------------------------
 
     private function recordAction(Workorder $workorder, int $actorId): void
     {
@@ -277,10 +225,6 @@ class AssignmentService
             'estimasi_selesai' => $workorder->workorderAssignment?->estimasi_selesai,
         ]);
     }
-
-    // ------------------------------------------------------------------
-    // HELPERS
-    // ------------------------------------------------------------------
 
     private function statusIdByKode(string $kode): ?int
     {

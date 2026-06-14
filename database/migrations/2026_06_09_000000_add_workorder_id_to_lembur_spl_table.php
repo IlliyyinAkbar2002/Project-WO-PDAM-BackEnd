@@ -5,34 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-/**
- * Tambah FK forward `lembur_spl.workorder_id` → `workorder.id`.
- *
- * Latar belakang:
- * - Sebelumnya tautan WO ↔ pengajuan lembur HANYA satu arah lewat
- *   `workorder.lembur_spl_id` (kolom ini juga dipakai sebagai penanda
- *   "WO ini lembur"). Arah itu kebalikan dari konvensi tabel detail 1:1
- *   lain di skema ini — `wo_meter`, `wo_jaringan`, `wo_infrastruktur`,
- *   `laporan_workorder` semuanya memegang `workorder_id` unik + cascade di
- *   sisi anak (lihat 2026_04_26_201500_align_schema_with_erd_physical.php).
- * - Migration ini menyelaraskan `lembur_spl` dengan konvensi tsb: kolom
- *   `workorder_id` di sisi anak, unik (1:1), cascade-on-delete.
- *
- * Yang dilakukan:
- *   1. Tambah kolom `lembur_spl.workorder_id` (nullable, FK cascade).
- *   2. Backfill dari `workorder.lembur_spl_id` agar baris lama konsisten
- *      (relasi `LemburSpl::workorder()` kini belongsTo via kolom ini).
- *   3. Promote `workorder_id` ke UNIQUE setelah data terisi.
- *   4. Promote `workorder.lembur_spl_id` (penanda lembur) ke UNIQUE juga —
- *      sebelumnya tidak unik, jadi DB tidak benar-benar menjamin 1:1.
- *
- * Kolom `workorder.lembur_spl_id` TETAP dipertahankan sebagai penanda
- * "WO ini lembur" (`lembur_spl_id != null`). Kedua kolom di-set bersamaan
- * di LemburSplController@store, jadi selalu sinkron.
- *
- * Nullable + multi-NULL: WO non-lembur tetap NULL (Postgres UNIQUE
- * mengizinkan banyak NULL), jadi promote unik tidak merusak data lama.
- */
 class AddWorkorderIdToLemburSplTable extends Migration
 {
     public function up()
@@ -49,6 +21,14 @@ class AddWorkorderIdToLemburSplTable extends Migration
                     ->after('id')
                     ->constrained('workorder')
                     ->cascadeOnDelete();
+            });
+        }
+
+        if (! Schema::hasColumn('lembur_spl', 'latitude')) {
+            Schema::table('lembur_spl', function (Blueprint $table) {
+                $table->decimal('latitude', 10, 7)->nullable();
+                $table->decimal('longitude', 10, 7)->nullable();
+                $table->foreignId('location_id')->nullable()->constrained('m_location');
             });
         }
 
@@ -102,6 +82,19 @@ class AddWorkorderIdToLemburSplTable extends Migration
         if (Schema::hasColumn('lembur_spl', 'workorder_id')) {
             Schema::table('lembur_spl', function (Blueprint $table) {
                 $table->dropConstrainedForeignId('workorder_id');
+            });
+        }
+
+        if (Schema::hasColumn('lembur_spl', 'location_id')) {
+            Schema::table('lembur_spl', function (Blueprint $table) {
+                $table->dropForeign(['location_id']);
+                $table->dropColumn('location_id');
+            });
+        }
+
+        if (Schema::hasColumn('lembur_spl', 'latitude')) {
+            Schema::table('lembur_spl', function (Blueprint $table) {
+                $table->dropColumn(['latitude', 'longitude']);
             });
         }
     }

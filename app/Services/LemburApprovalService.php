@@ -46,6 +46,9 @@ class LemburApprovalService
                     'deskripsi'        => $lembur->alasan_lembur,
                     'tanggal_mulai'    => $tanggalMulai,
                     'estimasi_selesai' => $estimasiSelesai,
+                    'latitude'         => $lembur->latitude,
+                    'longitude'        => $lembur->longitude,
+                    'location_id'      => $lembur->location_id,
                 ]
             );
 
