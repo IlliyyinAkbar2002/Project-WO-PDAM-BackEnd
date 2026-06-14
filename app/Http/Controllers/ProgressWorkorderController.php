@@ -138,7 +138,7 @@ class ProgressWorkorderController extends Controller
             'longitude' => 'required|numeric',
             'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
-            'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+            'foto.*' => 'image|mimes:jpeg,png,jpg|max:4048',
         ];
 
         $kategoriForm = optional(
@@ -185,8 +185,6 @@ class ProgressWorkorderController extends Controller
             $dibatalkanId = $this->statusId('DIBATALKAN');
             $hasInspeksi = ProgressWorkorder::where('workorder_id', $workorder->id)
                 ->where('tipe_progress_id', $this->tipeId('INSPEKSI'))
-                // dan men-set DIBATALKAN) tidak membuka MULAI. Inspeksi yang
-                // diminta revisi tetap dihitung — inspeksinya sudah terjadi.
                 ->whereNotNull('waktu_submit')
                 ->when($dibatalkanId !== null, fn ($q) => $q->where('status_id', '!=', $dibatalkanId))
                 ->exists();
@@ -290,7 +288,7 @@ class ProgressWorkorderController extends Controller
             'longitude' => 'required|numeric',
             'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
-            'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+            'foto.*' => 'image|mimes:jpeg,png,jpg|max:4048',
             'tahapan' => 'nullable|integer|between:1,4',
         ];
 
@@ -502,7 +500,7 @@ class ProgressWorkorderController extends Controller
             'longitude' => 'required|numeric',
             'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
-            'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+            'foto.*' => 'image|mimes:jpeg,png,jpg|max:4048',
             'tahapan' => 'nullable|integer|between:1,4',
         ];
 
@@ -1081,7 +1079,7 @@ class ProgressWorkorderController extends Controller
             'longitude' => 'required|numeric',
             'accuracy'  => 'nullable|numeric',
             'foto' => 'nullable|array',
-            'foto.*' => 'image|mimes:jpeg,png,jpg|max:2048',
+            'foto.*' => 'image|mimes:jpeg,png,jpg|max:4048',
         ]);
 
         $progressWorkorder = ProgressWorkorder::with('workorder')->findOrFail($id);

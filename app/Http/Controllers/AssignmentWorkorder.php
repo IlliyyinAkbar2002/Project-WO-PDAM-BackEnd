@@ -56,10 +56,6 @@ class AssignmentWorkorder extends Controller
 
         $validated = $request->validate([
             'kategori_form'          => 'nullable|string|in:meter,jaringan,infrastruktur',
-            // Field kategori "awal" kini diisi staff saat MULAI (lihat
-            // BE_pindah_form_awal_ke_mulai.md), jadi form_kategori boleh kosong/{}
-            // di tahap assign. 'required|array' akan menolak {} (Laravel
-            // menganggap array kosong = tidak terisi), karena itu pakai nullable.
             'form_kategori'          => 'nullable|array',
             'petugas'                => 'required|array|min:1',
             'petugas.*.user_id'      => 'required|exists:users,id',
@@ -81,10 +77,6 @@ class AssignmentWorkorder extends Controller
                 (int) $request->user()->id
             );
 
-            // Reload WO dengan relasi lengkap supaya FE tidak perlu
-            // memanggil endpoint detail lagi setelah assign sukses.
-            // Shape mengikuti WorkorderController@show + tambahan
-            // workorderAssignment dan members (user.pegawai).
             $fresh = Workorder::with([
                 'assignmentMembers.user.pegawai',
                 'assignedTo',
@@ -114,10 +106,7 @@ class AssignmentWorkorder extends Controller
         }
     }
 
-    /**
-     * Ekstrak field-field kategori dari payload flat berdasarkan tipe kategori.
-     * Ini memungkinkan FE mengirim field langsung tanpa wrapper "form_kategori".
-     */
+  
     private function extractKategoriFields(?string $kategori, array $input): array
     {
         $fieldMap = [
