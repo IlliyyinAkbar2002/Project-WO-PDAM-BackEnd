@@ -5,10 +5,14 @@ namespace App\Services;
 use App\Models\LemburSpl;
 use App\Models\MasterAction;
 use App\Models\Status;
+use App\Models\User;
 use App\Models\WoAssignmentMember;
+use App\Models\Workorder;
 use App\Models\WorkorderAssignment;
+use App\Notifications\WorkOrderNotification;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 
 class LemburApprovalService
@@ -30,8 +34,6 @@ class LemburApprovalService
                 throw new \LogicException('Pengajuan lembur tidak terhubung ke work order manapun.');
             }
 
-            // Idempotensi: kalau staff sudah pernah ditugaskan (mis. approve
-            // dobel), jangan bangun ulang assignment.
             if ($workorder->workorderAssignment && $workorder->workorderAssignment->members()->exists()) {
                 return $workorder->workorderAssignment;
             }
@@ -59,14 +61,13 @@ class LemburApprovalService
 
             $this->recordAction($workorder, $assignment, (int) ($lembur->pemohon_id ?? $workorder->assigned_to));
 
+            $this->notifyStaffAssigned($workorder, $lembur, $assignment);
+
             return $assignment;
         });
     }
 
     /**
-     * Turunkan timeline assignment dari field lembur (zero-migration):
-     *   tanggal_mulai    = tanggal_lembur + jam_mulai (default 00:00)
-     *   estimasi_selesai = tanggal_mulai + estimasi_jam jam
      *
      * @return array{0: ?Carbon, 1: ?Carbon}
      */
@@ -89,9 +90,6 @@ class LemburApprovalService
     }
 
     /**
-     * Salin anggota pengajuan → anggota assignment (lock-to-request).
-     * Konvensi: anggota pertama (id terkecil) menjadi PIC/koordinator,
-     * selaras dengan WoAssignmentMember.is_pic di alur normal.
      */
     private function attachMembers(WorkorderAssignment $assignment, LemburSpl $lembur): void
     {
@@ -105,6 +103,41 @@ class LemburApprovalService
                 ],
                 ['is_pic' => $index === 0],
             );
+        }
+    }
+
+    /**
+     */
+    private function notifyStaffAssigned(Workorder $workorder, LemburSpl $lembur, WorkorderAssignment $assignment): void
+    {
+        try {
+            $spvId = (int) ($lembur->pemohon_id ?? $workorder->assigned_to);
+            $spv = $spvId ? User::with('pegawai:id,nama')->find($spvId) : null;
+            $senderName = optional($spv?->pegawai)->nama ?? $spv?->name ?? 'SPV';
+
+            $userIds = $assignment->members()
+                ->pluck('user_id')
+                ->filter()
+                ->map(fn ($v) => (int) $v)
+                ->unique();
+
+            $staffUsers = User::whereIn('id', $userIds)->get();
+
+            foreach ($staffUsers as $staff) {
+                $staff->notify(new WorkOrderNotification(
+                    'Tugas Work Order Lembur',
+                    "{$senderName} menugaskan Anda pada WO lembur #{$workorder->nama_workorder}.",
+                    (int) $workorder->id,
+                    'wo_assigned',
+                    $senderName
+                ));
+            }
+        } catch (\Throwable $e) {
+            Log::warning('LemburApprovalService notifyStaffAssigned failed', [
+                'workorder_id'  => $workorder->id,
+                'lembur_spl_id' => $lembur->id,
+                'error'         => $e->getMessage(),
+            ]);
         }
     }
 
