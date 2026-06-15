@@ -16,7 +16,7 @@ class CreateLemburSplsTable extends Migration
         Schema::create('lembur_spl', function (Blueprint $table) {
             $table->id();
             $table->foreignId('verifikator_id')->nullable()->constrained('users');
-            $table->foreignId('status_id')->constrained('m_status');
+            // $table->foreignId('status_id')->constrained('m_status');
             $table->datetime('waktu_pengajuan');
             $table->datetime('waktu_verifikasi')->nullable();
             $table->string('alasan_ditolak')->nullable();

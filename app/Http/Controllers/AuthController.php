@@ -181,4 +181,85 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
+    public function checking_email(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'email' => 'required|email',
+            ]);
+
+            $user = User::where('email', $validated['email'])->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email tidak terdaftar',
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Email terdaftar. Silakan atur password baru.',
+                'email'   => $user->email,
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data tidak valid',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan server',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+  
+    public function new_password(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'email'        => 'required|email',
+                'new_password' => 'required|string|min:8',
+            ]);
+
+            $user = User::where('email', $validated['email'])->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email tidak terdaftar',
+                ], 404);
+            }
+
+            $user->password = Hash::make($validated['new_password']);
+            $user->save();
+
+            // Cabut semua token lama supaya sesi lama (jika ada) ikut logout.
+            $user->tokens()->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password berhasil diatur ulang. Silakan login dengan password baru.',
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data tidak valid',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan server',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

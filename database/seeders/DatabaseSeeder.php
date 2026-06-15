@@ -56,7 +56,6 @@ class DatabaseSeeder extends Seeder
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
         Role::factory(4)->create();
-        Status::factory(8)->create();
 
         Pegawai::updateOrCreate(['id' => 1], [
         'nama' => 'Super Admin',
@@ -133,7 +132,6 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
         ]);
         User::factory(7)->create();
-        // MasterKpi::factory(10)->create();
         JenisLokasi::factory(2)->create();
         TipeWorkorder::factory(2)->create();
         JenisWorkorder::factory(9)->create();

@@ -25,6 +25,9 @@ Route::prefix('v1')->group(function () {
         // Public auth
         Route::post('login', [AuthController::class, 'AuthLogin']);
         Route::post('register', [AuthController::class, 'AuthRegister']);
+
+        Route::post('check-email', [AuthController::class, 'checking_email']);
+        Route::post('new-password', [AuthController::class, 'new_password']);
         
         // Protected auth routes
         Route::middleware(['auth:sanctum', 'client.valid'])->group(function () {
