@@ -28,7 +28,7 @@ class CreateWorkordersTable extends Migration
                 'Pending',
                 'Proses',
                 'Selesai',
-                'Ditolak'
+                'Tutup',
             ])->default('Pending');
             $table->boolean('is_active')->default(true);
             $table->string('kode_pengaduan');

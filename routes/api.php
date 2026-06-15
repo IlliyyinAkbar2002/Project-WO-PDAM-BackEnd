@@ -1,8 +1,6 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DetailFormController;
-use App\Http\Controllers\FormWorkorderController;
 use App\Http\Controllers\JenisLokasiController;
 use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
@@ -61,10 +59,8 @@ Route::prefix('v1')->group(function () {
         Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
         Route::get('pegawai/{pegawai}', [PegawaiController::class, 'show'])
             ->whereNumber('pegawai');
-
         Route::put('pegawai/{pegawai}', [PegawaiController::class, 'update'])
             ->whereNumber('pegawai');
-
         Route::delete('pegawai/{pegawai}', [PegawaiController::class, 'destroy'])
             ->whereNumber('pegawai');
 
