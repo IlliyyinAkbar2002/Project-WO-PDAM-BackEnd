@@ -34,6 +34,20 @@ class ProgressWorkorderController extends Controller
         return TipeProgress::where('kode', $kode)->value('id');
     }
 
+    /**
+     * Estimasi jumlah hari kerja WO (selisih tanggal_mulai → estimasi_selesai, minimal 1).
+     * Sekadar metadata tampilan (estimasi_hari) — bukan kuota.
+     */
+    private function estimasiHari(?string $tanggalMulai, ?string $estimasiSelesai): int
+    {
+        if (!$tanggalMulai || !$estimasiSelesai) {
+            return 1;
+        }
+        $start = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
+        $end   = \Illuminate\Support\Carbon::parse($estimasiSelesai)->startOfDay();
+        return max(1, (int) $start->diffInDays($end, false));
+    }
+
     private function rejectIfWorkorderFinal(Workorder $workorder): ?\Illuminate\Http\JsonResponse
     {
         if ((int) $workorder->status_id === $this->statusId('DITOLAK_SPV')) {
@@ -1200,7 +1214,7 @@ class ProgressWorkorderController extends Controller
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
             $estimasiSelesai = optional($assignment)->estimasi_selesai;
 
-            $totalDays = \App\Support\WorkorderQuota::totalDays($tanggalMulai, $estimasiSelesai);
+            $totalDays = $this->estimasiHari($tanggalMulai, $estimasiSelesai);
 
             $members = $workorder->assignmentMembers->map(function ($member) use ($workorderId) {
                 $userId = $member->user_id;
@@ -1253,8 +1267,8 @@ class ProgressWorkorderController extends Controller
     /**
      * Get member progress summary for web dashboard.
      *
-     * Endpoint untuk Web Dashboard menampilkan ringkasan progress individual
-     * setiap anggota tim dengan statistik lengkap.
+     * Ringkasan progress per anggota berbasis milestone (tahapan 1..4 → 25/50/75/100).
+     * Tidak lagi memakai konsep kuota — tanpa quota_total/quota_remaining/daily_breakdown.
      *
      * @param  int  $workorderId
      * @return \Illuminate\Http\Response
@@ -1268,49 +1282,25 @@ class ProgressWorkorderController extends Controller
                 'status'
             ])->findOrFail($workorderId);
 
-            // Hitung estimasi hari untuk kuota
             $assignment = $workorder->workorderAssignment;
             $tanggalMulai = optional($assignment)->tanggal_mulai ?? $workorder->tanggal_mulai;
             $estimasiSelesai = optional($assignment)->estimasi_selesai;
+            $totalDays = $this->estimasiHari($tanggalMulai, $estimasiSelesai);
 
-            $totalDays = \App\Support\WorkorderQuota::totalDays($tanggalMulai, $estimasiSelesai);
-            $maxPelaporanTotal = \App\Support\WorkorderQuota::quotaTotal($tanggalMulai, $estimasiSelesai);
+            $dibatalkanId = \App\Models\Status::where('kode', 'DIBATALKAN')->value('id');
 
-            $membersSummary = $workorder->assignmentMembers->map(function ($member) use ($workorderId, $maxPelaporanTotal, $totalDays) {
+            $membersSummary = $workorder->assignmentMembers->map(function ($member) use ($workorderId, $dibatalkanId) {
                 $userId = $member->user_id;
 
-                // Ambil submission terhitung (hanya PROGRESS) dari user ini untuk WO ini
-                $progressList = \App\Support\WorkorderQuota::countableSubmissions($workorderId, $userId)
-                    ->orderBy('waktu_submit', 'asc')
-                    ->get();
-
-                $totalSubmissions = $progressList->count();
-
-                // Hitung submission per hari
-                $submissionsByDate = $progressList->groupBy(function ($p) {
-                    return \Illuminate\Support\Carbon::parse($p->waktu_submit)->format('Y-m-d');
-                });
-
-                // Hitung rata-rata submission per hari
-                $avgSubmissionsPerDay = $submissionsByDate->count() > 0
-                    ? round($totalSubmissions / $submissionsByDate->count(), 2)
-                    : 0;
-
-                // Progress percentage individual (berdasarkan kuota mereka)
-                $progressPercentage = $maxPelaporanTotal > 0
-                    ? min(100, round(($totalSubmissions / $maxPelaporanTotal) * 100, 2))
-                    : 0;
-
-                // Waktu submission pertama dan terakhir
-                $firstSubmission = $progressList->first()?->waktu_submit;
-                $lastSubmission = $progressList->last()?->waktu_submit;
-
-                $dibatalkanId = \App\Models\Status::where('kode', 'DIBATALKAN')->value('id');
-                $memberMaxTahapan = ProgressWorkorder::where('workorder_id', $workorderId)
+                // Semua laporan milik anggota ini yang sudah disubmit & tidak dibatalkan.
+                $base = ProgressWorkorder::where('workorder_id', $workorderId)
                     ->where('submitted_by_user_id', $userId)
                     ->whereNotNull('waktu_submit')
-                    ->when($dibatalkanId !== null, fn ($q) => $q->where('status_id', '!=', $dibatalkanId))
-                    ->max('tahapan');
+                    ->when($dibatalkanId !== null, fn ($q) => $q->where('status_id', '!=', $dibatalkanId));
+
+                $memberMaxTahapan = (clone $base)->max('tahapan');
+                $firstSubmission  = (clone $base)->min('waktu_submit');
+                $lastSubmission   = (clone $base)->max('waktu_submit');
                 
                 $memberProgressTahapan = $memberMaxTahapan !== null ? (int) round(($memberMaxTahapan / 4) * 100) : null;
 
@@ -1322,30 +1312,19 @@ class ProgressWorkorderController extends Controller
                     'jabatan_kode' => optional(optional($member->user->pegawai)->jabatan)->kode,
                     'is_pic' => $member->is_pic,
                     'statistics' => [
-                        'total_submissions' => $totalSubmissions,
-                        'quota_total' => $maxPelaporanTotal,
-                        'quota_remaining' => max(0, $maxPelaporanTotal - $totalSubmissions),
-                        'progress_percentage' => $progressPercentage,
-                        'avg_submissions_per_day' => $avgSubmissionsPerDay,
-                        'days_active' => $submissionsByDate->count(),
-                        'first_submission' => $firstSubmission,
-                        'last_submission' => $lastSubmission,
-                        'tahapan_tertinggi' => $memberMaxTahapan,
-                        'progress_tahapan' => $memberProgressTahapan,
+                        'tahapan_tertinggi'   => $memberMaxTahapan,
+                        'progress_tahapan'    => $memberProgressTahapan,
+                        // Key lama dipertahankan; kini bernilai milestone, bukan kuota.
+                        'progress_percentage' => $memberProgressTahapan,
+                        'first_submission'    => $firstSubmission,
+                        'last_submission'     => $lastSubmission,
                     ],
-                    'daily_breakdown' => $submissionsByDate->map(function ($items, $date) {
-                        return [
-                            'date' => $date,
-                            'count' => $items->count(),
-                        ];
-                    })->values(),
                 ];
             });
 
-            // Hitung statistik keseluruhan tim
+            // Statistik keseluruhan tim (berbasis milestone)
             $teamStats = [
                 'total_members' => $workorder->assignmentMembers->count(),
-                'total_submissions_all' => $membersSummary->sum('statistics.total_submissions'),
                 'avg_progress_percentage' => $membersSummary->avg('statistics.progress_percentage'),
             ];
 

@@ -41,12 +41,12 @@ The core workflow is a multi-stage work order lifecycle:
 
 1. **Superadmin** creates a WO and assigns it to a **SPV** (status: `DITUGASKAN_KE_SPV`)
 2. **SPV** fills a category-specific form (meter/jaringan/infrastruktur) and assigns **Staff** members (status: `DITUGASKAN_KE_STAFF`)
-3. **Staff** submits an inspection (INSPEKSI, description + min. 1 photo) — required before the first "Mulai"; does NOT change WO status or consume quota
+3. **Staff** submits an inspection (INSPEKSI, description + min. 1 photo) — required before the first "Mulai"; does NOT change WO status
 4. **Staff** starts work ("Mulai") and reports progress with geolocation + photos (status: `IN_PROGRESS`)
 5. **Staff** marks work complete (status: `PENGECEKAN`)
 6. **SPV** reviews: accept → `SELESAI`, revisi → back to `IN_PROGRESS`, tolak → `DITOLAK_SPV`
 
-Progress reporting has a quota system: max 8 submissions per day, total quota = estimated_days * 8.
+Progress percentage is milestone-based: each progress report carries a `tahapan` (1=Persiapan, 2=Pengerjaan, 3=Pengujian, 4=Dokumentasi). `Workorder::progres_persen` = highest non-cancelled `tahapan` reached / 4 * 100 (→ 25/50/75/100), with status overrides `SELESAI` → 100 and `PENGECEKAN` → 90. (The older per-day submission quota has been removed.)
 
 ### Service Layer
 

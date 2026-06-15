@@ -156,8 +156,7 @@ class Workorder extends Model
             return (int) round(($maxTahapan / 4) * 100);
         }
 
-        // 3. Legacy short-circuits
-        // 0%: Belum dikerjakan oleh staff
+        
         if (in_array($statusKode, ['DITUGASKAN_KE_SPV', 'DISETUJUI', 'DITUGASKAN_KE_STAFF'])) {
             return 0;
         }
@@ -167,30 +166,7 @@ class Workorder extends Model
             return 90;
         }
 
-        // Individual-based progress: rata-rata progress semua anggota tim
-        if (in_array($statusKode, ['IN_PROGRESS', 'REVISI_REQUESTED', 'DITOLAK_SPV'])) {
-            $assignment = $this->workorderAssignment;
-            $tanggalMulai = optional($assignment)->tanggal_mulai ?? $this->tanggal_mulai;
-            $estimasiSelesai = optional($assignment)->estimasi_selesai;
-
-            $maxPelaporanTotal = \App\Support\WorkorderQuota::quotaTotal($tanggalMulai, $estimasiSelesai);
-
-            // Ambil semua anggota tim
-            $members = $this->assignmentMembers;
-
-            if ($members->isEmpty()) {
-                return 0;
-            }
-
-            $memberProgressPercentages = $members->map(function ($member) use ($maxPelaporanTotal) {
-                $totalPelaporan = \App\Support\WorkorderQuota::countableSubmissions($this->id, $member->user_id)->count();
-
-                return min(90, round(($totalPelaporan / $maxPelaporanTotal) * 100));
-            });
-
-            return (int) min(90, round($memberProgressPercentages->avg()));
-        }
-
+        // Belum ada milestone (tahapan) yang tercatat → progress 0%.
         return 0;
     }
 
