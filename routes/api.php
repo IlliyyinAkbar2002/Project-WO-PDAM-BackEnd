@@ -1,8 +1,6 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DetailFormController;
-use App\Http\Controllers\FormWorkorderController;
 use App\Http\Controllers\JenisLokasiController;
 use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
@@ -41,18 +39,31 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('workorder', WorkorderController::class);
         Route::post('workorder', [WorkorderController::class, 'store']);
         Route::patch('workorder/{id}/status', [WorkorderController::class, 'updateStatus']);
+        Route::patch('workorder/{id}/toggle-status',[WorkorderController::class, 'toggleStatus']);
         
         // KPI
         Route::get('kpi', [KpiController::class, 'index']);
         Route::get('kpi/departemen/{id}', [KpiController::class, 'departemen']);
-        
-        // Master data
-        Route::apiResource('jenis-workorder', JenisWorkorderController::class);
+
         Route::apiResource('jenis-lokasi', JenisLokasiController::class);
-        Route::get('user', [UserController::class, 'index']);
-        Route::get('pegawai', [PegawaiController::class, 'index']);
-        Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
+
+        // User & Pegawai
+        Route::get('users', [UserController::class, 'index']);
+        Route::post('users/{id}/reset-password',[UserController::class, 'resetPassword']);
+        Route::patch('users/{id}/toggle-status', [UserController::class, 'toggleAccountStatus']);
         
+        Route::get('pegawai', [PegawaiController::class, 'index']);
+        Route::post('pegawai-user-create', [PegawaiController::class, 'store']);
+        Route::get('pegawai/meta', [PegawaiController::class, 'meta']);
+        Route::get('pegawai/meta/filter-options', [PegawaiController::class, 'filterOptions']);
+        Route::get('pegawai/filter', [PegawaiController::class, 'getPegawaiByFilter']);
+        Route::get('pegawai/{pegawai}', [PegawaiController::class, 'show'])
+            ->whereNumber('pegawai');
+        Route::put('pegawai/{pegawai}', [PegawaiController::class, 'update'])
+            ->whereNumber('pegawai');
+        Route::delete('pegawai/{pegawai}', [PegawaiController::class, 'destroy'])
+            ->whereNumber('pegawai');
+
         // Location management
         Route::get('master-location', [MasterLocationController::class, 'index']);
         Route::post('master-location', [MasterLocationController::class, 'store']);
@@ -83,6 +94,7 @@ Route::prefix('v1')->group(function () {
         Route::post('material', [MaterialController::class, 'store']);
         Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
         Route::put('material/{kode_material}/edit', [MaterialController::class, 'edit']);
+        Route::get('material/generate-code', [MaterialController::class, 'generateCode']);
     });
 });
 

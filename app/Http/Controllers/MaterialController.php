@@ -16,7 +16,11 @@ class MaterialController extends Controller
     public function index()
     {
         try {
-            $material = Material::with('pegawai:id,nama')->get();
+            $material = Material::with('pegawai:id,nama')
+            ->get()
+            ->each(function ($material) {
+                $material->append('tersedia');
+            });
             return response()->json($material, 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -45,22 +49,39 @@ class MaterialController extends Controller
     public function store(Request $request)
     {
         $validatedData = $request->validate([
-            'kode_material' => 'required|integer|unique:m_material,kode_material',
+            'kode_material' => 'required|unique:m_material,kode_material',
             'nama' => 'required|string',
             'jumlah_stok' => 'required|integer',
         ]);
-
         $user = Auth::user();
-
         $validatedData['pegawai_id'] = $user->pegawai_id;
-
         $validatedData['terpakai'] = 0;
-
         $material = Material::create($validatedData);
         return response()->json([
             'message' => 'Data material berhasil ditambahkan',
             'material' => $material->append('tersedia')
         ], 201);
+    }
+
+    public function generateCode()
+    {
+        $lastMaterial = Material::orderBy('id', 'desc')->first();
+        $nextNumber = 1;
+        if ($lastMaterial) {
+            preg_match('/MAT-(\d+)/', $lastMaterial->kode_material, $matches);
+            if (isset($matches[1])) {
+                $nextNumber = ((int) $matches[1]) + 1;
+            }
+        }
+        $kodeMaterial = 'MAT-' . str_pad(
+            $nextNumber,
+            6,
+            '0',
+            STR_PAD_LEFT
+        );
+        return response()->json([
+            'kode_material' => $kodeMaterial
+        ]);
     }
 
     /**

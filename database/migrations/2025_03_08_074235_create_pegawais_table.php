@@ -17,10 +17,10 @@ class CreatePegawaisTable extends Migration
             $table->id();
             $table->string('nama');
             $table->string('nip');
-            $table->date('tanggal_lahir');
-            $table->enum('jenis_kelamin', ['Laki-laki', 'Perempuan']);
-            $table->string('alamat');
-            $table->string('telepon');
+            $table->enum('jenis_kelamin', ['Laki-laki', 'Perempuan'])->nullable();
+            $table->date('tanggal_lahir')->nullable();
+            $table->string('alamat')->nullable();
+            $table->string('telepon')->nullable();
             $table->foreignId('departemen_id')->constrained('m_departemen');
             $table->foreignId('jabatan_id')->constrained('m_jabatan');
             $table->timestamps();

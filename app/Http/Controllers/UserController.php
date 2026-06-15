@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -14,15 +16,7 @@ class UserController extends Controller
      */
     public function index()
     {
-        try {
-            $user = User::with('pegawai:id,nama,nip')->get();
-            return response()->json($user, 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data user',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        // 
     }
 
     /**
@@ -34,19 +28,6 @@ class UserController extends Controller
     public function store(Request $request)
     {
         //
-        $validatedData = $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|string|min:8',
-            'pegawai_id' => 'required|exists:m_pegawai,id',
-            'role_id' => 'required|exists:m_role,id',
-        ]);
-        $validatedData['password'] = bcrypt($validatedData['password']);
-        $user = User::create($validatedData);
-        return response()->json([
-            'message' => 'User berhasil dibuat',
-            'user' => $user
-        ], 201);
     }
 
     /**
@@ -57,15 +38,7 @@ class UserController extends Controller
      */
     public function show($id)
     {
-        try {
-            $user = User::with('pegawai:id,nama,nip')->findOrFail($id);
-            return response()->json($user, 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data user',
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        // 
     }
 
     /**
@@ -77,7 +50,27 @@ class UserController extends Controller
      */
     public function update(Request $request, $id)
     {
-        //
+        // 
+    }
+
+    public function resetPassword($id)
+    {
+        try {
+            $user = User::findOrFail($id);
+            $defaultPassword = 'password';
+            $user->update([
+                'password' => Hash::make($defaultPassword)
+            ]);
+            return response()->json([
+                'message' => 'Password berhasil direset',
+                'default_password' => $defaultPassword
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat reset password',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -89,5 +82,31 @@ class UserController extends Controller
     public function destroy($id)
     {
         //
+    }
+
+    public function toggleAccountStatus($id)
+    {
+        try {
+            $user = User::findOrFail($id);
+            if ($user->id === auth()->id()) {
+                return response()->json([
+                    'error' => 'Anda tidak dapat menonaktifkan akun sendiri.'
+                ], 422);
+            }
+            $user->is_active = !$user->is_active;
+            $user->save();
+            return response()->json([
+                'message' => $user->is_active
+                    ? 'Akun berhasil diaktifkan'
+                    : 'Akun berhasil dinonaktifkan',
+                'is_active' => $user->is_active,
+                'user_id' => $user->id,
+            ]);
+        } catch (\Exception $e) {
+            Log::error($e);
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat mengubah status akun'
+            ], 500);
+        }
     }
 }

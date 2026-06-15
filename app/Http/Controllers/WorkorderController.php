@@ -7,7 +7,6 @@ use App\Models\JenisWorkorder;
 use App\Models\Pengaduan;
 use App\Models\Workorder;
 use App\Models\WorkorderAction;
-
 use App\Services\ProgressWorkorderService;
 use App\Services\WorkorderService;
 use Illuminate\Http\Request;
@@ -44,24 +43,10 @@ class WorkorderController extends Controller
                 'assignedTo',
                 'createdBy',
             ]);
+            // Filter pencarian
             if ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('nama_workorder', 'ILIKE', "%{$search}%")
-                        ->orWhere('deskripsi', 'ILIKE', "%{$search}%")
-                        ->orWhere('kode_pengaduan', 'ILIKE', "%{$search}%")
-                        ->orWhereHas('jenisWorkorder', function ($sub) use ($search) {
-
-                            $sub->where('nama', 'ILIKE', "%{$search}%");
-                        })
-                        ->orWhereHas('assignedTo', function ($sub) use ($search) {
-
-                            $sub->where('name', 'ILIKE', "%{$search}%");
-                        })
-                        ->orWhereHas('createdBy', function ($sub) use ($search) {
-
-                            $sub->where('name', 'ILIKE', "%{$search}%");
-                        });
-                });
+                $query->where('nama_workorder', 'ILIKE', "%{$search}%")
+                    ->orWhere('kode_pengaduan', 'ILIKE', "%{$search}%");
             }
             // Filter status
             if ($status) {
@@ -154,6 +139,12 @@ class WorkorderController extends Controller
                 'status' => Pengaduan::STATUS_PROSES
             ]);
             DB::commit();
+            $workorder->load([
+                'departemen',
+                'jenisWorkorder',
+                'assignedTo',
+                'createdBy',
+            ]);
             return response()->json([
                 'message' => 'Workorder berhasil disimpan',
                 'data' => $workorder,
@@ -215,6 +206,12 @@ class WorkorderController extends Controller
         try {
             $workorder = Workorder::findOrFail($id);
             $workorder->update($validatedData);
+            $workorder->load([
+                'departemen',
+                'jenisWorkorder',
+                'assignedTo',
+                'createdBy',
+            ]);
             return response()->json([
                 'message' => 'Workorder berhasil diperbarui',
                 'data' => $workorder,
@@ -261,6 +258,33 @@ class WorkorderController extends Controller
         }
     }
 
+    public function toggleStatus($id)
+    {
+        try {
+            $workorder = Workorder::findOrFail($id);
+            $workorder->is_active = !$workorder->is_active;
+            $workorder->save();
+            $workorder->load([
+                'departemen',
+                'jenisWorkorder',
+                'assignedTo',
+                'createdBy',
+            ]);
+            return response()->json([
+                'message' => $workorder->is_active
+                    ? 'Workorder berhasil diaktifkan'
+                    : 'Workorder berhasil dinonaktifkan',
+
+                'is_active' => $workorder->is_active,
+                'workorder_id' => $workorder->id,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     /**
      * Remove the specified resource from storage.
      *
@@ -269,16 +293,6 @@ class WorkorderController extends Controller
      */
     public function destroy($id)
     {
-        try {
-        $workorder = Workorder::findOrFail($id);
-        $workorder->delete();
-        return response()->json([
-            'message' => 'Workorder berhasil dihapus',
-        ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        // 
     }
 }
