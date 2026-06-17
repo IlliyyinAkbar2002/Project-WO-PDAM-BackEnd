@@ -779,7 +779,13 @@ class ProgressWorkorderController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = ProgressWorkorder::with('dokumentasiProgress');
+            // Eager-load detail review agar FE bisa menurunkan status siklus
+            // (pending/approved/rejected) langsung dari list, sama seperti show().
+            $query = ProgressWorkorder::with([
+                'dokumentasiProgress',
+                'progressDetails',
+                'latestDetail',
+            ]);
 
             if ($request->has('workorder_id')) {
                 $query->where('workorder_id', $request->query('workorder_id'))

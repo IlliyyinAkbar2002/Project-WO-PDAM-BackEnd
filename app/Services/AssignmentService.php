@@ -25,9 +25,12 @@ class AssignmentService
         return DB::transaction(function () use ($workorder, $data, $actor) {
             $this->guardAssignability($workorder, $actor);
 
-            // Prioritas: payload FE > jenis_workorder.kategori_form (kolom ini
-            // belum ada di current → praktis selalu dari payload).
-            $kategori = $data['kategori_form'] ?? optional($workorder->jenisWorkorder)->kategori_form;
+            // Prioritas: payload FE (kategori_form) > kolom jenis_workorder.
+            // Kolom yang ada di skema target adalah `kategori` (bukan kategori_form),
+            // jadi fallback ke `kategori` agar tidak wajib dikirim FE tiap assign.
+            $kategori = $data['kategori_form']
+                ?? optional($workorder->jenisWorkorder)->kategori_form
+                ?? optional($workorder->jenisWorkorder)->kategori;
             if (! in_array($kategori, ['meter', 'jaringan', 'infrastruktur'], true)) {
                 throw new \LogicException('kategori_form tidak valid: ' . ($kategori ?? 'null'));
             }

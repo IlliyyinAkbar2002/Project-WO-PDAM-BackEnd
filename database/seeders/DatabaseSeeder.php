@@ -9,9 +9,7 @@ use App\Models\MasterAction;
 use App\Models\MasterKpi;
 use App\Models\MasterLocation;
 use App\Models\Pegawai;
-use App\Models\Pic;
 use App\Models\Role;
-use App\Models\Status;
 use App\Models\User;
 use App\Models\Workorder;
 use Illuminate\Support\Facades\DB;
@@ -109,5 +107,11 @@ class DatabaseSeeder extends Seeder
         User::factory(7)->create();
         JenisWorkorder::factory(9)->create();
         MasterAction::factory(4)->create();
+
+        // Pengaduan (kode PGD-001..010) — diperlukan saat membuat Work Order.
+        $this->call(PengaduanSeeder::class);
+
+        // Akun uji alur Mobile: 1 SPV + 1 senior (PIC) + 1 staff.
+        $this->call(StaffTestSeeder::class);
     }
 }

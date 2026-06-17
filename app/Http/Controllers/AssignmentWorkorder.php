@@ -36,7 +36,9 @@ class AssignmentWorkorder extends Controller
 
         $input = $request->all();
         if (! isset($input['form_kategori']) || ! is_array($input['form_kategori'])) {
-            $kategori = $input['kategori_form'] ?? optional($workorder->jenisWorkorder)->kategori_form;
+            $kategori = $input['kategori_form']
+                ?? optional($workorder->jenisWorkorder)->kategori_form
+                ?? optional($workorder->jenisWorkorder)->kategori;
             $kategoriFields = $this->extractKategoriFields($kategori, $input);
             if (! empty($kategoriFields)) {
                 $request->merge(['form_kategori' => $kategoriFields]);

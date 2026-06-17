@@ -91,7 +91,7 @@ class WorkorderController extends Controller
             'deskripsi' => 'nullable|string',
             'lokasi' => 'required|string|max:255',
             'prioritas' => 'required|in:Rendah,Sedang,Tinggi,Urgent',
-            'status' => 'required|in:Pending,Proses,Selesai,Ditolak',
+            'status' => 'required|in:Pending,Proses,Selesai,Tutup',
             'kode_pengaduan' => 'required|exists:pengaduan,kode_pengaduan',
             'departemen_id' => 'required|exists:m_departemen,id',
             'jenis_workorder_id' => 'required|exists:m_jenis_workorder,id',
@@ -196,7 +196,7 @@ class WorkorderController extends Controller
         'deskripsi' => 'nullable|string',
         'lokasi' => 'nullable|string|max:255',
         'prioritas' => 'sometimes|in:Rendah,Sedang,Tinggi,Urgent',
-        'status' => 'sometimes|in:Pending,Proses,Selesai,Ditolak',
+        'status' => 'sometimes|in:Pending,Proses,Selesai,Tutup',
         'kode_pengaduan' => 'nullable|string|max:255',
         'departemen_id' => 'sometimes|exists:m_departemen,id',
         'jenis_workorder_id' => 'sometimes|exists:m_jenis_workorder,id',
@@ -226,7 +226,7 @@ class WorkorderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status' => 'required|in:Pending,Proses,Selesai,Ditolak'
+            'status' => 'required|in:Pending,Proses,Selesai,Tutup'
         ]);
 
         DB::beginTransaction();
