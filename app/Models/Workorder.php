@@ -25,56 +25,6 @@ class Workorder extends Model
 
     protected $guarded = [];
 
-    // public function pic()
-    // {
-    //     return $this->belongsTo(User::class, 'pic_id')->with(['pegawai:id,nama,nip']);
-    // }
-
-    // public function petugas()
-    // {
-    //     return $this->belongsTo(User::class, 'petugas_id')->with(['pegawai:id,nama,nip']);
-    // }
-
-    // public function status()
-    // {
-    //     return $this->belongsTo(Status::class, 'status_id');
-    // }
-
-    // public function jenisWorkorder()
-    // {
-    //     return $this->belongsTo(JenisWorkorder::class, 'jenis_workorder_id');
-    // }
-
-    // public function tipeWorkorder()
-    // {
-    //     return $this->belongsTo(TipeWorkorder::class, 'tipe_workorder_id');
-    // }
-
-    // public function lemburSpl()
-    // {
-    //     return $this->belongsTo(LemburSpl::class, 'lembur_spl_id');
-    // }
-
-    // public function jenisLokasi()
-    // {
-    //     return $this->belongsTo(JenisLokasi::class, 'jenis_lokasi_id');
-    // }
-
-    // public function workorderAction()
-    // {
-    //     return $this->hasMany(WorkorderAction::class, 'workorder_id');
-    // }
-
-    // public function latestFreeze()
-    // {
-    //     return $this->hasOne(WorkorderAction::class, 'workorder_id')
-    //         ->where('action_id', 2)->latest();
-    // }
-
-    // public function progressWorkorder()
-    // {
-    //     return $this->hasMany(ProgressWorkorder::class, 'workorder_id');
-    // }
 
     // geo menambahkan ini ya, sisanya bisa akbar sesuaikan lagi
     public function pengaduan()
@@ -121,5 +71,22 @@ class Workorder extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function workorderAssignment()
+    {
+        return $this->hasOne(WorkorderAssignment::class, 'workorder_id');
+    }
+
+    public function assignmentMembers()
+    {
+        return $this->hasManyThrough(
+            WoAssignmentMember::class,
+            WorkorderAssignment::class,
+            'workorder_id', // Foreign key on WorkorderAssignment table
+            'assignment_id', // Foreign key on WoAssignmentMember table
+            'id', // Local key on Workorder table
+            'id'  // Local key on WorkorderAssignment table
+        );
     }
 }

@@ -18,7 +18,7 @@ class CreateWorkordersTable extends Migration
             $table->string('nama_workorder');
             $table->text('deskripsi')->nullable();
             $table->string('lokasi');
-            $table->enum('prioritas', [
+            $table->enum('prioritas', [ 
                 'Rendah',
                 'Sedang',
                 'Tinggi',
@@ -32,6 +32,8 @@ class CreateWorkordersTable extends Migration
             ])->default('Pending');
             $table->boolean('is_active')->default(true);
             $table->string('kode_pengaduan');
+            // $table->boolean('is_lembur')->default(false);
+            // $table->foreignId('is_lembur_id')->nullable()->constrained('m_lembur');
 
             $table->foreignId('departemen_id')
                 ->constrained('m_departemen')

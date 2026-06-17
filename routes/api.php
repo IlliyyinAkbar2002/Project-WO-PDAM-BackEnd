@@ -14,6 +14,8 @@ use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
 use App\Http\Controllers\PengaduanController;
+use App\Http\Controllers\AssignmentWorkorder;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -67,6 +69,15 @@ Route::prefix('v1')->group(function () {
         Route::delete('pegawai/{pegawai}', [PegawaiController::class, 'destroy'])
             ->whereNumber('pegawai');
 
+
+        // Assignment Workorder Mobile Flutter
+        Route::get('workorder/{id}/assignment', [AssignmentWorkorder::class, 'show']);
+        Route::post('workorder/{id}/assign-staff', [AssignmentWorkorder::class, 'assignStaff']);
+        // notification
+                // [S] Notifikasi — Laravel Database Notification
+        Route::get('notifications', [NotificationController::class, 'index']);
+        Route::match(['put', 'post'], 'notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+
         // Location management
         Route::get('master-location', [MasterLocationController::class, 'index']);
         Route::post('master-location', [MasterLocationController::class, 'store']);
@@ -111,17 +122,3 @@ Route::get('ping', function () {
         'timestamp' => now()->toISOString()
     ]);
 });
-
-// // Form Workorder
-        // Route::get('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'index']);
-        // Route::post('jenis-workorder/{id}/form-workorder', [FormWorkorderController::class, 'store']);
-        // Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'show']);
-        // Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'update']);
-        // Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{id}', [FormWorkorderController::class, 'destroy']);
-
-        // // Detail form (opsi dropdown)
-        // Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'index']);
-        // Route::post('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form', [DetailFormController::class, 'store']);
-        // Route::get('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'show']);
-        // Route::put('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'update']);
-        // Route::delete('jenis-workorder/{jenis_workorder_id}/form-workorder/{form_workorder_id}/detail-form/{id}', [DetailFormController::class, 'destroy']);

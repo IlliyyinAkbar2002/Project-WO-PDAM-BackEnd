@@ -1,0 +1,28 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class WoAssignmentMember extends Model
+{
+    use HasFactory;
+
+    protected $table = 'wo_assignment_member';
+    protected $guarded = [];
+
+    protected $casts = [
+        'is_pic' => 'boolean',
+    ];
+
+    public function assignment()
+    {
+        return $this->belongsTo(WorkorderAssignment::class, 'assignment_id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(Pegawai::class, 'pegawai_id');
+    }
+}
