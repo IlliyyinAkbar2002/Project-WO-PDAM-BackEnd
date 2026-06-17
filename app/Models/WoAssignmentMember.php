@@ -21,6 +21,14 @@ class WoAssignmentMember extends Model
         return $this->belongsTo(WorkorderAssignment::class, 'assignment_id');
     }
 
+    public function pegawai()
+    {
+        return $this->belongsTo(Pegawai::class, 'pegawai_id');
+    }
+
+    /**
+     * Alias backward-compat — anggota tim dimodelkan sebagai Pegawai.
+     */
     public function user()
     {
         return $this->belongsTo(Pegawai::class, 'pegawai_id');

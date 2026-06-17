@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Departemen;
 use App\Models\Jabatan;
-use App\Models\JenisLokasi;
 use App\Models\JenisWorkorder;
 use App\Models\MasterAction;
 use App\Models\MasterKpi;
@@ -13,7 +12,6 @@ use App\Models\Pegawai;
 use App\Models\Pic;
 use App\Models\Role;
 use App\Models\Status;
-use App\Models\TipeWorkorder;
 use App\Models\User;
 use App\Models\Workorder;
 use Illuminate\Support\Facades\DB;
@@ -28,30 +26,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        MasterLocation::updateOrCreate(
-            ['nama' => 'PERUMDA Air Minum Surya Sembada Kota Surabaya'],
-            [
-                'latitude' => -7.2654798,
-                'longitude' => 112.754074,
-                'radius_meter' => 50,
-            ]
-        );
-        MasterLocation::updateOrCreate(
-            ['nama' => 'PDAM IPAM Karangpilang'],
-            [
-                'latitude' => -7.347395836428751,
-                'longitude' => 112.6821334744601,
-                'radius_meter' => 100,
-            ]
-        );
-        MasterLocation::updateOrCreate(
-            ['nama' => 'PDAM Ngagel Tirto'],
-            [
-                'latitude' => -7.299541498200452,
-                'longitude' => 112.74518509673882,
-                'radius_meter' => 150,
-            ]
-        );
+        
 
         Departemen::factory(3)->create();
         Jabatan::factory(6)->create();
@@ -132,8 +107,6 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
         ]);
         User::factory(7)->create();
-        JenisLokasi::factory(2)->create();
-        TipeWorkorder::factory(2)->create();
         JenisWorkorder::factory(9)->create();
         MasterAction::factory(4)->create();
     }

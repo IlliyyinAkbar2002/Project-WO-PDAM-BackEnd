@@ -25,14 +25,17 @@ class WorkorderActionService
 
       $workorder = Workorder::findOrFail($data['workorder_id']);
       $action = WorkorderAction::create($data);
-      switch ((int) $action->action_id) {
-        case 2:
+
+      // Branching pakai slug `kode` (PENUGASAN / FREEZE / RESUME / EXTEND)
+      // bukan id numerik — id bisa berubah kalau master data di-re-seed.
+      switch ($action->action->kode ?? null) {
+        case 'FREEZE':
           $this->handleFreeze($action, $workorder, $data);
           break;
-        case 3:
+        case 'RESUME':
           $this->handleResume($action, $workorder, $data);
           break;
-        case 4:
+        case 'EXTEND':
           $this->handleExtend($action, $workorder, $data);
           break;
       }
@@ -42,8 +45,13 @@ class WorkorderActionService
 
   public function handleFreeze($action, $workorder, $data): void
   {
-    $sisaDurasi = Carbon::parse($workorder->estimasi_selesai)
-      ->diffInMinutes(Carbon::parse($data['waktu_mulai']));
+    // estimasi_selesai sekarang ada di workorder_assignment
+    $assignment = $workorder->workorderAssignment;
+    $estimasiSelesai = optional($assignment)->estimasi_selesai;
+
+    $sisaDurasi = $estimasiSelesai
+      ? Carbon::parse($estimasiSelesai)->diffInMinutes(Carbon::parse($data['waktu_mulai']))
+      : 0;
     $statusSebelumnya = $workorder->status_id;
 
     $action->update([
@@ -59,7 +67,7 @@ class WorkorderActionService
   public function handleResume($action, $workorder, $data): void
   {
     $freezeAction = WorkorderAction::where('workorder_id', $workorder->id)
-      ->where('action_id', 2)
+      ->whereHas('action', fn ($q) => $q->where('kode', 'FREEZE'))
       ->latest('waktu_mulai')
       ->first();
 
@@ -69,9 +77,16 @@ class WorkorderActionService
       $estimasiBaru = Carbon::parse($data['waktu_mulai'])->addMinutes($sisaDurasi);
 
       $workorder->update([
-        'estimasi_selesai' => $estimasiBaru,
-        'status_id'        => $statusSebelumnya,
+        'status_id' => $statusSebelumnya,
       ]);
+
+      // estimasi_selesai sekarang ada di workorder_assignment
+      $assignment = $workorder->workorderAssignment;
+      if ($assignment) {
+        $assignment->update([
+          'estimasi_selesai' => $estimasiBaru,
+        ]);
+      }
 
       $action->update([
         'estimasi_selesai' => $estimasiBaru,
@@ -81,8 +96,12 @@ class WorkorderActionService
 
   public function handleExtend($action, $workorder, $data): void
   {
-    $workorder->update([
-      'estimasi_selesai' => $data['estimasi_selesai'],
-    ]);
+    // estimasi_selesai sekarang ada di workorder_assignment (bukan workorder)
+    $assignment = $workorder->workorderAssignment;
+    if ($assignment) {
+      $assignment->update([
+        'estimasi_selesai' => $data['estimasi_selesai'],
+      ]);
+    }
   }
 }

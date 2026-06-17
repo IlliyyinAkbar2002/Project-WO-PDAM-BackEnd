@@ -59,23 +59,12 @@ class AssignmentService
 
             $workorder->update(['status' => self::STATUS_AFTER_ASSIGN]);
 
-            // TODO(audit): referensi catat WorkorderAction kode 'PENUGASAN'.
-            //   m_action current belum punya kolom `kode` → di-skip.
-
             $this->notifyStaffAssigned($workorder, $data['petugas'], $actor);
 
             return $assignment;
         });
     }
 
-    /**
-     * Kirim notifikasi database ke staff yang baru di-assign.
-     *
-     * Desain current pegawai-based: anggota disimpan sbg pegawai_id, sedangkan
-     * Notifiable adalah User. Jadi pegawai_id dipetakan ke User (via
-     * users.pegawai_id) lalu User-nya yang di-notify. Pegawai tanpa akun User
-     * otomatis terlewati (tidak bisa menerima notif in-app).
-     */
     private function notifyStaffAssigned(Workorder $workorder, array $petugasList, User $actor): void
     {
         try {

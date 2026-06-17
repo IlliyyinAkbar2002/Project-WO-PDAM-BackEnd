@@ -16,7 +16,7 @@ class CreateProgressWorkordersTable extends Migration
         Schema::create('progress_workorder', function (Blueprint $table) {
             $table->id();
             $table->foreignId('workorder_id')->constrained('workorder')->onDelete('cascade');
-            $table->enum('tipe_progress', ['pending', 'in_progress', 'completed']);
+            $table->enum('tipe_progress', ['inpeksi', 'mulai', 'progress', 'selesai']);
             $table->string('hasil_pengerjaan')->nullable();
             $table->integer('order');
             $table->dateTime('waktu_submit')->nullable();

@@ -25,6 +25,32 @@ class Workorder extends Model
 
     protected $guarded = [];
 
+    // Field turunan yang ikut diserialisasi ke JSON (dipakai FE Web/Mobile).
+    protected $appends = ['progres_persen'];
+
+    /**
+     * Persentase progress berbasis milestone (tahapan 1..4 -> 25/50/75/100).
+     *
+     * Sumber tahapan: kolom `tahapan` pada progress_workorder (diisi saat submit).
+     * Status enum `Selesai` meng-override ke 100%. Tanpa milestone -> 0%.
+     */
+    public function getProgresPersenAttribute(): int
+    {
+        if ($this->status === 'Selesai') {
+            return 100;
+        }
+
+        $maxTahapan = ProgressWorkorder::where('workorder_id', $this->id)
+            ->whereNotNull('waktu_submit')
+            ->max('tahapan');
+
+        if ($maxTahapan !== null) {
+            return (int) round(($maxTahapan / 4) * 100);
+        }
+
+        return 0;
+    }
+
 
     // geo menambahkan ini ya, sisanya bisa akbar sesuaikan lagi
     public function pengaduan()
@@ -88,5 +114,15 @@ class Workorder extends Model
             'id', // Local key on Workorder table
             'id'  // Local key on WorkorderAssignment table
         );
+    }
+
+    public function progressWorkorder()
+    {
+        return $this->hasMany(ProgressWorkorder::class, 'workorder_id');
+    }
+
+    public function laporanWorkorder()
+    {
+        return $this->hasOne(LaporanWorkorder::class, 'workorder_id');
     }
 }

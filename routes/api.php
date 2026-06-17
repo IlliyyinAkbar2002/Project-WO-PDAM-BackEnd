@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\JenisLokasiController;
 use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
 use App\Http\Controllers\LemburSplController;
@@ -9,7 +8,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\WorkorderActionController;
 use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
-use App\Http\Controllers\DetailProgressController;
+use App\Http\Controllers\ProgressDetailController;
+use App\Http\Controllers\LaporanWorkorderController;
 use App\Http\Controllers\MasterLocationController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\PegawaiController;
@@ -40,17 +40,19 @@ Route::prefix('v1')->group(function () {
     
 
     Route::middleware('auth:sanctum')->group(function () {
-        // Workorder resources
+        // Workorder resources Web NextJS and Flutter Mobile
         Route::apiResource('workorder', WorkorderController::class);
         Route::post('workorder', [WorkorderController::class, 'store']);
         Route::patch('workorder/{id}/status', [WorkorderController::class, 'updateStatus']);
         Route::patch('workorder/{id}/toggle-status',[WorkorderController::class, 'toggleStatus']);
+
+        // Assignment Workorder Mobile Flutter
+        Route::get('workorder/{id}/assignment', [AssignmentWorkorder::class, 'show']);
+        Route::post('workorder/{id}/assign-staff', [AssignmentWorkorder::class, 'assignStaff']);
         
         // KPI
         Route::get('kpi', [KpiController::class, 'index']);
         Route::get('kpi/departemen/{id}', [KpiController::class, 'departemen']);
-
-        Route::apiResource('jenis-lokasi', JenisLokasiController::class);
 
         // User & Pegawai
         Route::get('users', [UserController::class, 'index']);
@@ -70,32 +72,46 @@ Route::prefix('v1')->group(function () {
             ->whereNumber('pegawai');
 
 
-        // Assignment Workorder Mobile Flutter
-        Route::get('workorder/{id}/assignment', [AssignmentWorkorder::class, 'show']);
-        Route::post('workorder/{id}/assign-staff', [AssignmentWorkorder::class, 'assignStaff']);
+        
         // notification
-                // [S] Notifikasi — Laravel Database Notification
+        // [S] Notifikasi — Laravel Database Notification Flutter Mobile.
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::match(['put', 'post'], 'notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 
-        // Location management
+        // Location management Web NextJS
         Route::get('master-location', [MasterLocationController::class, 'index']);
         Route::post('master-location', [MasterLocationController::class, 'store']);
         
-        // Progress tracking
-        Route::apiResource('progress-workorder', ProgressWorkorderController::class);
-        Route::apiResource('detail-progress', DetailProgressController::class);
+        // Progress tracking Flutter Mobile and Web NextJS
+        // Segmen literal didefinisikan SEBELUM {id} agar tidak tertangkap sebagai id.
+        Route::get('progress-workorder', [ProgressWorkorderController::class, 'index']);
         Route::post('progress-workorder/manual-run', [ProgressWorkorderController::class, 'manualRun']);
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/start', [ProgressWorkorderController::class, 'start']);
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/submit', [ProgressWorkorderController::class, 'submit']);
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/review', [ProgressWorkorderController::class, 'review']);
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/resubmit', [ProgressWorkorderController::class, 'resubmit']);
+        Route::get('progress-workorder/by-member/{workorderId}', [ProgressWorkorderController::class, 'progressByMember'])->whereNumber('workorderId');
+        Route::get('progress-workorder/member-summary/{workorderId}', [ProgressWorkorderController::class, 'memberSummary'])->whereNumber('workorderId');
+        Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show'])->whereNumber('id');
+        Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
+        Route::post('progress-workorder/{id}/cancel', [ProgressWorkorderController::class, 'cancel'])->whereNumber('id');
+
+        // Progress Detail — riwayat review (read-only) Flutter Mobile and Web NextJS
+        Route::get('progress-detail', [ProgressDetailController::class, 'index']);
+        Route::get('progress-detail/{id}', [ProgressDetailController::class, 'show'])->whereNumber('id');
+
+        // Laporan Workorder — auto-generate saat SPV approve review Flutter Mobile and Web NextJS
+        Route::apiResource('laporan-workorder', LaporanWorkorderController::class)->only(['index', 'show', 'store']);
         
-        // Lembur SPL
+        // Lembur SPL Flutter Mobile and Web NextJS
         Route::apiResource('lembur-spl', LemburSplController::class);
         Route::post('lembur-spl', [LemburSplController::class, 'store']);
         Route::put('lembur-spl/{id}', [LemburSplController::class, 'update']);
 
-        // Pengaduan
+        // Pengaduan Web NextJS
         Route::apiResource('pengaduan', PengaduanController::class);
 
-        // Jenis Work Order
+        // Jenis Work Order Web NextJS
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);
         Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
         Route::patch('jenis-workorder/{id}/status', [JenisWorkorderController::class, 'updateStatus']);
@@ -103,7 +119,7 @@ Route::prefix('v1')->group(function () {
         // Workorder actions
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
 
-        // Master Material
+        // Master Material Web NextJS
         Route::apiResource('material', MaterialController::class);
         Route::post('material', [MaterialController::class, 'store']);
         Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);

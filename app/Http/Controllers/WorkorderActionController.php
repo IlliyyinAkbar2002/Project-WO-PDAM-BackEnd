@@ -33,6 +33,9 @@ class WorkorderActionController extends Controller
             'sisa_durasi_menit' => 'nullable|integer',
             'estimasi_selesai' => 'nullable|date',
         ]);
+
+        $validatedData['actor_id'] = optional($request->user())->id;
+
         try {
             $action = (new WorkorderActionService())->createAction($validatedData);
             return response()->json([

@@ -2,71 +2,68 @@
 
 namespace App\Services;
 
-use App\Models\DetailProgress;
 use App\Models\ProgressWorkorder;
-use App\Models\Workorder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
+/**
+ * Versi enum + pegawai (target MergerManual).
+ *
+ * progress_workorder tidak punya kolom status_id; siklus review dilacak via
+ * progress_detail + waktu_submit. tipe_progress = enum ('inpeksi','mulai','progress','selesai').
+ * workorder.status = enum ('Pending','Proses','Selesai','Tutup').
+ */
 class ProgressWorkorderService
 {
-    public function createInitialProgress(int $workOrderId): void
+    /** Tipe progress (enum target). 'inpeksi' mengikuti ejaan kolom enum yang ada. */
+    public const TIPE_INSPEKSI = 'inpeksi';
+    public const TIPE_MULAI    = 'mulai';
+    public const TIPE_PROGRESS = 'progress';
+    public const TIPE_SELESAI  = 'selesai';
+
+    /**
+     * Tambah baris PROGRESS untuk WO aktif (dipakai manual-run/batch).
+     */
+    public function addWorkorderProgress(int $workOrderId): void
     {
-        ProgressWorkorder::create([
-            'workorder_id' => $workOrderId,
-            'tipe_progress' => 'Mulai',
-            'order' => 0,
-        ]);
+        DB::transaction(function () use ($workOrderId) {
+            $maxOrder = ProgressWorkorder::where('workorder_id', $workOrderId)
+                ->max('order') ?? 0;
 
-        $progressSelesai = ProgressWorkorder::create([
-            'workorder_id' => $workOrderId,
-            'tipe_progress' => 'Selesai',
-            'order' => 1,
-        ]);
+            // Geser semua >= maxOrder agar baris baru tersisip rapi.
+            ProgressWorkorder::where('workorder_id', $workOrderId)
+                ->where('order', '>=', $maxOrder)
+                ->increment('order');
 
-        $workorder = Workorder::with('jenisWorkorder.detailForm')->findOrFail($workOrderId);
-
-        $detailForms = $workorder->jenisWorkorder->detailForm;
-
-        foreach ($detailForms as $detailForm) {
-            DetailProgress::create([
-                'progress_workorder_id' => $progressSelesai->id,
-                'detail_form_id' => $detailForm->id,
-                'value' => '',
+            ProgressWorkorder::create([
+                'workorder_id'  => $workOrderId,
+                'tipe_progress' => self::TIPE_PROGRESS,
+                'order'         => $maxOrder,
             ]);
-        }
+        });
     }
 
-    public function addWorkorderProgress(int $workOrderId)
-    {
-        $maxOrder = ProgressWorkorder::where('workorder_id', $workOrderId)
-            ->max('order');
-
-        if (is_null($maxOrder)) {
-            $maxOrder = 0;
-        }
-
-        // geser finish ke belakang
-        ProgressWorkorder::where('workorder_id', $workOrderId)
-            ->where('order', $maxOrder)
-            ->increment('order');
-
-        // insert progress baru di posisi maxSeq (sebelum finish)
-        ProgressWorkorder::create([
-            'workorder_id' => $workOrderId,
-            'tipe_progress' => 'Progress ' . ($maxOrder),
-            'order' => $maxOrder,
-        ]);
-
-        return response()->json(['message' => 'Progress ditambahkan'], 201);
-    }
-
+    /**
+     * Tandai progress sebagai ter-submit & selaraskan status WO (enum).
+     *
+     * - 'mulai'  → WO 'Proses' (pekerjaan berjalan)
+     * - lainnya  → WO tidak diubah (tetap 'Proses' hingga SPV approve final)
+     */
     public function updateStatusOnSubmit(int $progressId): void
     {
         $progress = ProgressWorkorder::with('workorder')->findOrFail($progressId);
-        if ($progress->tipe_progress === 'Mulai') {
-            $progress->workorder->update(['status_id' => 7]);
+
+        $progress->update(['waktu_submit' => now()]);
+
+        if ($progress->tipe_progress === self::TIPE_MULAI
+            && $progress->workorder
+            && $progress->workorder->status === 'Pending') {
+            $progress->workorder->update(['status' => 'Proses']);
         }
-        if ($progress->tipe_progress === 'Selesai') {
-            $progress->workorder->update(['status_id' => 5]);
-        }
+
+        Log::info('updateStatusOnSubmit OK', [
+            'progress_id' => $progressId,
+            'tipe'        => $progress->tipe_progress,
+        ]);
     }
 }

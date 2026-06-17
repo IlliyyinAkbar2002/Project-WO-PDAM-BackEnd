@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterLocation;
-use App\Models\UserLocations;
 use Illuminate\Http\Request;
-// use function React\Promise\all;
 
 class MasterLocationController extends Controller
 {
@@ -18,31 +16,10 @@ class MasterLocationController extends Controller
     {
         try {
             $masters = MasterLocation::all();
-            $userLocation = null;
-            
-            if ($request->user()) {
-                $userLocation = UserLocations::where('user_id', $request->user()->id)->latest()->first();
-            }
-
-            // tambahkan flag inside pada tiap master
-            $masters = $masters->map(function($m) use ($userLocation) {
-                $m->inside = false;
-                if ($userLocation && $m->latitude && $m->longitude && $m->radius_meter) {
-                    $meters = $this->haversineMeters(
-                        $m->latitude, 
-                        $m->longitude, 
-                        $userLocation->latitude, 
-                        $userLocation->longitude
-                    );
-                    $m->inside = $meters <= $m->radius_meter;
-                }
-                return $m;
-            });
 
             return response()->json([
                 'success' => true,
                 'data' => $masters,
-                'user_location' => $userLocation
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -51,7 +28,7 @@ class MasterLocationController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
-    }    
+    }
 
     /**
      * Store a newly created resource in storage.
@@ -130,16 +107,18 @@ class MasterLocationController extends Controller
      */
     public function destroy($id)
     {
-        //
+        try {
+            $location = MasterLocation::findOrFail($id);
+            $location->delete();
+            return response()->json([
+                'message' => 'Lokasi berhasil dihapus',
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Terjadi kesalahan saat menghapus lokasi',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
-    // helper
-    private function haversineMeters($lat1, $lon1, $lat2, $lon2) {
-        $R = 6371000;
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
-        $a = sin($dLat/2) * sin($dLat/2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon/2) * sin($dLon/2);
-        $c = 2 * atan2(sqrt($a), sqrt(1-$a));
-        return $R * $c;
-    }
 }
