@@ -16,6 +16,7 @@ use App\Http\Controllers\PegawaiController;
 use App\Http\Controllers\PengaduanController;
 use App\Http\Controllers\AssignmentWorkorder;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\WoPeminjamanMaterialController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -118,6 +119,12 @@ Route::prefix('v1')->group(function () {
 
         // Workorder actions
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
+
+        // Peminjaman Material per WO — Flutter Mobile
+        Route::get('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'index']);
+        Route::post('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'pinjam']);
+        Route::post('peminjaman-material/{id}/kembalikan', [WoPeminjamanMaterialController::class, 'kembalikan']);
+        Route::post('peminjaman-material/{id}/verify', [WoPeminjamanMaterialController::class, 'verify']);
 
         // Master Material Web NextJS
         Route::apiResource('material', MaterialController::class);

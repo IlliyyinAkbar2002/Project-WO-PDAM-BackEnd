@@ -113,5 +113,8 @@ class DatabaseSeeder extends Seeder
 
         // Akun uji alur Mobile: 1 SPV + 1 senior (PIC) + 1 staff.
         $this->call(StaffTestSeeder::class);
+
+        // Master material berstok untuk uji peminjaman material di FE Mobile.
+        $this->call(MaterialSeeder::class);
     }
 }

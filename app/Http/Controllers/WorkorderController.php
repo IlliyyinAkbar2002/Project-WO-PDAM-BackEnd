@@ -171,6 +171,10 @@ class WorkorderController extends Controller
                 'jenisWorkorder',
                 'assignedTo',
                 'createdBy',
+                // Ini supaya bisa menampilkan data anggota tim workorder, termasuk SPV dan anggota tim. Di Flutter
+                'workorderAssignment.spv',
+                'workorderAssignment.members.user',
+                'workorderAssignment.location',
             ])->findOrFail($id);
             return response()->json([
                 'data' => $workorder

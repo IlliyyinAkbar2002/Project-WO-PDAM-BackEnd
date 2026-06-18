@@ -16,6 +16,13 @@ class WoAssignmentMember extends Model
         'is_pic' => 'boolean',
     ];
 
+    protected $appends = ['peran'];
+
+    public function getPeranAttribute(): string
+    {
+        return $this->is_pic ? 'koordinator' : 'anggota';
+    }
+
     public function assignment()
     {
         return $this->belongsTo(WorkorderAssignment::class, 'assignment_id');

@@ -6,6 +6,10 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Buat tabel wo_peminjaman_material — peminjaman material/aset untuk WO.
+ *
+ * Adaptasi skema target (MergerManual): identitas berbasis m_pegawai
+ * (bukan users). diajukan_oleh / diverifikasi_oleh menyimpan pegawai_id,
+ * konsisten dengan wo_assignment_member.pegawai_id & workorder_assignment.spv_pegawai_id.
  */
 return new class extends Migration
 {
@@ -16,6 +20,7 @@ return new class extends Migration
             $table->foreignId('workorder_id')
                   ->constrained('workorder')
                   ->onDelete('cascade');
+
             $table->integer('material_kode');
             $table->foreign('material_kode')
                   ->references('kode_material')
@@ -25,23 +30,26 @@ return new class extends Migration
             // Pengajuan
             $table->integer('jumlah_pinjam');
             $table->text('catatan')->nullable();
-            $table->foreignId('diverifikasi_oleh')->nullable()->after('kondisi_kembali')
-                  ->constrained('users')
-                  ->onDelete('restrict');
-            $table->timestamp('diverifikasi_at')->nullable();
 
             $table->foreignId('diajukan_oleh')
-                  ->constrained('users')
+                  ->constrained('m_pegawai')
                   ->onDelete('restrict');
             $table->timestamp('diajukan_at');
 
-            // Status
+            // Status: DIPINJAM | PENDING_KEMBALI | DIKEMBALIKAN
             $table->string('status', 32)->default('DIPINJAM');
 
             // Pengembalian
             $table->integer('jumlah_kembali')->nullable();
-            $table->timestamp('dikembalikan_at')->nullable();
             $table->string('kondisi_kembali', 64)->nullable();
+            $table->timestamp('dikembalikan_at')->nullable();
+
+            // Verifikasi pengembalian oleh SPV (two-step approval)
+            $table->foreignId('diverifikasi_oleh')->nullable()
+                  ->constrained('m_pegawai')
+                  ->onDelete('restrict');
+            $table->timestamp('diverifikasi_at')->nullable();
+            $table->text('catatan_verifikator')->nullable();
 
             $table->timestamps();
 

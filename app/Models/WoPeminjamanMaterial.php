@@ -29,16 +29,18 @@ class WoPeminjamanMaterial extends Model
         return $this->belongsTo(Material::class, 'material_kode', 'kode_material');
     }
 
+    /**
+     * Pengaju peminjaman = Pegawai (m_pegawai). Identitas target berbasis pegawai,
+     * jadi dikembalikan flat ({id, nama, nip}) — FE Flutter sudah menangani bentuk ini.
+     */
     public function pengaju()
     {
-        return $this->belongsTo(Pegawai::class, 'diajukan_oleh')
-            ->with(['pegawai:id,nama,nip']);
+        return $this->belongsTo(Pegawai::class, 'diajukan_oleh');
     }
 
     public function verifier()
     {
-        return $this->belongsTo(Pegawai::class, 'diverifikasi_oleh')
-            ->with(['pegawai:id,nama,nip']);
+        return $this->belongsTo(Pegawai::class, 'diverifikasi_oleh');
     }
 
     /**
