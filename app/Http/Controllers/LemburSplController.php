@@ -174,11 +174,11 @@ class LemburSplController extends Controller
 
     public function update(Request $request, $id)
     {
-        // Verifikasi lembur (approve/reject) adalah wewenang Superadmin (role_id 1),
-        // konsisten dengan KpiService::isSuperAdmin(). Role 2=Admin, 3=Manager.
-        if ((int) $request->user()->role_id !== 1) {
+        $allowedRoles = [1, 2, 3];
+        
+        if (!in_array((int) $request->user()->role_id, $allowedRoles)) {
             return response()->json([
-                'error' => 'Hanya Superadmin yang dapat memverifikasi (approve/reject) pengajuan lembur.',
+                'error' => 'Anda tidak memiliki hak akses untuk memverifikasi pengajuan lembur.',
             ], 403);
         }
 
