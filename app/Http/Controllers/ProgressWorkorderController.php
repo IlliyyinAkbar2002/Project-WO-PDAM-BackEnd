@@ -183,13 +183,24 @@ class ProgressWorkorderController extends Controller
 
     /**
      * Staff memulai pekerjaan (MULAI). Wajib sudah submit INSPEKSI lebih dulu.
-     * Data kategori AWAL sudah dibuat saat assignment, jadi tidak divalidasi di sini.
+     *
+     * Data kategori AWAL idealnya dibuat saat assignment, namun alur mobile dapat
+     * mengirim field AWAL datar (sesuai kategori WO) di tombol "Mulai". Field tsb
+     * divalidasi opsional di sini lalu ditambal ke tabel wo_* via persistKategoriAwal().
      */
     public function start(Request $request)
     {
         $this->hydrateInputFromBody($request);
 
-        $validated = $request->validate([
+        // Resolusi kategori dulu agar aturan validasi field AWAL bisa ditambahkan.
+        // Pakai TIPE WO (m_jenis_workorder.kategori), BUKAN keberadaan baris wo_*:
+        // baris wo_* belum tentu ada saat MULAI (dibuat di assignment hanya bila
+        // form_kategori dikirim). Fallback ke resolveKategori bila tipe tak ter-set.
+        $workorder    = Workorder::with(['assignmentMembers', 'jenisWorkorder'])->findOrFail($request->input('workorder_id'));
+        $kategoriForm = optional($workorder->jenisWorkorder)->kategori
+            ?? $this->resolveKategori($workorder);
+
+        $rules = [
             'workorder_id'     => 'required|exists:workorder,id',
             'hasil_pengerjaan' => 'nullable|string|max:255',
             'latitude'         => 'required|numeric',
@@ -197,10 +208,27 @@ class ProgressWorkorderController extends Controller
             'accuracy'         => 'nullable|numeric',
             'foto'             => 'nullable|array',
             'foto.*'           => 'image|mimes:jpeg,png,jpg|max:4048',
-        ]);
+        ];
+
+        // Field kategori AWAL — opsional (nullable) supaya tidak memutus alur lama.
+        if ($kategoriForm === 'meter') {
+            $rules['nomor_meter']        = 'nullable|string';
+            $rules['kondisi_meter_awal'] = 'nullable|string';
+        } elseif ($kategoriForm === 'jaringan') {
+            $rules['jenis_pipa']        = 'nullable|string';
+            $rules['diameter_pipa']     = 'nullable|numeric'; // varchar(255) di DB; terima angka dari multipart.
+            $rules['panjang_pipa']      = 'nullable|numeric'; // double precision di DB.
+            $rules['tingkat_kerusakan'] = 'nullable|string';
+        } elseif ($kategoriForm === 'infrastruktur') {
+            $rules['nama_aset']    = 'nullable|string';
+            $rules['jenis_aset']   = 'nullable|string';
+            $rules['kapasitas']    = 'nullable|string';
+            $rules['kondisi_awal'] = 'nullable|string';
+        }
+
+        $validated = $request->validate($rules);
 
         $pegawaiId = (int) optional($request->user())->pegawai_id;
-        $workorder = Workorder::with('assignmentMembers')->findOrFail($validated['workorder_id']);
 
         if (! $this->isMember($workorder, $pegawaiId)) {
             return response()->json(['error' => 'User bukan petugas WO ini'], 403);
@@ -255,6 +283,9 @@ class ProgressWorkorderController extends Controller
             if ($workorder->status !== 'Proses') {
                 $workorder->update(['status' => 'Proses']);
             }
+
+            // Tambal data kategori AWAL bila dikirim mobile (tidak menimpa kolom AKHIR).
+            $this->persistKategoriAwal($workorder, $kategoriForm, $validated);
 
             DB::commit();
 
@@ -552,6 +583,42 @@ class ProgressWorkorderController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Tambal kolom kategori AWAL (dari payload mobile saat MULAI) ke tabel wo_*.
+     * Hanya field yang BENAR-BENAR dikirim yang ditulis — kolom AKHIR & nilai existing
+     * tidak ditimpa dengan null. updateOrCreate keyed pada workorder_id (simetris dgn
+     * persistKategoriHasilAkhir, tapi pakai updateOrCreate karena baris bisa belum ada).
+     */
+    private function persistKategoriAwal(Workorder $workorder, ?string $kategoriForm, array $validated): void
+    {
+        $only = static function (array $keys) use ($validated): array {
+            $data = [];
+            foreach ($keys as $key) {
+                if (array_key_exists($key, $validated) && $validated[$key] !== null) {
+                    $data[$key] = $validated[$key];
+                }
+            }
+            return $data;
+        };
+
+        if ($kategoriForm === 'meter') {
+            $data = $only(['nomor_meter', 'kondisi_meter_awal']);
+            if ($data !== []) {
+                WoMeter::updateOrCreate(['workorder_id' => $workorder->id], $data);
+            }
+        } elseif ($kategoriForm === 'jaringan') {
+            $data = $only(['jenis_pipa', 'diameter_pipa', 'panjang_pipa', 'tingkat_kerusakan']);
+            if ($data !== []) {
+                WoJaringan::updateOrCreate(['workorder_id' => $workorder->id], $data);
+            }
+        } elseif ($kategoriForm === 'infrastruktur') {
+            $data = $only(['nama_aset', 'jenis_aset', 'kapasitas', 'kondisi_awal']);
+            if ($data !== []) {
+                WoInfrastruktur::updateOrCreate(['workorder_id' => $workorder->id], $data);
+            }
         }
     }
 

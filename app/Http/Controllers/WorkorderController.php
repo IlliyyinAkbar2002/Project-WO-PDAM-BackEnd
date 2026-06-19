@@ -5,13 +5,16 @@ namespace App\Http\Controllers;
 use App\Models\LemburSpl;
 use App\Models\JenisWorkorder;
 use App\Models\Pengaduan;
+use App\Models\User;
 use App\Models\Workorder;
 use App\Models\WorkorderAction;
+use App\Notifications\WorkOrderNotification;
 use App\Services\ProgressWorkorderService;
 use App\Services\WorkorderService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WorkorderController extends Controller
 {
@@ -145,6 +148,32 @@ class WorkorderController extends Controller
                 'assignedTo',
                 'createdBy',
             ]);
+
+            // ==================================================
+            // NOTIFIKASI: WO baru → SPV (assigned_to = m_pegawai).
+            // Best-effort: kegagalan notif TIDAK boleh menggagalkan WO.
+            // ==================================================
+            try {
+                $spvUser = User::where('pegawai_id', $workorder->assigned_to)->first();
+                if ($spvUser) {
+                    $creator    = User::with('pegawai')->find($workorder->created_by);
+                    $senderName = optional(optional($creator)->pegawai)->nama
+                        ?? optional($creator)->name ?? 'Admin';
+                    $spvUser->notify(new WorkOrderNotification(
+                        'Work Order Baru',
+                        "{$senderName} membuat work order #{$workorder->nama_workorder} untuk Anda.",
+                        (int) $workorder->id,
+                        'wo_created',
+                        $senderName
+                    ));
+                }
+            } catch (\Throwable $e) {
+                Log::warning('notify wo_created failed', [
+                    'workorder_id' => $workorder->id,
+                    'error'        => $e->getMessage(),
+                ]);
+            }
+
             return response()->json([
                 'message' => 'Workorder berhasil disimpan',
                 'data' => $workorder,

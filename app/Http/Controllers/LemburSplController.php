@@ -6,11 +6,14 @@ use App\Models\LemburSpl;
 use App\Models\LemburSplMember;
 use App\Models\MasterLocation;
 use App\Models\Status;
+use App\Models\User;
 use App\Models\Workorder;
+use App\Notifications\WorkOrderNotification;
 
 use App\Services\LemburApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class LemburSplController extends Controller
@@ -207,6 +210,46 @@ class LemburSplController extends Controller
             }
 
             DB::commit();
+
+            // ==================================================
+            // NOTIFIKASI: pengajuan lembur disetujui → anggota lembur (staff lapangan).
+            // Anggota tersimpan sebagai users.id di lembur_spl_member.user_id, jadi
+            // resolve langsung lewat users.id. Best-effort (di luar transaksi bisnis).
+            // ==================================================
+            if ($isNewApproval) {
+                try {
+                    $lemburSpl->loadMissing('members', 'workorder');
+
+                    $workorderId = (int) $lemburSpl->workorder_id;
+                    $namaWo      = optional($lemburSpl->workorder)->nama_workorder ?? "#$workorderId";
+
+                    // verifikator_id menyimpan users.id (lihat validasi exists:users,id),
+                    // jadi resolve nama via User->pegawai, bukan relasi verifikator() yang
+                    // (saat ini) salah memetakan ke Pegawai. Lihat catatan tech debt.
+                    $verifUser  = $lemburSpl->verifikator_id
+                        ? User::with('pegawai')->find($lemburSpl->verifikator_id)
+                        : null;
+                    $senderName = optional(optional($verifUser)->pegawai)->nama
+                        ?? optional($verifUser)->name ?? 'Manajer';
+
+                    $memberUserIds = $lemburSpl->members->pluck('user_id')->filter()->unique();
+                    $staffUsers = User::whereIn('id', $memberUserIds)->get();
+                    foreach ($staffUsers as $staff) {
+                        $staff->notify(new WorkOrderNotification(
+                            'Pengajuan Lembur Disetujui',
+                            "Pengajuan lembur pada WO #{$namaWo} telah disetujui. Anda ditugaskan.",
+                            $workorderId,
+                            'wo_lembur_approved',
+                            $senderName
+                        ));
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('notify wo_lembur_approved failed', [
+                        'lembur_spl_id' => $lemburSpl->id,
+                        'error'         => $e->getMessage(),
+                    ]);
+                }
+            }
 
             $lemburSpl->load($this->defaultWith);
 
