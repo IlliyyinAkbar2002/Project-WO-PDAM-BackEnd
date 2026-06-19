@@ -46,6 +46,12 @@ class LemburApprovalService
 
             [$tanggalMulai, $estimasiSelesai] = $this->resolveTimeline($lembur);
 
+            if (!$workorder->assigned_to) {
+                throw new \LogicException(
+                    "Workorder belum memiliki SPV yang ditugaskan."
+                );
+            }
+
             $assignment = WorkorderAssignment::updateOrCreate(
                 ['workorder_id' => $workorder->id],
                 [
@@ -67,7 +73,7 @@ class LemburApprovalService
     }
 
     /**
-     * Turunkan tanggal_mulai & estimasi_selesai dari form lembur.
+     * 
      *
      * @return array{0: ?Carbon, 1: ?Carbon}
      */

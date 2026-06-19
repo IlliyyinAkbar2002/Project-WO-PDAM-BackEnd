@@ -31,15 +31,40 @@ class LemburSplController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $lemburSpl = LemburSpl::with($this->defaultWith)->get();
+            $search = $request->get('search');
+            $sort = $request->get('sort', 'desc');
+            $perPage = 10;
+            $query = LemburSpl::with($this->defaultWith);
+
+            // Search
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('judul_pekerjaan', 'like', "%{$search}%")
+                    ->orWhere('jenis_pekerjaan', 'like', "%{$search}%")
+                    ->orWhereHas('workorder', function ($wo) use ($search) {
+                        $wo->where('nama_workorder', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('pemohon.pegawai', function ($pegawai) use ($search) {
+                        $pegawai->where('nama', 'like', "%{$search}%");
+                    });
+                });
+            }
+            // Filter Status
+            if (!empty($status) && $status !== 'all') {
+                $query->where('status', $status);
+            }
+            
+            // Sort
+            $query->orderBy('created_at', $sort === 'asc' ? 'asc' : 'desc');
+            $lemburSpl = $query->paginate($perPage);
             return response()->json($lemburSpl, 200);
         } catch (\Exception $e) {
             return response()->json([
-                'error' => 'Terjadi kesalahan saat mengambil data lembur spl',
-                'message' => $e->getMessage()
+                'error' => 'Terjadi kesalahan saat mengambil data lembur SPL',
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -209,97 +234,116 @@ class LemburSplController extends Controller
 
     public function update(Request $request, $id)
     {
-        $allowedRoles = [1, 2, 3];
-        
-        if (!in_array((int) $request->user()->role_id, $allowedRoles)) {
+        // Superadmin, Admin, Manager
+        if (!in_array((int) $request->user()->role_id, [1, 2, 3])) {
             return response()->json([
-                'error' => 'Anda tidak memiliki hak akses untuk memverifikasi pengajuan lembur.',
+                'error' => 'Anda tidak memiliki hak akses untuk memverifikasi lembur.'
             ], 403);
         }
 
         $validatedData = $request->validate([
-            'verifikator_id' => 'nullable|exists:users,id',
-            'status'         => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+            'status' => [
+                'required',
+                Rule::in(['approved', 'rejected']),
+            ],
             'alasan_ditolak' => 'nullable|string',
         ]);
 
         DB::beginTransaction();
-        try {
-            $lemburSpl = LemburSpl::with(['workorder.workorderAssignment', 'members'])->findOrFail($id);
-            $previousStatus = $lemburSpl->status;
 
+        try {
+            $lemburSpl = LemburSpl::with([
+                'workorder.workorderAssignment',
+                'members',
+                'verifikator.pegawai'
+            ])->findOrFail($id);
+            
+            if ($lemburSpl->status !== 'pending') {
+                return response()->json([
+                    'error' => 'Pengajuan ini sudah diproses sebelumnya.'
+                ], 422);
+            }
+            $previousStatus = $lemburSpl->status;
             $lemburSpl->update([
-                'verifikator_id'   => $validatedData['verifikator_id'],
+                'verifikator_id'   => $request->user()->id,
                 'status'           => $validatedData['status'],
                 'waktu_verifikasi' => now(),
                 'alasan_ditolak'   => $validatedData['alasan_ditolak'] ?? null,
             ]);
 
-            // APPROVE = status baru berpindah ke 'approved'.
-            $isNewApproval = $validatedData['status'] === 'approved'
+            $isNewApproval =
+                $validatedData['status'] === 'approved'
                 && $previousStatus !== 'approved';
 
             if ($isNewApproval) {
+
                 $workorder = $lemburSpl->workorder;
+
                 if ($workorder && $workorder->status === 'Pending') {
-                    $workorder->update(['status' => 'Proses']);
+                    $workorder->update([
+                        'status' => 'Proses'
+                    ]);
                 }
 
-                // Auto-assign: replikasi anggota lembur → staff WO (wo_assignment_member).
-                (new LemburApprovalService())->approveAndAssign($lemburSpl);
+                (new LemburApprovalService())
+                    ->approveAndAssign($lemburSpl);
             }
 
             DB::commit();
 
-            // ==================================================
-            // NOTIFIKASI: pengajuan lembur disetujui → anggota lembur (staff lapangan).
-            // Anggota tersimpan sebagai users.id di lembur_spl_member.user_id, jadi
-            // resolve langsung lewat users.id. Best-effort (di luar transaksi bisnis).
-            // ==================================================
-            if ($isNewApproval) {
-                try {
-                    $lemburSpl->loadMissing('members', 'workorder');
-
-                    $workorderId = (int) $lemburSpl->workorder_id;
-                    $namaWo      = optional($lemburSpl->workorder)->nama_workorder ?? "#$workorderId";
-
-                    $verifUser  = $lemburSpl->verifikator_id
-                        ? User::with('pegawai')->find($lemburSpl->verifikator_id)
-                        : null;
-                    $senderName = optional(optional($verifUser)->pegawai)->nama
-                        ?? optional($verifUser)->name ?? 'Manajer';
-
-                    $memberUserIds = $lemburSpl->members->pluck('user_id')->filter()->unique();
-                    $staffUsers = User::whereIn('id', $memberUserIds)->get();
-                    foreach ($staffUsers as $staff) {
-                        $staff->notify(new WorkOrderNotification(
-                            'Pengajuan Lembur Disetujui',
-                            "Pengajuan lembur pada WO #{$namaWo} telah disetujui. Anda ditugaskan.",
-                            $workorderId,
-                            'wo_lembur_approved',
-                            $senderName
-                        ));
-                    }
-                } catch (\Throwable $e) {
-                    Log::warning('notify wo_lembur_approved failed', [
-                        'lembur_spl_id' => $lemburSpl->id,
-                        'error'         => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            $lemburSpl->load($this->defaultWith);
+            $lemburSpl->load([
+                'workorder',
+                'pemohon.pegawai',
+                'verifikator.pegawai',
+                'members.user.pegawai',
+            ]);
 
             return response()->json([
-                'message' => 'Data lembur SPL berhasil diupdate',
-                'data' => $lemburSpl
+                'message' => $validatedData['status'] === 'approved'
+                    ? 'Pengajuan lembur berhasil disetujui'
+                    : 'Pengajuan lembur berhasil ditolak',
+
+                'data' => [
+                    'id' => $lemburSpl->id,
+                    'status' => $lemburSpl->status,
+                    'waktu_pengajuan' => $lemburSpl->waktu_pengajuan,
+                    'waktu_verifikasi' => $lemburSpl->waktu_verifikasi,
+                    'alasan_ditolak' => $lemburSpl->alasan_ditolak,
+                    'workorder' => [
+                        'id' => $lemburSpl->workorder?->id,
+                        'nama_workorder' => $lemburSpl->workorder?->nama_workorder,
+                        'status' => $lemburSpl->workorder?->status,
+                    ],
+                    'pemohon' => [
+                        'id' => $lemburSpl->pemohon?->id,
+                        'nama' => $lemburSpl->pemohon?->pegawai?->nama,
+                        'nip' => $lemburSpl->pemohon?->pegawai?->nip,
+                    ],
+                    'verifikator' => [
+                        'id' => $lemburSpl->verifikator?->id,
+                        'nama' => $lemburSpl->verifikator?->pegawai?->nama,
+                        'nip' => $lemburSpl->verifikator?->pegawai?->nip,
+                    ],
+                    'members' => $lemburSpl->members->map(function ($member) {
+                        return [
+                            'id' => $member->id,
+                            'user_id' => $member->user_id,
+                            'nama' => $member->user?->pegawai?->nama,
+                            'nip' => $member->user?->pegawai?->nip,
+                        ];
+                    }),
+                ]
             ], 200);
         } catch (\LogicException $e) {
             DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 422);
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
