@@ -17,7 +17,6 @@ class CreateWorkorderAssignmentTable extends Migration
             $table->foreignId('spv_pegawai_id')->constrained('m_pegawai');
             $table->timestamp('assigned_at');
             $table->text('deskripsi')->nullable();
-            $table->text('tipe_workorder')->nullable();
             $table->timestamp('tanggal_mulai')->nullable();
             $table->timestamp('tanggal_selesai')->nullable();
             $table->timestamp('estimasi_selesai')->nullable();

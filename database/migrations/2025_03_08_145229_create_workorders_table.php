@@ -32,8 +32,11 @@ class CreateWorkordersTable extends Migration
             ])->default('Pending');
             $table->boolean('is_active')->default(true);
             $table->string('kode_pengaduan');
-            // $table->boolean('is_lembur')->default(false);
-            // $table->foreignId('is_lembur_id')->nullable()->constrained('m_lembur');
+
+            // Link 1:1 ke pengajuan lembur (nullable). NULL = WO non-lembur.
+            // FE membaca kolom ini sebagai penanda "WO lembur" (splId → isLembur).
+            // FK aman: tabel `lembur_spl` (145217) dibuat sebelum tabel ini (145229).
+            $table->foreignId('lembur_spl_id')->nullable()->constrained('lembur_spl');
 
             $table->foreignId('departemen_id')
                 ->constrained('m_departemen')

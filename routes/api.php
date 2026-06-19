@@ -105,9 +105,9 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('laporan-workorder', LaporanWorkorderController::class)->only(['index', 'show', 'store']);
         
         // Lembur SPL Flutter Mobile and Web NextJS
+        // apiResource sudah mencakup: index, store (POST), show, update (PUT|PATCH), destroy.
+        // SPV ajukan lembur → POST; Superadmin approve/reject → PUT|PATCH /{id} (auto-assign staff).
         Route::apiResource('lembur-spl', LemburSplController::class);
-        Route::post('lembur-spl', [LemburSplController::class, 'store']);
-        Route::put('lembur-spl/{id}', [LemburSplController::class, 'update']);
 
         // Pengaduan Web NextJS
         Route::apiResource('pengaduan', PengaduanController::class);

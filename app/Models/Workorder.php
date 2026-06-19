@@ -21,6 +21,7 @@ class Workorder extends Model
         'jenis_workorder_id',
         'assigned_to',
         'created_by',
+        'lembur_spl_id',
     ];
 
     protected $guarded = [];
@@ -97,6 +98,12 @@ class Workorder extends Model
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    // Pengajuan lembur untuk WO ini (1:1, nullable). NULL = WO non-lembur.
+    public function lemburSpl()
+    {
+        return $this->belongsTo(LemburSpl::class, 'lembur_spl_id');
     }
 
     public function workorderAssignment()

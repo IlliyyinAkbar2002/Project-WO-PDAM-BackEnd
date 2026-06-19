@@ -32,11 +32,6 @@ class LemburSpl extends Model
         return $this->belongsTo(MasterLocation::class, 'location_id');
     }
 
-    public function status()
-    {
-        return $this->belongsTo(Status::class, 'status_id');
-    }
-
     /**
      * Pemohon (SPV / pegawai yang mengajukan lembur).
      * Diisi otomatis dari auth pegawai di endpoint store.

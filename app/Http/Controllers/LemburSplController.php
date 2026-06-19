@@ -5,11 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\LemburSpl;
 use App\Models\LemburSplMember;
 use App\Models\MasterLocation;
-use App\Models\Status;
 use App\Models\User;
 use App\Models\Workorder;
 use App\Notifications\WorkOrderNotification;
-
 use App\Services\LemburApprovalService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +18,6 @@ class LemburSplController extends Controller
 {
     private array $defaultWith = [
         'workorder',
-        'status',
         'pemohon.pegawai:id,nama,nip',
         'verifikator.pegawai:id,nama,nip',
         'members.user.pegawai',
@@ -68,17 +65,17 @@ class LemburSplController extends Controller
             ],
         ]);
 
-        $workorder = Workorder::with('status')->findOrFail($validated['workorder_id']);
+        $workorder = Workorder::findOrFail($validated['workorder_id']);
 
-
-        if ((int) $workorder->assigned_to !== (int) $request->user()->id) {
+        if ((int) $workorder->assigned_to !== (int) $request->user()->pegawai_id) {
             return response()->json([
                 'error' => 'Hanya SPV yang ditugaskan pada WO ini yang bisa mengajukan lembur.',
             ], 403);
         }
-        if (optional($workorder->status)->kode !== 'DITUGASKAN_KE_SPV') {
+
+        if ($workorder->status !== 'Pending') {
             return response()->json([
-                'error' => 'WO tidak pada status DITUGASKAN_KE_SPV (belum bisa diajukan lembur atau sudah ditugaskan).',
+                'error' => "WO tidak pada status 'Pending', tidak bisa diajukan lembur (status saat ini: {$workorder->status}).",
             ], 422);
         }
         if ($workorder->lembur_spl_id) {
@@ -86,9 +83,6 @@ class LemburSplController extends Controller
                 'error' => 'WO ini sudah memiliki pengajuan lembur.',
             ], 422);
         }
-
-        $statusAwalId = Status::where('kode', 'BELUM_DISETUJUI')->value('id')
-            ?? Status::query()->min('id');
 
         DB::beginTransaction();
         try {
@@ -120,7 +114,7 @@ class LemburSplController extends Controller
                 'latitude'           => $validated['latitude'] ?? null,
                 'longitude'          => $validated['longitude'] ?? null,
                 'location_id'        => $locationId,
-                'status_id'          => $statusAwalId,
+                'status'             => 'pending', // status awal pengajuan lembur
                 'waktu_pengajuan'    => now(),
             ]);
 
@@ -180,32 +174,43 @@ class LemburSplController extends Controller
 
     public function update(Request $request, $id)
     {
+        // Verifikasi lembur (approve/reject) adalah wewenang Superadmin (role_id 1),
+        // konsisten dengan KpiService::isSuperAdmin(). Role 2=Admin, 3=Manager.
+        if ((int) $request->user()->role_id !== 1) {
+            return response()->json([
+                'error' => 'Hanya Superadmin yang dapat memverifikasi (approve/reject) pengajuan lembur.',
+            ], 403);
+        }
+
         $validatedData = $request->validate([
             'verifikator_id' => 'nullable|exists:users,id',
-            'status_id' => 'required|exists:m_status,id',
-            'alasan_ditolak' => 'nullable|string'
+            'status'         => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+            'alasan_ditolak' => 'nullable|string',
         ]);
-
-        $disetujuiId = Status::where('kode', 'DISETUJUI')->value('id');
 
         DB::beginTransaction();
         try {
             $lemburSpl = LemburSpl::with(['workorder.workorderAssignment', 'members'])->findOrFail($id);
-            $previousStatusId = $lemburSpl->status_id;
+            $previousStatus = $lemburSpl->status;
 
             $lemburSpl->update([
-                'verifikator_id' => $validatedData['verifikator_id'],
-                'status_id' => $validatedData['status_id'],
+                'verifikator_id'   => $validatedData['verifikator_id'],
+                'status'           => $validatedData['status'],
                 'waktu_verifikasi' => now(),
-                'alasan_ditolak' => $validatedData['alasan_ditolak'] ?? null,
+                'alasan_ditolak'   => $validatedData['alasan_ditolak'] ?? null,
             ]);
 
-            // APPROVE (transisi baru ke DISETUJUI) → tugaskan staff ke WO.
-            $isNewApproval = $disetujuiId !== null
-                && (int) $validatedData['status_id'] === (int) $disetujuiId
-                && (int) $previousStatusId !== (int) $disetujuiId;
+            // APPROVE = status baru berpindah ke 'approved'.
+            $isNewApproval = $validatedData['status'] === 'approved'
+                && $previousStatus !== 'approved';
 
             if ($isNewApproval) {
+                $workorder = $lemburSpl->workorder;
+                if ($workorder && $workorder->status === 'Pending') {
+                    $workorder->update(['status' => 'Proses']);
+                }
+
+                // Auto-assign: replikasi anggota lembur → staff WO (wo_assignment_member).
                 (new LemburApprovalService())->approveAndAssign($lemburSpl);
             }
 
@@ -223,9 +228,6 @@ class LemburSplController extends Controller
                     $workorderId = (int) $lemburSpl->workorder_id;
                     $namaWo      = optional($lemburSpl->workorder)->nama_workorder ?? "#$workorderId";
 
-                    // verifikator_id menyimpan users.id (lihat validasi exists:users,id),
-                    // jadi resolve nama via User->pegawai, bukan relasi verifikator() yang
-                    // (saat ini) salah memetakan ke Pegawai. Lihat catatan tech debt.
                     $verifUser  = $lemburSpl->verifikator_id
                         ? User::with('pegawai')->find($lemburSpl->verifikator_id)
                         : null;

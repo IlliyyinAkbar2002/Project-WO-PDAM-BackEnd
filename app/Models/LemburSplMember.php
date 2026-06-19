@@ -24,9 +24,12 @@ class LemburSplMember extends Model
         return $this->belongsTo(LemburSpl::class, 'lembur_spl_id');
     }
 
+    /**
+     * Anggota lembur disimpan sebagai users.id di kolom `user_id`.
+     * Eager-load `members.user.pegawai` → User → Pegawai (lihat defaultWith).
+     */
     public function user()
     {
-        return $this->belongsTo(Pegawai::class, 'pegawai_id')
-            ->with(['pegawai:id,nama,nip']);
+        return $this->belongsTo(User::class, 'user_id');
     }
 }
