@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Jabatan;
 use App\Models\LemburSpl;
 use App\Models\LemburSplMember;
 use App\Models\MasterLocation;
+use App\Models\Pegawai;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\Workorder;
 use App\Notifications\WorkOrderNotification;
@@ -43,6 +46,13 @@ class LemburSplController extends Controller
 
     public function store(Request $request)
     {
+        // Referensi "petugas lapangan": role employee + jabatan Staff Senior/Staff,
+        // dan harus satu departemen dengan pemohon (SPV). Diresolusi by nama agar tidak
+        // bergantung pada magic id yang rapuh terhadap urutan seeding.
+        $employeeRoleId    = Role::where('nama', 'employee')->value('id');
+        $allowedJabatanIds = Jabatan::whereIn('nama', ['Staff Senior', 'Staff'])->pluck('id')->all();
+        $pemohonDeptId     = Pegawai::whereKey($request->user()->pegawai_id)->value('departemen_id');
+
         $validated = $request->validate([
             'workorder_id'       => ['required', Rule::exists('workorder', 'id')],
             'judul_pekerjaan'    => 'required|string|max:255',
@@ -56,14 +66,35 @@ class LemburSplController extends Controller
             'nama_lokasi'        => 'nullable|string',
             'location_id'        => 'nullable|integer',
 
-            // Anggota tim — minimal 1, harus user yang valid dan role petugas (3), tidak boleh duplikat.
+            // Anggota minimal 1, dikirim FE sebagai pegawai_id (m_pegawai.id), tidak duplikat.
+            // Syarat petugas lapangan (role/departemen/jabatan) dicek setelah validate.
             'members'            => 'required|array|min:1',
             'members.*'          => [
                 'integer',
                 'distinct',
-                Rule::exists('users', 'id')->where('role_id', 3),
+                Rule::exists('m_pegawai', 'id'),
             ],
         ]);
+
+        
+        // members dikirim sebagai pegawai_id. Petugas lapangan yang sah = pegawai pada
+        // departemen yang sama dengan pemohon (SPV), berjabatan Staff Senior/Staff, dan
+        // punya akun user dengan role employee.
+        $validMembers = Pegawai::whereIn('id', $validated['members'])
+            ->where('departemen_id', $pemohonDeptId)
+            ->whereIn('jabatan_id', $allowedJabatanIds)
+            ->whereHas('user', fn ($q) => $q->where('role_id', $employeeRoleId))
+            ->pluck('id')
+            ->all();
+
+        $invalidMembers = array_values(array_diff($validated['members'], $validMembers));
+
+        if (!empty($invalidMembers)) {
+            return response()->json([
+                'error'   => 'Sebagian anggota tim tidak memenuhi syarat: harus satu departemen dengan pemohon (SPV) dan berjabatan Staff Senior/Staff.',
+                'members' => array_values($invalidMembers),
+            ], 422);
+        }
 
         $workorder = Workorder::findOrFail($validated['workorder_id']);
 
@@ -118,11 +149,15 @@ class LemburSplController extends Controller
                 'waktu_pengajuan'    => now(),
             ]);
 
+            // FK lembur_spl_member.user_id menunjuk ke users.id, sedangkan members masuk
+            // sebagai pegawai_id. Petakan pegawai_id -> users.id sebelum insert.
+            $pegToUser = User::whereIn('pegawai_id', $validated['members'])->pluck('id', 'pegawai_id');
+
             $rows = collect($validated['members'])
                 ->unique()
-                ->map(fn ($userId) => [
+                ->map(fn ($pegId) => [
                     'lembur_spl_id' => $lemburSpl->id,
-                    'user_id'       => (int) $userId,
+                    'user_id'       => (int) $pegToUser[$pegId],
                     'created_at'    => now(),
                     'updated_at'    => now(),
                 ])

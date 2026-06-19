@@ -17,16 +17,18 @@ class StaffTestSeeder extends Seeder
         $departemen = Departemen::firstOrCreate(['nama' => 'Operasional']);
 
         $jabSpv    = Jabatan::firstOrCreate(['nama' => 'Supervisor']);
-        $jabSenior = Jabatan::firstOrCreate(['nama' => 'Senior Staff']);
+        $jabSenior = Jabatan::firstOrCreate(['nama' => 'Staff Senior']);
         $jabStaff  = Jabatan::firstOrCreate(['nama' => 'Staff']);
 
-        $role = Role::firstOrCreate(['nama' => 'Petugas Lapangan']);
+        // Petugas lapangan = role employee (bukan role khusus). Dibuat oleh RoleFactory
+        // di DatabaseSeeder; firstOrCreate hanya jaring pengaman bila seeder dijalankan sendiri.
+        $role = Role::firstOrCreate(['nama' => 'employee']);
 
         // 1 SPV — pegawai inilah yang dipakai sebagai workorder.assigned_to.
         $spv = Pegawai::updateOrCreate(
             ['nip' => 'SPV-001'],
             [
-                'nama'          => 'Slamet Supervisor',
+                'nama'          => 'Illiyin Akbar',
                 'jenis_kelamin' => 'Laki-laki',
                 'tanggal_lahir' => '1985-05-10',
                 'alamat'        => 'Jl. Operasional No. 1, Surabaya',
@@ -40,7 +42,7 @@ class StaffTestSeeder extends Seeder
         $senior = Pegawai::updateOrCreate(
             ['nip' => 'STF-001'],
             [
-                'nama'          => 'Budi Senior',
+                'nama'          => 'David Jakeior',
                 'jenis_kelamin' => 'Laki-laki',
                 'tanggal_lahir' => '1990-03-15',
                 'alamat'        => 'Jl. Operasional No. 2, Surabaya',
@@ -54,7 +56,7 @@ class StaffTestSeeder extends Seeder
         $staff = Pegawai::updateOrCreate(
             ['nip' => 'STF-002'],
             [
-                'nama'          => 'Andi Staff',
+                'nama'          => 'Andi Ahmad',
                 'jenis_kelamin' => 'Laki-laki',
                 'tanggal_lahir' => '1995-07-20',
                 'alamat'        => 'Jl. Operasional No. 3, Surabaya',
@@ -67,7 +69,7 @@ class StaffTestSeeder extends Seeder
         $accounts = [
             ['email' => 'iyyin@gmail.com',    'pegawai' => $spv],
             ['email' => 'david123@gmail.com', 'pegawai' => $senior],
-            ['email' => 'budi@gmail.com',  'pegawai' => $staff],
+            ['email' => 'andi@gmail.com',  'pegawai' => $staff],
         ];
 
         foreach ($accounts as $acc) {

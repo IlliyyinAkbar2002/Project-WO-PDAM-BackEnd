@@ -38,8 +38,8 @@ class LemburSpl extends Model
      */
     public function pemohon()
     {
-        return $this->belongsTo(Pegawai::class, 'pemohon_id')
-            ->with(['pegawai:id,nama,nip']);
+        return $this->belongsTo(User::class, 'pemohon_id')
+            ->with('pegawai:id,nama,nip');
     }
 
     /**
@@ -48,8 +48,8 @@ class LemburSpl extends Model
      */
     public function verifikator()
     {
-        return $this->belongsTo(Pegawai::class, 'verifikator_id')
-            ->with(['pegawai:id,nama,nip']);
+        return $this->belongsTo(User::class, 'verifikator_id')
+            ->with('pegawai:id,nama,nip');
     }
 
     /**

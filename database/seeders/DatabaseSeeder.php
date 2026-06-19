@@ -86,24 +86,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'manager@gmail.com',
             'password' => bcrypt('password'),
         ]);
-        User::updateOrCreate([
-            'pegawai_id' => 4,
-            'role_id' => 3,
-            'email' => 'employee@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::updateOrCreate([
-            'pegawai_id' => 5,
-            'role_id' => 3,
-            'email' => 'david123@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
-        User::updateOrCreate([
-            'pegawai_id' => 6,
-            'role_id' => 3,
-            'email' => 'budi123@gmail.com',
-            'password' => bcrypt('password'),
-        ]);
         User::factory(7)->create();
         JenisWorkorder::factory(9)->create();
         MasterAction::factory(4)->create();
