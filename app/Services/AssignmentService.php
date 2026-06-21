@@ -53,7 +53,6 @@ class AssignmentService
                     'estimasi_selesai' => $data['estimasi_selesai'] ?? null,
                     'latitude'         => $data['latitude'] ?? null,
                     'longitude'        => $data['longitude'] ?? null,
-                    'accuracy'         => $data['accuracy'] ?? null,
                     'location_id'      => $locationId,
                 ]
             );

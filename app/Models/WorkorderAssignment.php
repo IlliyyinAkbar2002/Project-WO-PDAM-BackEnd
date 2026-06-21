@@ -19,7 +19,6 @@ class WorkorderAssignment extends Model
         'estimasi_selesai' => 'datetime',
         'latitude'         => 'float',
         'longitude'        => 'float',
-        'accuracy'         => 'float',
         'location_id'      => 'integer',
     ];
 

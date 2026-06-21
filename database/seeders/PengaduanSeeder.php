@@ -116,6 +116,16 @@ class PengaduanSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
+            [
+                'kode_pengaduan' => 'PGD-011',
+                'judul' => 'Saluran air bocor',
+                'deskripsi' => 'Aliran air tidak lancar dan sering mati karena bocor',
+                'lokasi' => 'Kecipik, Boteng, Menganti, Gresik Regency',
+                'status' => 'Pending',
+                'tanggal_pengaduan' => Carbon::now()->subDays(9),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ]);
     }
 

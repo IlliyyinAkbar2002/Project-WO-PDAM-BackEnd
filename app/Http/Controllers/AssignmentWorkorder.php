@@ -53,7 +53,6 @@ class AssignmentWorkorder extends Controller
             'petugas.*.peran'      => 'nullable|in:koordinator,anggota',
             'latitude'          => 'nullable|numeric|between:-90,90',
             'longitude'         => 'nullable|numeric|between:-180,180',
-            'accuracy'          => 'nullable|numeric|min:0',
             'nama_lokasi'       => 'nullable|string|max:255',
             'deskripsi'         => 'nullable|string',
             'tanggal_mulai'     => 'nullable|date',
