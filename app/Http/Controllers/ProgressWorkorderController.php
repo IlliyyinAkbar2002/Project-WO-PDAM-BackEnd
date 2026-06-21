@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\LaporanWorkorder;
+use App\Models\Pengaduan;
 use App\Models\ProgressDetail;
 use App\Models\ProgressWorkorder;
 use App\Models\User;
@@ -688,7 +689,6 @@ class ProgressWorkorderController extends Controller
             'progress_id'      => 'required|exists:progress_workorder,id',
             'decision'         => 'required|in:accept,revisi,tolak',
             'approval_notes'   => 'nullable|string',
-            'alasan_penolakan' => 'nullable|string',
             'field_to_revise'  => 'nullable|array',
         ]);
 
@@ -724,6 +724,11 @@ class ProgressWorkorderController extends Controller
                 ]);
 
                 $workorder->update(['status' => 'Selesai']);
+
+                if ($workorder->kode_pengaduan) {
+                    Pengaduan::where('kode_pengaduan', $workorder->kode_pengaduan)
+                        ->update(['status' => Pengaduan::STATUS_SELESAI]);
+                }
 
                 $workorder->loadMissing(['meter', 'jaringan', 'infrastruktur', 'assignmentMembers.pegawai']);
 
@@ -763,8 +768,7 @@ class ProgressWorkorderController extends Controller
                     'status'                => 'rejected',
                     'reviewed_by_user_id'   => $userId,
                     'reviewed_at'           => now(),
-                    'alasan_penolakan'      => $validated['alasan_penolakan'] ?? null,
-                    'field_to_revise'       => $fieldToReviseStr,
+                    'alasan_revisi'      => $validated['alasan_revisi'] ?? null
                 ]);
 
                 // WO tetap berjalan; staff melakukan perbaikan lalu resubmit.
@@ -777,7 +781,7 @@ class ProgressWorkorderController extends Controller
                     'status'                => 'rejected',
                     'reviewed_by_user_id'   => $userId,
                     'reviewed_at'           => now(),
-                    'alasan_penolakan'      => $validated['alasan_penolakan'] ?? null,
+                    'alasan_revisi'      => $validated['alasan_revisi'] ?? null,
                 ]);
 
                 $workorder->update(['status' => 'Tutup']);

@@ -27,7 +27,7 @@ class Pengaduan extends Model
     public const STATUS_PENDING = 'Pending';
     public const STATUS_PROSES = 'Proses';
     public const STATUS_SELESAI = 'Selesai';
-    public const STATUS_DITOLAK = 'Ditolak';
+    public const STATUS_DITUTUP = 'Ditutup';
 
     public function workorders()
     {

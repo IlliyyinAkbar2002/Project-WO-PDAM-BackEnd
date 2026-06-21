@@ -22,7 +22,7 @@ class CreatePengaduansTable extends Migration
                 'Pending',
                 'Proses',
                 'Selesai',
-                'Ditolak'
+                'Ditutup'
             ])->default('Pending');
             $table->timestamp('tanggal_pengaduan')->nullable();
             $table->timestamps();

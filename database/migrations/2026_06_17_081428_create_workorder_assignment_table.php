@@ -22,7 +22,6 @@ class CreateWorkorderAssignmentTable extends Migration
             $table->timestamp('estimasi_selesai')->nullable();
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
-            $table->float('accuracy')->nullable();
             $table->foreignId('location_id')->nullable()->constrained('m_location');
             $table->timestamps();
 

@@ -97,6 +97,6 @@ class DatabaseSeeder extends Seeder
         $this->call(StaffTestSeeder::class);
 
         // Master material berstok untuk uji peminjaman material di FE Mobile.
-        $this->call(MaterialSeeder::class);
+        // $this->call(MaterialSeeder::class);
     }
 }

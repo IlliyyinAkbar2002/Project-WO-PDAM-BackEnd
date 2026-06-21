@@ -25,8 +25,7 @@ class CreateProgressDetail extends Migration
             $table->timestamp('reviewed_at')->nullable();
 
             // Rejection metadata
-            $table->text('alasan_penolakan')->nullable();
-            $table->string('field_to_revise')->nullable()
+            $table->string('alasan_revisi')->nullable()
                 ->comment('Comma-separated: photo,description,location,etc');
 
             $table->timestamps();
