@@ -37,6 +37,36 @@ class PengaduanController extends Controller
         }
     }
 
+    public function options()
+    {
+        try {
+            $pengaduan = Pengaduan::query()
+                ->select([
+                    'id',
+                    'kode_pengaduan',
+                    'judul',
+                    'lokasi',
+                    'status',
+                    'tanggal_pengaduan',
+                ])
+                ->orderBy('tanggal_pengaduan', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data pengaduan berhasil diambil',
+                'data' => $pengaduan,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data pengaduan',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Show the form for creating a new resource.
      *
