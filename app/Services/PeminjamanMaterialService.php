@@ -50,7 +50,7 @@ class PeminjamanMaterialService
                 throw new \LogicException('Material tidak ditemukan.');
             }
 
-            $tersedia = $material->jumlah_stok - $material->terpakai;
+            $tersedia = $material->tersedia; // jumlah_stok - terpakai - rusak
             if ($data['jumlah_pinjam'] > $tersedia) {
                 throw new \LogicException(
                     "Stok material tidak mencukupi. Tersedia: {$tersedia}."
@@ -70,7 +70,7 @@ class PeminjamanMaterialService
                 'status'        => 'DIPINJAM',
             ]);
 
-            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai']);
+            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai,rusak']);
         });
     }
 
@@ -102,14 +102,20 @@ class PeminjamanMaterialService
                 throw new \LogicException('Jumlah kembali tidak boleh lebih dari jumlah yang dipinjam.');
             }
 
+            $jumlahRusak = (int) ($data['jumlah_rusak'] ?? 0);
+            if ($jumlahRusak > $data['jumlah_kembali']) {
+                throw new \LogicException('Jumlah rusak tidak boleh lebih dari jumlah yang dikembalikan.');
+            }
+
             $pinjaman->jumlah_kembali  = $data['jumlah_kembali'];
+            $pinjaman->jumlah_rusak    = $jumlahRusak;
             $pinjaman->kondisi_kembali = $data['kondisi_kembali'] ?? null;
             $pinjaman->status          = 'PENDING_KEMBALI';
             $pinjaman->save();
 
             $this->notifyReturnSubmitted($workorder, $pinjaman, $pegawaiId);
 
-            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai']);
+            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai,rusak']);
         });
     }
 
@@ -147,10 +153,18 @@ class PeminjamanMaterialService
                     ->lockForUpdate()
                     ->first();
                 if ($material && $pinjaman->jumlah_kembali > 0) {
+                    // Semua yang dikembalikan keluar dari "terpakai" (tidak jadi konsumsi WO).
                     $material->terpakai -= $pinjaman->jumlah_kembali;
                     if ($material->terpakai < 0) {
                         $material->terpakai = 0;
                     }
+
+                    // Bagian yang rusak tidak balik ke stok tersedia: parkir di kolom rusak.
+                    $rusak = (int) ($pinjaman->jumlah_rusak ?? 0);
+                    if ($rusak > 0) {
+                        $material->rusak += $rusak;
+                    }
+
                     $material->save();
                 }
 
@@ -159,6 +173,7 @@ class PeminjamanMaterialService
             } else {
                 $pinjaman->status          = 'DIPINJAM';
                 $pinjaman->jumlah_kembali  = null;
+                $pinjaman->jumlah_rusak    = null;
                 $pinjaman->kondisi_kembali = null;
                 $pinjaman->dikembalikan_at = null;
             }
@@ -167,7 +182,7 @@ class PeminjamanMaterialService
 
             $this->notifyVerified($workorder, $pinjaman, $statusInput);
 
-            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai']);
+            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai,rusak']);
         });
     }
 

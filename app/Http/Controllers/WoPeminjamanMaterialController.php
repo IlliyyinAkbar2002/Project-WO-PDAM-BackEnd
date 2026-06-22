@@ -19,7 +19,7 @@ class WoPeminjamanMaterialController extends Controller
     public function index($workorder_id)
     {
         $peminjaman = WoPeminjamanMaterial::with([
-            'material:kode_material,nama,jumlah_stok,terpakai',
+            'material:kode_material,nama,jumlah_stok,terpakai,rusak',
             'pengaju:id,nama,nip',
             'verifier:id,nama,nip',
         ])
@@ -82,6 +82,7 @@ class WoPeminjamanMaterialController extends Controller
     {
         $data = $request->validate([
             'jumlah_kembali'  => 'required|integer|min:0',
+            'jumlah_rusak'    => 'nullable|integer|min:0',
             'kondisi_kembali' => 'nullable|string',
         ]);
 

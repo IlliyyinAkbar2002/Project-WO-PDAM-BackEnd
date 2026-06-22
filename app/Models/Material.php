@@ -26,7 +26,7 @@ class Material extends Model
 
     public function getTersediaAttribute()
     {
-        return $this->jumlah_stok - $this->terpakai;
+        return $this->jumlah_stok - $this->terpakai - $this->rusak;
     }
 
     public function role()
