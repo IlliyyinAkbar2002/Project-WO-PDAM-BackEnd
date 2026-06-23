@@ -1151,4 +1151,32 @@ class ProgressWorkorderController extends Controller
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
+
+    public function monitoring()
+    {
+        $workorders = Workorder::with([
+            'workorderAssignment',
+            'assignmentMembers'
+        ])->get();
+
+        $data = $workorders->map(function ($wo) {
+            $maxTahapan = ProgressWorkorder::where(
+                'workorder_id',
+                $wo->id
+            )
+            ->whereNotNull('waktu_submit')
+            ->max('tahapan');
+
+            $progressPercentage = $maxTahapan
+                ? round(($maxTahapan / 4) * 100)
+                : 0;
+            return [
+                'id' => $wo->id,
+                'nama_workorder' => $wo->nama_workorder,
+                'status' => $wo->status,
+                'progress_percentage' => $progressPercentage,
+            ];
+        });
+        return response()->json($data);
+    }
 }
