@@ -98,10 +98,7 @@ Route::prefix('v1')->group(function () {
         Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show'])->whereNumber('id');
         Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
         Route::post('progress-workorder/{id}/cancel', [ProgressWorkorderController::class, 'cancel'])->whereNumber('id');
-<<<<<<< HEAD
         // Monitoring Progress — untuk dashboard Superadmin Web NextJS, menampilkan semua progress dengan filter lebih lengkap (status, departemen, tanggal, dll).
-=======
->>>>>>> e969f314c1a0281e146aaaca9adc32eb2868098f
         Route::get('progress-workorder/monitoring', [ProgressWorkorderController::class, 'monitoring']);
 
 
