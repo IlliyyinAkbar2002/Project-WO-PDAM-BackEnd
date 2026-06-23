@@ -44,6 +44,8 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         // Workorder resources Web NextJS and Flutter Mobile
+        Route::get('workorder/history',[WorkorderController::class, 'history']);
+        Route::get('workorder/history/{id}',[WorkorderController::class, 'historyDetail']);
         Route::apiResource('workorder', WorkorderController::class);
         Route::post('workorder', [WorkorderController::class, 'store']);
         Route::patch('workorder/{id}/status', [WorkorderController::class, 'updateStatus']);
