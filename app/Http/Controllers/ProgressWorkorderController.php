@@ -1095,10 +1095,10 @@ class ProgressWorkorderController extends Controller
                 'workorderAssignment',
             ])->findOrFail($workorderId);
 
-            $assignment      = $workorder->workorderAssignment;
-            $tanggalMulai    = optional($assignment)->tanggal_mulai;
-            $estimasiSelesai = optional($assignment)->estimasi_selesai;
-            $totalDays       = $this->estimasiHari($tanggalMulai, $estimasiSelesai);
+            // $assignment      = $workorder->workorderAssignment;
+            // $tanggalMulai    = optional($assignment)->tanggal_mulai;
+            // $estimasiSelesai = optional($assignment)->estimasi_selesai;
+            // $totalDays       = $this->estimasiHari($tanggalMulai, $estimasiSelesai);
 
             $membersSummary = $workorder->assignmentMembers->map(function ($member) use ($workorderId) {
                 $pegawaiId = (int) $member->pegawai_id;
@@ -1128,21 +1128,21 @@ class ProgressWorkorderController extends Controller
                 ];
             });
 
-            $teamStats = [
-                'total_members'           => $workorder->assignmentMembers->count(),
-                'avg_progress_percentage' => $membersSummary->avg('statistics.progress_percentage'),
-            ];
+            // $teamStats = [
+            //     'total_members'           => $workorder->assignmentMembers->count(),
+            //     'avg_progress_percentage' => $membersSummary->avg('statistics.progress_percentage'),
+            // ];
 
             return response()->json([
                 'workorder' => [
                     'id'               => $workorder->id,
                     'nama_workorder'   => $workorder->nama_workorder,
                     'status'           => $workorder->status,
-                    'tanggal_mulai'    => $tanggalMulai,
-                    'estimasi_selesai' => $estimasiSelesai,
-                    'estimasi_hari'    => $totalDays,
+                    // 'tanggal_mulai'    => $tanggalMulai,
+                    // 'estimasi_selesai' => $estimasiSelesai,
+                    // 'estimasi_hari'    => $totalDays,
                 ],
-                'team_statistics' => $teamStats,
+                // 'team_statistics' => $teamStats,
                 'members'         => $membersSummary,
             ], 200);
         } catch (ModelNotFoundException $e) {
