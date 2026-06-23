@@ -96,7 +96,7 @@ Route::prefix('v1')->group(function () {
         Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show'])->whereNumber('id');
         Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
         Route::post('progress-workorder/{id}/cancel', [ProgressWorkorderController::class, 'cancel'])->whereNumber('id');
-        Route::get('progress-workorder-monitoring', [ProgressWorkorderController::class, 'monitoring']);
+        Route::get('progress-workorder/monitoring', [ProgressWorkorderController::class, 'monitoring']);
 
         // Progress Detail — riwayat review (read-only) Flutter Mobile and Web NextJS
         Route::get('progress-detail', [ProgressDetailController::class, 'index']);
