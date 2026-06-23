@@ -59,7 +59,10 @@ class AssignmentService
 
             $this->attachMembers($assignment, $data['petugas']);
 
-            $workorder->update(['status' => self::STATUS_AFTER_ASSIGN]);
+            $workorder->update([
+                'status'    => self::STATUS_AFTER_ASSIGN,
+                'deskripsi' => $data['deskripsi'] ?? $workorder->deskripsi,
+            ]);
 
             $this->notifyStaffAssigned($workorder, $data['petugas'], $actor);
 
