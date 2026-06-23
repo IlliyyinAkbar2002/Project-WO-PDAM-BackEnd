@@ -173,7 +173,6 @@ class WorkorderController extends Controller
                     'error'        => $e->getMessage(),
                 ]);
             }
-
             return response()->json([
                 'message' => 'Workorder berhasil disimpan',
                 'data' => $workorder,
