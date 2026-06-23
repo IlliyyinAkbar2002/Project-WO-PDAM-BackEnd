@@ -160,7 +160,7 @@ class PengaduanSeeder extends Seeder
                 'kode_pengaduan' => 'PGD-015',
                 'judul' => 'Pipa distribusi pecah',
                 'deskripsi' => 'Pipa utama pecah sehingga air menggenangi jalan.',
-                'lokasi' => 'Jl. Raya Kendangsari No. 23, Tenggilis Mejoyo, Surabaya',
+                'lokasi' => 'Jl. Joyoboyo, Sawunggaling, Kec. Wonokromo, Surabaya',
                 'status' => 'Pending',
                 'tanggal_pengaduan' => Carbon::now()->subDays(14),
                 'created_at' => now(),
