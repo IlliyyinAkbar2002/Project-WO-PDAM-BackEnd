@@ -110,8 +110,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('lembur-spl', LemburSplController::class);
 
         // Pengaduan Web NextJS
-        Route::apiResource('pengaduan', PengaduanController::class);
         Route::get('pengaduan/options', [PengaduanController::class, 'options']);
+        Route::apiResource('pengaduan', PengaduanController::class);
 
         // Jenis Work Order Web NextJS
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);
