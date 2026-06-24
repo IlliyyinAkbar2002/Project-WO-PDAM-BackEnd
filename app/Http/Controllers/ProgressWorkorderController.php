@@ -71,6 +71,36 @@ class ProgressWorkorderController extends Controller
         return null;
     }
 
+    /**
+     * Validasi urutan tahapan (defense-in-depth, selaras hard-guard FE).
+     * PROGRESS: tahapan ∈ [maxTahapan, min(maxTahapan+1, PENGUJIAN)], wajib ≥1.
+     * SELESAI : butuh maxTahapan ≥ PENGUJIAN. INSPEKSI/MULAI dilewati (tahapan dipaksa server).
+     * Return JsonResponse 422 bila melanggar, null bila lolos.
+     */
+    private function rejectIfTahapanInvalid(Workorder $workorder, string $tipeKode, ?int $tahapan): ?\Illuminate\Http\JsonResponse
+    {
+        $maxTahapan = (int) $this->tahapanTertinggi($workorder->id); // 0 bila belum ada
+
+        if ($tipeKode === 'PROGRESS') {
+            $tahapan = (int) $tahapan; // null → 0
+            if ($tahapan < TahapanWorkorder::PERSIAPAN) {
+                return response()->json(['error' => 'Tahapan progress wajib diisi (1-3).'], 422);
+            }
+            if ($tahapan < $maxTahapan) {
+                return response()->json(['error' => "Tahap {$tahapan} sudah dilewati. Tidak bisa mundur."], 422);
+            }
+            if ($tahapan > $maxTahapan + 1 || $tahapan > TahapanWorkorder::PENGUJIAN) {
+                return response()->json(['error' => 'Selesaikan tahap sebelumnya dulu sebelum lanjut.'], 422);
+            }
+        }
+
+        if ($tipeKode === 'SELESAI' && $maxTahapan < TahapanWorkorder::PENGUJIAN) {
+            return response()->json(['error' => 'Selesaikan tahap Pengujian terlebih dahulu sebelum menyelesaikan work order.'], 422);
+        }
+
+        return null;
+    }
+
     /** Apakah pegawai ini anggota tim WO. */
     private function isMember(Workorder $workorder, ?int $pegawaiId): bool
     {
@@ -387,6 +417,10 @@ class ProgressWorkorderController extends Controller
             }
         }
 
+        if ($guardError = $this->rejectIfTahapanInvalid($workorder, $tipeProgressKode, $validated['tahapan'] ?? null)) {
+            return $guardError;
+        }
+
         DB::beginTransaction();
         try {
             $order = ((int) ProgressWorkorder::where('workorder_id', $workorder->id)->max('order')) + 1;
@@ -526,7 +560,8 @@ class ProgressWorkorderController extends Controller
 
         DB::beginTransaction();
         try {
-            $tahapan = $validated['tahapan'] ?? $progress->tahapan;
+            // Resubmit memperbaiki ISI milestone yang ditolak, bukan menggeser tahap.
+            $tahapan = $progress->tahapan; // pertahankan tahapan asli; abaikan override klien
             if ($progress->tipe_progress === 'selesai') {
                 $tahapan = TahapanWorkorder::DOKUMENTASI;
             } elseif ($progress->tipe_progress === 'inpeksi') {
