@@ -81,6 +81,56 @@ class WorkorderController extends Controller
         }
     }
 
+    public function history(Request $request)
+    {
+        try {
+            $search = $request->query('search');
+            $page = $request->query('page', 1);
+            $limit = $request->query('limit', 10);
+            $query = Workorder::with([
+                'pengaduan',
+                'departemen',
+                'jenisWorkorder',
+                'workorderAssignment.location',
+                'workorderAssignment.spv',
+                'workorderAssignment.picMember.pegawai',
+                'assignmentMembers.pegawai',
+                'laporanWorkorder',
+                'progressWorkorder' => function ($q) {
+                    $q->latest();
+                }
+            ])->where('status', 'Selesai');
+
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('nama_workorder', 'ILIKE', "%{$search}%")
+                        ->orWhere('kode_pengaduan', 'ILIKE', "%{$search}%");
+                });
+            }
+
+            $history = $query
+                ->orderBy('updated_at', 'desc')
+                ->paginate(
+                    $limit,
+                    ['*'],
+                    'page',
+                    $page
+                );
+            return response()->json([
+                'success' => true,
+                'data' => $history->items(),
+                'totalPages' => $history->lastPage(),
+                'currentPage' => $history->currentPage(),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil history workorder',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Store a newly created resource in storage.
      *
@@ -209,6 +259,47 @@ class WorkorderController extends Controller
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function historyDetail($id)
+    {
+        try {
+            $workorder = Workorder::with([
+                'pengaduan',
+                'departemen',
+                'jenisWorkorder',
+                'assignedTo',
+                'createdBy',
+                'workorderAssignment.location',
+                'workorderAssignment.spv',
+                'workorderAssignment.picMember.pegawai',
+                'workorderAssignment.members.pegawai',
+                'progressWorkorder' => function ($q) {
+                    $q->with([
+                        'dokumentasiProgress',
+                        'latestDetail'
+                    ])->orderBy('created_at', 'desc');
+                },
+                'laporanWorkorder',
+            ])
+            ->where('id', $id)
+            ->where('status', 'Selesai')
+            ->firstOrFail();
+            return response()->json([
+                'success' => true,
+                'workorder' => $workorder,
+                'assignment' => $workorder->workorderAssignment,
+                'members' => $workorder->assignmentMembers,
+                'progress' => $workorder->progressWorkorder,
+                'laporan' => $workorder->laporanWorkorder,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil detail history workorder',
                 'error' => $e->getMessage(),
             ], 500);
         }
