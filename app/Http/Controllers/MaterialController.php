@@ -17,10 +17,7 @@ class MaterialController extends Controller
     {
         try {
             $material = Material::with('pegawai:id,nama')
-            ->get()
-            ->each(function ($material) {
-                $material->append('tersedia');
-            });
+            ->get();
             return response()->json($material, 200);
         } catch (\Exception $e) {
             return response()->json([

@@ -17,7 +17,6 @@ class CreateMaterialsTable extends Migration
             $table->integer('kode_material')->primary();
             $table->string('nama');
             $table->integer('jumlah_stok');
-            $table->integer('terpakai')->default(0);
             $table->integer('rusak')->default(0);
             $table->foreignId('pegawai_id')->constrained('m_pegawai');
             $table->timestamps();
