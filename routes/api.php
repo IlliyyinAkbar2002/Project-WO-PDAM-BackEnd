@@ -152,9 +152,8 @@ Route::prefix('v1')->group(function () {
 
         // Master Material Web NextJS
         Route::get('material/generate-code', [MaterialController::class, 'generateCode']);
-        Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
         Route::put('material/{kode_material}/edit', [MaterialController::class, 'edit']);
-        Route::apiResource('material', MaterialController::class);
+        Route::apiResource('material', MaterialController::class)->except(['update']);
         Route::post('material', [MaterialController::class, 'store']);
     });
 });

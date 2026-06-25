@@ -52,7 +52,6 @@ class MaterialController extends Controller
         ]);
         $user = Auth::user();
         $validatedData['pegawai_id'] = $user->pegawai_id;
-        $validatedData['terpakai'] = 0;
         $material = Material::create($validatedData);
         return response()->json([
             'message' => 'Data material berhasil ditambahkan',
@@ -122,36 +121,6 @@ class MaterialController extends Controller
 
         return response()->json([
             'message' => 'Material berhasil diperbarui',
-            'data' => $material->append('tersedia')
-        ]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Material  $material
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $kode_material)
-    {
-        $request->validate([
-        'jumlah_pakai' => 'required|integer|min:1'
-        ]);
-
-        $material = Material::findOrFail($kode_material);
-
-        if ($material->terpakai + $request->jumlah_pakai > $material->jumlah_stok) {
-            return response()->json([
-                'message' => 'Stok tidak mencukupi'
-            ], 400);
-        }
-
-        $material->terpakai += $request->jumlah_pakai;
-        $material->save();
-
-        return response()->json([
-            'message' => 'Pemakaian berhasil diperbarui',
             'data' => $material->append('tersedia')
         ]);
     }
