@@ -21,7 +21,7 @@ return new class extends Migration
                   ->constrained('workorder')
                   ->onDelete('cascade');
 
-            $table->integer('material_kode');
+            $table->string('material_kode');
             $table->foreign('material_kode')
                   ->references('kode_material')
                   ->on('m_material')
