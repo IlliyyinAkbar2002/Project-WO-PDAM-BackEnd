@@ -14,7 +14,7 @@ class CreateMaterialsTable extends Migration
     public function up()
     {
         Schema::create('m_material', function (Blueprint $table) {
-            $table->integer('kode_material')->primary();
+            $table->string('kode_material')->primary();
             $table->string('nama');
             $table->integer('jumlah_stok');
             $table->integer('rusak')->default(0);
