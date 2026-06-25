@@ -1106,10 +1106,15 @@ class ProgressWorkorderController extends Controller
                 ];
             });
 
+            $totalLaporan = $members->sum(function ($m) {
+                return count($m['progress_list']);
+            });
+
             return response()->json([
                 'workorder_id'   => $workorder->id,
                 'workorder_name' => $workorder->nama_workorder,
                 'estimasi_hari'  => $totalDays,
+                'total_laporan'  => $totalLaporan,
                 'members'        => $members,
             ], 200);
         } catch (ModelNotFoundException $e) {
