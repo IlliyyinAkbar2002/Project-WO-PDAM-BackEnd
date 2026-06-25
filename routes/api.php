@@ -151,11 +151,11 @@ Route::prefix('v1')->group(function () {
         Route::post('peminjaman-material/{id}/verify', [WoPeminjamanMaterialController::class, 'verify']);
 
         // Master Material Web NextJS
-        Route::apiResource('material', MaterialController::class);
-        Route::post('material', [MaterialController::class, 'store']);
+        Route::get('material/generate-code', [MaterialController::class, 'generateCode']);
         Route::patch('material/{kode_material}/pakai', [MaterialController::class, 'update']);
         Route::put('material/{kode_material}/edit', [MaterialController::class, 'edit']);
-        Route::get('material/generate-code', [MaterialController::class, 'generateCode']);
+        Route::apiResource('material', MaterialController::class);
+        Route::post('material', [MaterialController::class, 'store']);
     });
 });
 
