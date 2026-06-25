@@ -17,10 +17,7 @@ class MaterialController extends Controller
     {
         try {
             $material = Material::with('pegawai:id,nama')
-            ->get()
-            ->each(function ($material) {
-                $material->append('tersedia');
-            });
+            ->get();
             return response()->json($material, 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -65,7 +62,7 @@ class MaterialController extends Controller
 
     public function generateCode()
     {
-        $lastMaterial = Material::orderBy('id', 'desc')->first();
+        $lastMaterial = Material::orderBy('kode_material', 'desc')->first();
         $nextNumber = 1;
         if ($lastMaterial) {
             preg_match('/MAT-(\d+)/', $lastMaterial->kode_material, $matches);

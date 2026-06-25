@@ -21,7 +21,7 @@ return new class extends Migration
                   ->constrained('workorder')
                   ->onDelete('cascade');
 
-            $table->integer('material_kode');
+            $table->string('material_kode');
             $table->foreign('material_kode')
                   ->references('kode_material')
                   ->on('m_material')
@@ -41,6 +41,7 @@ return new class extends Migration
 
             // Pengembalian
             $table->integer('jumlah_kembali')->nullable();
+            $table->integer('jumlah_rusak')->nullable();
             $table->string('kondisi_kembali', 64)->nullable();
             $table->timestamp('dikembalikan_at')->nullable();
 

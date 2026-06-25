@@ -15,18 +15,42 @@ class Material extends Model
 
     protected $primaryKey = 'kode_material';
     public $incrementing = false;
-    protected $keyType = 'int';
+    protected $keyType = 'string';
     
     protected $fillable = [
         'kode_material',
         'nama',
         'jumlah_stok',
+        'rusak',
         'pegawai_id',
     ];
 
+    protected $appends = [
+        'terpakai',
+        'tersedia',
+    ];
+
+    public function getTerpakaiAttribute()
+    {
+        return WoPeminjamanMaterial::where(
+            'material_kode',
+            $this->kode_material
+        )
+            ->whereIn('status', [
+                'DIPINJAM',
+                'PENDING_KEMBALI'
+            ])
+            ->sum('jumlah_pinjam');
+    }
+
     public function getTersediaAttribute()
     {
-        return $this->jumlah_stok - $this->terpakai - $this->rusak;
+        return max(
+            0,
+            $this->jumlah_stok
+            - $this->terpakai
+            - $this->rusak
+        );
     }
 
     public function role()

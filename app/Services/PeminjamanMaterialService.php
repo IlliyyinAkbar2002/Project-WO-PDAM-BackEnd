@@ -57,9 +57,6 @@ class PeminjamanMaterialService
                 );
             }
 
-            $material->terpakai += $data['jumlah_pinjam'];
-            $material->save();
-
             $pinjaman = WoPeminjamanMaterial::create([
                 'workorder_id'  => $workorder->id,
                 'material_kode' => $data['material_kode'],
@@ -152,17 +149,11 @@ class PeminjamanMaterialService
                 $material = Material::where('kode_material', $pinjaman->material_kode)
                     ->lockForUpdate()
                     ->first();
-                if ($material && $pinjaman->jumlah_kembali > 0) {
-                    // Semua yang dikembalikan keluar dari "terpakai" (tidak jadi konsumsi WO).
-                    $material->terpakai -= $pinjaman->jumlah_kembali;
-                    if ($material->terpakai < 0) {
-                        $material->terpakai = 0;
-                    }
-
+                if ($material) {
                     // Bagian yang rusak tidak balik ke stok tersedia: parkir di kolom rusak.
                     $rusak = (int) ($pinjaman->jumlah_rusak ?? 0);
                     if ($rusak > 0) {
-                        $material->rusak += $rusak;
+                        $material->increment('rusak', $rusak);
                     }
 
                     $material->save();
