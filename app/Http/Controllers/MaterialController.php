@@ -62,7 +62,7 @@ class MaterialController extends Controller
 
     public function generateCode()
     {
-        $lastMaterial = Material::orderBy('id', 'desc')->first();
+        $lastMaterial = Material::orderBy('kode_material', 'desc')->first();
         $nextNumber = 1;
         if ($lastMaterial) {
             preg_match('/MAT-(\d+)/', $lastMaterial->kode_material, $matches);
