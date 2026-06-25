@@ -67,7 +67,7 @@ class PeminjamanMaterialService
                 'status'        => 'DIPINJAM',
             ]);
 
-            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai,rusak']);
+            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,rusak']);
         });
     }
 
@@ -112,7 +112,7 @@ class PeminjamanMaterialService
 
             $this->notifyReturnSubmitted($workorder, $pinjaman, $pegawaiId);
 
-            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai,rusak']);
+            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,rusak']);
         });
     }
 
@@ -151,9 +151,10 @@ class PeminjamanMaterialService
                     ->first();
                 if ($material) {
                     // Bagian yang rusak tidak balik ke stok tersedia: parkir di kolom rusak.
-                    $rusak = (int) ($pinjaman->jumlah_rusak ?? 0);
-                    if ($rusak > 0) {
-                        $material->increment('rusak', $rusak);
+                    $jumlahRusak = (int) ($pinjaman->jumlah_rusak ?? 0);
+                    if ($jumlahRusak > 0) {
+                        $material->rusak += $jumlahRusak;
+                        $material->save();
                     }
 
                     $material->save();
@@ -173,7 +174,7 @@ class PeminjamanMaterialService
 
             $this->notifyVerified($workorder, $pinjaman, $statusInput);
 
-            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,terpakai,rusak']);
+            return $pinjaman->load(['material:kode_material,nama,jumlah_stok,rusak']);
         });
     }
 

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Material;
 use App\Models\Pengaduan;
 use App\Models\Workorder;
+use App\Models\WoPeminjamanMaterial;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -61,9 +62,28 @@ class KpiService
         $pengaduanQuery = $this->applyDepartemenFilter(
             Pengaduan::query()
         );
+
         $workorderQuery = $this->applyDepartemenFilter(
             Workorder::query()
         );
+
+        $materialTotal = Material::sum('jumlah_stok');
+
+        $materialRusak = Material::sum('rusak');
+
+        $materialTerpakai = WoPeminjamanMaterial::whereIn(
+            'status',
+            [
+                'DIPINJAM',
+                'PENDING_KEMBALI',
+            ]
+        )->sum('jumlah_pinjam');
+
+        $materialTersedia =
+            $materialTotal
+            - $materialTerpakai
+            - $materialRusak;
+
         return [
             // ================= PENGADUAN =================
             'pengaduan_total' =>
@@ -114,11 +134,10 @@ class KpiService
                     ->count(),
 
             // ================= MATERIAL =================
-            'material_total' => Material::sum('jumlah_stok'),
-            'material_terpakai' => Material::sum('terpakai'),
-            'material_tersedia' =>
-                Material::sum('jumlah_stok')
-                - Material::sum('terpakai'),
+            'material_total' => $materialTotal,
+            'material_terpakai' => $materialTerpakai,
+            'material_rusak' => $materialRusak,
+            'material_tersedia' => $materialTersedia,
         ];
     }
 
