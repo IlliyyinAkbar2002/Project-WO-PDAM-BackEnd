@@ -19,6 +19,7 @@ class WoPeminjamanMaterialController extends Controller
     public function index($workorder_id)
     {
         $peminjaman = WoPeminjamanMaterial::with([
+            'workorder:id,nama',
             'material:kode_material,nama,jumlah_stok,rusak',
             'pengaju:id,nama,nip',
             'verifier:id,nama,nip',
@@ -32,6 +33,24 @@ class WoPeminjamanMaterialController extends Controller
             'data'    => $peminjaman,
         ]);
     }
+
+    public function show($workorder_id)
+    {
+        $peminjaman = WoPeminjamanMaterial::with([
+            'material:kode_material,nama,jumlah_stok,rusak',
+            'pengaju:id,nama,nip',
+            'verifier:id,nama,nip',
+        ])
+            ->where('workorder_id', $workorder_id)
+            ->orderByDesc('diajukan_at')
+            ->get();
+
+        return response()->json([
+            'message' => 'Data peminjaman material berhasil diambil.',
+            'data'    => $peminjaman,
+        ]);
+    }
+    
 
     /**
      * POST /v1/workorder/{id}/peminjaman-material
