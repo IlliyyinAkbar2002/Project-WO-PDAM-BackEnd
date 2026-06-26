@@ -59,6 +59,7 @@ class LemburApprovalService
                     'assigned_at'      => now(),
                     'deskripsi'        => $lembur->alasan_lembur,
                     'tanggal_mulai'    => $tanggalMulai,
+                    'tanggal_selesai'  => $estimasiSelesai,
                     'estimasi_selesai' => $estimasiSelesai,
                     'latitude'         => $lembur->latitude,
                     'longitude'        => $lembur->longitude,
