@@ -292,7 +292,7 @@ class WorkorderController extends Controller
                 'success' => true,
                 'workorder' => $workorder,
                 'assignment' => $workorder->workorderAssignment,
-                'members' => $workorder->assignmentMembers,
+                'members' => $workorder->assignmentMembers->members,
                 'progress' => $workorder->progressWorkorder,
                 'laporan' => $workorder->laporanWorkorder,
             ]);

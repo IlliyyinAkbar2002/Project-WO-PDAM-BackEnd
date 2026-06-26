@@ -19,17 +19,19 @@ class WoPeminjamanMaterialController extends Controller
     public function index($workorder_id)
     {
         $peminjaman = WoPeminjamanMaterial::with([
-            'workorder:id,nama',
+            'workorder:id,nama_workorder,status',
             'material:kode_material,nama,jumlah_stok,rusak',
             'pengaju:id,nama,nip',
             'verifier:id,nama,nip',
         ])
-            ->where('workorder_id', $workorder_id)
-            ->orderByDesc('diajukan_at')
-            ->get();
-
+        ->where('workorder_id', $workorder_id)
+        ->whereHas('workorder', function ($query) {
+            $query->where('status', 'Selesai');
+        })
+        ->orderBy('diajukan_at')
+        ->get();
         return response()->json([
-            'message' => 'Data peminjaman material berhasil diambil.',
+            'message' => 'Log penggunaan material berhasil diambil.',
             'data'    => $peminjaman,
         ]);
     }
