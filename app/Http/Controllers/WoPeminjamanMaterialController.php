@@ -16,7 +16,7 @@ class WoPeminjamanMaterialController extends Controller
      * GET /v1/workorder/{id}/peminjaman-material
      * Riwayat peminjaman material untuk WO tertentu.
      */
-    public function index($workorder_id)
+    public function index()
     {
         $peminjaman = WoPeminjamanMaterial::with([
             'workorder:id,nama_workorder,status',
@@ -24,7 +24,6 @@ class WoPeminjamanMaterialController extends Controller
             'pengaju:id,nama,nip',
             'verifier:id,nama,nip',
         ])
-        ->where('workorder_id', $workorder_id)
         ->whereHas('workorder', function ($query) {
             $query->where('status', 'Selesai');
         })

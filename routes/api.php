@@ -145,7 +145,7 @@ Route::prefix('v1')->group(function () {
         Route::get('workorder-action', [WorkorderActionController::class, 'index']);
 
         // Peminjaman Material per WO — Flutter Mobile
-        Route::get('workorder/{id}/log-peminjaman-material', [WoPeminjamanMaterialController::class, 'index']);
+        Route::get('log-peminjaman-material', [WoPeminjamanMaterialController::class, 'index']);
         Route::get('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'show']);
         Route::post('workorder/{id}/peminjaman-material', [WoPeminjamanMaterialController::class, 'pinjam']);
         Route::post('peminjaman-material/{id}/kembalikan', [WoPeminjamanMaterialController::class, 'kembalikan']);
