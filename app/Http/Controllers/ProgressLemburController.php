@@ -10,10 +10,8 @@ class ProgressLemburController extends ProgressWorkorderController
     {
         $this->hydrateInputFromBody($request);
 
-        $request->validate([
-            'decision' => 'required|in:accept,reject',
-        ]);
-
+        // Backward-compat: klien lama mengirim 'reject' untuk minta revisi.
+        // Validasi penuh (accept|revisi + alasan_revisi) ditangani parent::review().
         if ($request->input('decision') === 'reject') {
             $request->merge(['decision' => 'revisi']);
         }

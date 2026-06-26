@@ -99,7 +99,6 @@ Route::prefix('v1')->group(function () {
         Route::get('progress-workorder/member-summary/{workorderId}', [ProgressWorkorderController::class, 'memberSummary'])->whereNumber('workorderId');
         Route::get('progress-workorder/{id}', [ProgressWorkorderController::class, 'show'])->whereNumber('id');
         Route::match(['post', 'put', 'patch'], 'progress-workorder/{id}', [ProgressWorkorderController::class, 'update'])->whereNumber('id');
-        Route::post('progress-workorder/{id}/cancel', [ProgressWorkorderController::class, 'cancel'])->whereNumber('id');
         // Monitoring Progress — untuk dashboard Superadmin Web NextJS, menampilkan semua progress dengan filter lebih lengkap (status, departemen, tanggal, dll).
         Route::get('progress-workorder/monitoring', [ProgressWorkorderController::class, 'monitoring']);
 
@@ -113,7 +112,6 @@ Route::prefix('v1')->group(function () {
         Route::get('progress-lembur/member-summary/{workorderId}', [ProgressLemburController::class, 'memberSummary'])->whereNumber('workorderId');
         Route::get('progress-lembur/{id}', [ProgressLemburController::class, 'show'])->whereNumber('id');
         Route::match(['post', 'put', 'patch'], 'progress-lembur/{id}', [ProgressLemburController::class, 'update'])->whereNumber('id');
-        Route::post('progress-lembur/{id}/cancel', [ProgressLemburController::class, 'cancel'])->whereNumber('id');
         // Riwayat review progress lembur (read-only) — SPV melihat siklus review
         Route::get('progress-detail-lembur', [ProgressDetailLemburController::class, 'index']);
         Route::get('progress-detail-lembur/{id}', [ProgressDetailLemburController::class, 'show'])->whereNumber('id');

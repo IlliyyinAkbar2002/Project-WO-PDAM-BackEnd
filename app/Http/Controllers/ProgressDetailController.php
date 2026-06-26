@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 /**
  * Riwayat review progress (read-only). Penulisan review = satu sumber kebenaran
- * lewat ProgressWorkorderController::review (decision=accept|revisi|tolak).
+ * lewat ProgressWorkorderController::review (decision=accept|revisi).
  */
 class ProgressDetailController extends Controller
 {
@@ -63,7 +63,7 @@ class ProgressDetailController extends Controller
     private function deprecatedReviewResponse()
     {
         return response()->json([
-            'error' => 'Endpoint ini sudah tidak dipakai. Gunakan POST /api/v1/progress-workorder/review dengan field decision (accept|revisi|tolak).',
+            'error' => 'Endpoint ini sudah tidak dipakai. Gunakan POST /api/v1/progress-workorder/review dengan field decision (accept|revisi).',
         ], 410);
     }
 }

@@ -541,8 +541,8 @@ class ProgressWorkorderController extends Controller
             return $finalError;
         }
 
-        // Hanya progress yang ditolak (revisi) yang bisa diresubmit.
-        if (optional($progress->latestDetail)->status !== 'rejected') {
+        // Hanya progress yang diminta revisi oleh SPV yang bisa diresubmit.
+        if (optional($progress->latestDetail)->status !== 'revisi') {
             return response()->json(['error' => 'Progress tidak dalam status revisi'], 422);
         }
 
@@ -714,7 +714,45 @@ class ProgressWorkorderController extends Controller
     }
 
     /**
-     * SPV mereview progress: accept (→ generate Laporan), revisi (balik kerja), tolak (final).
+     * Notifikasi ke staff pelapor bahwa SPV meminta revisi progres (beserta alasannya).
+     * Best-effort: kegagalan notifikasi tidak menggagalkan proses review.
+     */
+    private function notifyProgressNeedsRevision(ProgressWorkorder $progress, Workorder $workorder, ?string $alasan): void
+    {
+        try {
+            $staff = User::where('pegawai_id', $progress->submitted_by_pegawai_id)->first();
+            if (! $staff) {
+                return;
+            }
+
+            $spvPegawaiId = $workorder->assigned_to;
+            $senderName   = $spvPegawaiId
+                ? (optional(\App\Models\Pegawai::select('id', 'nama')->find($spvPegawaiId))->nama ?? 'SPV')
+                : 'SPV';
+
+            $pesan = $alasan
+                ? "SPV meminta revisi pada WO #{$workorder->nama_workorder}. Alasan: {$alasan}"
+                : "SPV meminta revisi pada WO #{$workorder->nama_workorder}.";
+
+            $staff->notify(new WorkOrderNotification(
+                'Revisi Progress Work Order',
+                $pesan,
+                (int) $workorder->id,
+                'wo_revision_requested',
+                $senderName
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('notifyProgressNeedsRevision failed', [
+                'workorder_id'            => $workorder->id,
+                'progress_id'             => $progress->id,
+                'submitted_by_pegawai_id' => $progress->submitted_by_pegawai_id,
+                'error'                   => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * SPV mereview progress: accept (→ generate Laporan) atau revisi (balik ke staff).
      */
     public function review(Request $request)
     {
@@ -722,8 +760,9 @@ class ProgressWorkorderController extends Controller
 
         $validated = $request->validate([
             'progress_id'      => 'required|exists:progress_workorder,id',
-            'decision'         => 'required|in:accept,revisi,tolak',
+            'decision'         => 'required|in:accept,revisi',
             'approval_notes'   => 'nullable|string',
+            'alasan_revisi'    => 'required_if:decision,revisi|nullable|string',
             'field_to_revise'  => 'nullable|array',
         ]);
 
@@ -743,11 +782,6 @@ class ProgressWorkorderController extends Controller
 
         DB::beginTransaction();
         try {
-            $fieldToReviseArr = $validated['field_to_revise'] ?? null;
-            $fieldToReviseStr = is_array($fieldToReviseArr)
-                ? implode(',', array_map('strval', $fieldToReviseArr))
-                : $fieldToReviseArr;
-
             if ($validated['decision'] === 'accept') {
                 $approvalNotes = $validated['approval_notes'] ?? null;
 
@@ -797,84 +831,31 @@ class ProgressWorkorderController extends Controller
                 ], 200);
             }
 
-            if ($validated['decision'] === 'revisi') {
-                ProgressDetail::create([
-                    'progress_workorder_id' => $progress->id,
-                    'status'                => 'rejected',
-                    'reviewed_by_user_id'   => $userId,
-                    'reviewed_at'           => now(),
-                    'alasan_revisi'      => $validated['alasan_revisi'] ?? null
-                ]);
+            // decision === 'revisi' — SPV minta perbaikan; staff resubmit setelahnya.
+            $alasanRevisi = $validated['alasan_revisi'] ?? null;
 
-                // WO tetap berjalan; staff melakukan perbaikan lalu resubmit.
-                if ($workorder->status !== 'Proses') {
-                    $workorder->update(['status' => 'Proses']);
-                }
-            } else { // tolak (final)
-                ProgressDetail::create([
-                    'progress_workorder_id' => $progress->id,
-                    'status'                => 'rejected',
-                    'reviewed_by_user_id'   => $userId,
-                    'reviewed_at'           => now(),
-                    'alasan_revisi'      => $validated['alasan_revisi'] ?? null,
-                ]);
+            ProgressDetail::create([
+                'progress_workorder_id' => $progress->id,
+                'status'                => 'revisi',
+                'reviewed_by_user_id'   => $userId,
+                'reviewed_at'           => now(),
+                'alasan_revisi'         => $alasanRevisi,
+            ]);
 
-                $workorder->update(['status' => 'Tutup']);
+            // WO tetap berjalan; staff melakukan perbaikan lalu resubmit.
+            if ($workorder->status !== 'Proses') {
+                $workorder->update(['status' => 'Proses']);
             }
 
             DB::commit();
+
+            $this->notifyProgressNeedsRevision($progress, $workorder, $alasanRevisi);
+
             $workorder->refresh();
 
             return response()->json([
                 'message'   => 'Review progress berhasil diproses',
                 'workorder' => ['id' => $workorder->id, 'status' => $workorder->status],
-            ], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
-    }
-
-    /**
-     * Staff membatalkan progress yang baru saja disubmit (window 5 menit, sebelum direview).
-     */
-    public function cancel(Request $request, $id)
-    {
-        $progress  = ProgressWorkorder::with('progressDetails')->findOrFail($id);
-        $pegawaiId = (int) optional($request->user())->pegawai_id;
-
-        if ((int) $progress->submitted_by_pegawai_id !== $pegawaiId) {
-            return response()->json(['error' => 'Hanya petugas yang submit yang bisa membatalkan'], 403);
-        }
-
-        // Sudah pernah direview (approved/rejected) → tidak bisa dibatalkan.
-        $sudahReview = $progress->progressDetails
-            ->whereIn('status', ['approved', 'rejected'])
-            ->isNotEmpty();
-        if ($sudahReview) {
-            return response()->json(['error' => 'Progress sudah direview, tidak bisa dibatalkan'], 422);
-        }
-
-        if ($progress->waktu_submit === null) {
-            return response()->json(['error' => 'Progress belum disubmit'], 422);
-        }
-
-        $submitTime = \Illuminate\Support\Carbon::parse($progress->waktu_submit);
-        if ($submitTime->diffInSeconds(now(), false) > 300) {
-            return response()->json(['error' => 'Batas waktu pembatalan (5 menit) telah lewat'], 422);
-        }
-
-        DB::beginTransaction();
-        try {
-            // Tutup siklus review pending (jika ada) lalu tandai progress sebagai batal.
-            $progress->progressDetails()->where('status', 'pending')->delete();
-            $progress->update(['waktu_submit' => null]);
-
-            DB::commit();
-
-            return response()->json([
-                'message'     => 'Progress berhasil dibatalkan',
-                'progress_id' => $progress->id,
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
