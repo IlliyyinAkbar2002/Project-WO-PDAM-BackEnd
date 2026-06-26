@@ -456,7 +456,7 @@ class ProgressWorkorderController extends Controller
             }
 
             if ($tipeProgressKode === 'SELESAI') {
-                $this->persistKategoriHasilAkhir($workorder, $kategoriForm, $validated);
+                $this->persistKategoriHasilAkhirb($workorder, $kategoriForm, $validated);
 
                 // Buka siklus review (menunggu SPV). WO tetap 'Proses' sampai SPV approve.
                 ProgressDetail::create([
