@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
     {
         
 
-        Departemen::factory(3)->create();
+        Departemen::factory(2)->create();
         Jabatan::factory(6)->create();
         Role::factory(4)->create();
 

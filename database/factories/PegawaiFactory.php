@@ -26,7 +26,7 @@ class PegawaiFactory extends Factory
             'jenis_kelamin' => $this->faker->randomElement(['Laki-laki', 'Perempuan']),
             'alamat' => $this->faker->address(),
             'telepon' => $this->faker->phoneNumber(),
-            'departemen_id' => $this->faker->numberBetween(1, 3),
+            'departemen_id' => $this->faker->numberBetween(1, 2),
             'jabatan_id' => $this->faker->numberBetween(1, 6),
         ];
     }

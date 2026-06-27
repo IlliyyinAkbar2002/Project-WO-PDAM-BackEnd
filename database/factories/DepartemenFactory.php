@@ -13,7 +13,7 @@ class DepartemenFactory extends Factory
      */
     public function definition()
     {
-        static $names = ['Operasional', 'Pelayanan', 'Keuangan'];
+        static $names = ['Operasional', 'Pelayanan'];
         $nama = array_shift($names);
 
         return [
