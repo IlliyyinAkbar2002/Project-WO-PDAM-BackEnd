@@ -172,6 +172,20 @@ class WorkorderController extends Controller
             $pengaduan = Pengaduan::where('kode_pengaduan', $validatedData['kode_pengaduan'])->firstOrFail();
 
             // ==================================================
+            // VALIDASI 1 PENGADUAN HANYA BOLEH MEMILIKI 1 WORKORDER
+            // ==================================================
+            $existingWorkorder = Workorder::where(
+                'kode_pengaduan',
+                $pengaduan->kode_pengaduan
+            )->exists();
+
+            if ($existingWorkorder) {
+                return response()->json([
+                    'message' => 'Pengaduan ini sudah memiliki Workorder dan tidak dapat digunakan kembali.'
+                ], 422);
+            }
+
+            // ==================================================
             // AUTO AMBIL LOKASI DARI PENGADUAN
             // ==================================================
             $validatedData['lokasi'] = $pengaduan->lokasi;
