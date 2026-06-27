@@ -31,7 +31,7 @@ class CreateWorkordersTable extends Migration
                 'Tutup',
             ])->default('Pending');
             $table->boolean('is_active')->default(true);
-            $table->string('kode_pengaduan');
+            $table->unique('kode_pengaduan');
 
             // Link 1:1 ke pengajuan lembur (nullable). NULL = WO non-lembur.
             // FE membaca kolom ini sebagai penanda "WO lembur" (splId → isLembur).
