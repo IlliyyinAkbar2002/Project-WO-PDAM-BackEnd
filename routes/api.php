@@ -86,6 +86,8 @@ Route::prefix('v1')->group(function () {
         // Location management Web NextJS
         Route::get('master-location', [MasterLocationController::class, 'index']);
         Route::post('master-location', [MasterLocationController::class, 'store']);
+        // monitoring lokasi user (untuk admin) Web NextJS
+        Route::get('workorder/{id}/location-members', [LocationController::class, 'membersAtLocation']);
         
         // Progress tracking Flutter Mobile and Web NextJS
         // Segmen literal didefinisikan SEBELUM {id} agar tidak tertangkap sebagai id.

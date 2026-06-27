@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MasterLocation;
 use App\Models\UserLocations;
+use App\Models\WorkorderAssignment;
 use Illuminate\Http\Request;
 
 class LocationController extends Controller
@@ -90,4 +91,60 @@ class LocationController extends Controller
         return $earthRadius * $c;
     }
 
+
+    public function membersAtLocation(Request $request, int $workorderId)
+    {
+        $assignment = WorkorderAssignment::with([
+            'location',
+            'members.pegawai.user',
+        ])->where('workorder_id', $workorderId)->firstOrFail();
+
+        abort_if(
+            (int) $assignment->spv_pegawai_id !== (int) $request->user()->pegawai_id,
+            403,
+            'Anda bukan SPV untuk work order ini.'
+        );
+
+        abort_if(! $assignment->location, 422, 'Lokasi work order belum ditentukan.');
+
+        $location = $assignment->location;
+
+        $members = $assignment->members->map(function ($member) use ($location) {
+            $pegawai = $member->pegawai;
+            $user = $pegawai?->user;
+
+            $latestLocation = $user
+                ? UserLocations::where('user_id', $user->id)
+                    ->latest('created_at')
+                    ->first()
+                : null;
+
+            $distance = $latestLocation
+                ? $this->haversineMeters(
+                    $location->latitude,
+                    $location->longitude,
+                    $latestLocation->latitude,
+                    $latestLocation->longitude
+                )
+                : null;
+
+            return [
+                'pegawai_id'     => $pegawai?->id,
+                'nama'           => $pegawai?->nama,
+                'peran'          => $member->peran,
+                'inside'         => $distance !== null
+                    && $distance <= $location->radius_meter,
+                'distance_meter' => $distance !== null
+                    ? round($distance, 2)
+                    : null,
+                'last_location'  => $latestLocation?->created_at,
+            ];
+        });
+
+        return response()->json([
+            'location' => $location,
+            'members'  => $members,
+            'inside'   => $members->where('inside', true)->values(),
+        ]);
+    }
 }
