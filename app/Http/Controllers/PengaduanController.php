@@ -41,6 +41,7 @@ class PengaduanController extends Controller
     {
         try {
             $pengaduan = Pengaduan::query()
+                ->where('status', Pengaduan::STATUS_PENDING)
                 ->select([
                     'kode_pengaduan',
                     'judul',
