@@ -900,6 +900,7 @@ class ProgressWorkorderController extends Controller
             $progress = ProgressWorkorder::with([
                 'dokumentasiProgress',
                 'progressDetails',
+                'latestDetail',
                 'workorder.meter',
                 'workorder.jaringan',
                 'workorder.infrastruktur',
