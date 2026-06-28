@@ -66,7 +66,8 @@ class DatabaseSeeder extends Seeder
         // Pastikan sequence id m_pegawai mengikuti nilai maksimum saat ini
         DB::statement("SELECT setval(pg_get_serial_sequence('m_pegawai', 'id'), (SELECT COALESCE(MAX(id), 0) FROM m_pegawai))");
 
-        Pegawai::factory(20)->create();
+        // Pegawai::factory(20)->create(); // Aku comment sementara.
+        // User::factory(7)->create(); // Juga ini tak comment
 
         User::updateOrCreate([
             'pegawai_id' => 1,
@@ -86,7 +87,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'manager@gmail.com',
             'password' => bcrypt('password'),
         ]);
-        User::factory(7)->create();
         JenisWorkorder::factory(9)->create();
         MasterAction::factory(4)->create();
 
@@ -94,9 +94,9 @@ class DatabaseSeeder extends Seeder
         $this->call(PengaduanSeeder::class);
 
         // Akun uji alur Mobile: 1 SPV + 1 senior (PIC) + 1 staff.
-        // $this->call(StaffTestSeeder::class);
+        $this->call(StaffTestSeeder::class);
 
         // Master material berstok untuk uji peminjaman material di FE Mobile.
-        // $this->call(MaterialSeeder::class);
+        $this->call(MaterialSeeder::class);
     }
 }

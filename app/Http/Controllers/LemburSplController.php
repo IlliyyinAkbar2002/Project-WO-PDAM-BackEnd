@@ -153,7 +153,7 @@ class LemburSplController extends Controller
                     'nama'         => $namaLokasi,
                     'latitude'     => $validated['latitude'],
                     'longitude'    => $validated['longitude'],
-                    'radius_meter' => 100,
+                    'radius_meter' => 1000,
                 ]);
                 $locationId = $location->id;
             }

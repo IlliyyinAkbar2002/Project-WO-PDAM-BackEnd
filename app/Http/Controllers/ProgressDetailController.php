@@ -47,23 +47,4 @@ class ProgressDetailController extends Controller
             return response()->json(['error' => 'Progress detail not found'], 404);
         }
     }
-
-    /** DEPRECATED — gunakan POST /api/v1/progress-workorder/review. */
-    public function approve(Request $request, $id)
-    {
-        return $this->deprecatedReviewResponse();
-    }
-
-    /** DEPRECATED — gunakan POST /api/v1/progress-workorder/review. */
-    public function reject(Request $request, $id)
-    {
-        return $this->deprecatedReviewResponse();
-    }
-
-    private function deprecatedReviewResponse()
-    {
-        return response()->json([
-            'error' => 'Endpoint ini sudah tidak dipakai. Gunakan POST /api/v1/progress-workorder/review dengan field decision (accept|revisi).',
-        ], 410);
-    }
 }
