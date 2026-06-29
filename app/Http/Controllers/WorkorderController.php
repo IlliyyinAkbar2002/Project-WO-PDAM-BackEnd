@@ -36,6 +36,7 @@ class WorkorderController extends Controller
             $search = $request->query('search');
             $status = $request->query('status');
             $prioritas = $request->query('prioritas');
+            $jenis = $request->query('jenis');
             $page = $request->query('page', 1);
             $limit = $request->query('limit', 10);
             $sort = $request->query('sort', 'desc');
@@ -59,6 +60,13 @@ class WorkorderController extends Controller
             if ($prioritas) {
                 $query->where('prioritas', $prioritas);
             }
+            // Filter jenis workorder
+            if ($jenis === 'normal') {
+                $query->whereNull('lembur_spl_id');
+            }
+            if ($jenis === 'lembur') {
+                $query->whereNotNull('lembur_spl_id');
+            }
             $query->orderBy('created_at', $sort);
             // Pagination
             $workorders = $query->paginate(
@@ -68,9 +76,16 @@ class WorkorderController extends Controller
                 $page
             );
             return response()->json([
-                'data' => $workorders->items(),
+                'data' => collect($workorders->items())->map(function ($item) {
+                    $item->jenis_workorder = $item->lembur_spl_id
+                        ? 'Lembur'
+                        : 'Normal';
+                    return $item;
+                }),
                 'totalPages' => $workorders->lastPage(),
                 'currentPage' => $workorders->currentPage(),
+                'perPage' => $workorders->perPage(),
+                'totalData' => $workorders->total(),
             ]);
 
         } catch (\Exception $e) {
