@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\JenisWorkorder;
 use App\Models\Material;
 use App\Models\Pengaduan;
 use App\Models\Workorder;
 use App\Models\WoPeminjamanMaterial;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class KpiService
@@ -68,9 +70,7 @@ class KpiService
         );
 
         $materialTotal = Material::sum('jumlah_stok');
-
         $materialRusak = Material::sum('rusak');
-
         $materialTerpakai = WoPeminjamanMaterial::whereIn(
             'status',
             [
@@ -138,6 +138,9 @@ class KpiService
             'material_terpakai' => $materialTerpakai,
             'material_rusak' => $materialRusak,
             'material_tersedia' => $materialTersedia,
+
+            // ================= WORKORDER GRUP =================
+            'workorder_by_jenis'  => $this->workorderByJenis(),
         ];
     }
 
@@ -188,5 +191,30 @@ class KpiService
                     ->where('status', 'Selesai')
                     ->count(),
         ];
+    }
+
+    public function workorderByJenis()
+    {
+        $query = $this->applyDepartemenFilter(
+            Workorder::query()
+        );
+        return $query
+            ->join(
+                'm_jenis_workorder',
+                'workorder.jenis_workorder_id',
+                '=',
+                'm_jenis_workorder.id'
+            )
+            ->select(
+                'm_jenis_workorder.id',
+                'm_jenis_workorder.nama',
+                DB::raw('COUNT(workorder.id) as total')
+            )
+            ->groupBy(
+                'm_jenis_workorder.id',
+                'm_jenis_workorder.nama'
+            )
+            ->orderByDesc('total')
+            ->get();
     }
 }
