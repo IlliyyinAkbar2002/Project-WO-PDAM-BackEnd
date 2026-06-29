@@ -34,7 +34,7 @@ class ProgressWorkorderController extends Controller
     private function tipeEnum(string $kode): string
     {
         return [
-            'INSPEKSI' => 'inpeksi',
+            'INSPEKSI' => 'inspeksi',
             'MULAI'    => 'mulai',
             'PROGRESS' => 'progress',
             'SELESAI'  => 'selesai',
