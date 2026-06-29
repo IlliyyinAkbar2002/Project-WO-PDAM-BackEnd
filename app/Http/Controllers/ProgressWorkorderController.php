@@ -101,6 +101,74 @@ class ProgressWorkorderController extends Controller
         return null;
     }
 
+    /** tanggal_mulai (Carbon|null) dari assignment WO via relasi workorderAssignment. */
+    private function assignmentTanggalMulai(Workorder $workorder)
+    {
+        return optional($workorder->workorderAssignment)->tanggal_mulai;
+    }
+
+    /**
+     * Aturan #1 — Gate "belum waktunya mulai" (HANYA WO lembur).
+     * lembur_spl_id != null & tanggal_mulai != null: tolak bila now() < tanggal_mulai.
+     * WO non-lembur / tanpa jadwal: dilewati.
+     */
+    private function rejectIfBelumWaktunyaMulai(Workorder $workorder): ?\Illuminate\Http\JsonResponse
+    {
+        if ($workorder->lembur_spl_id === null) {
+            return null;
+        }
+        $tanggalMulai = $this->assignmentTanggalMulai($workorder);
+        if ($tanggalMulai === null) {
+            return null;
+        }
+        if (now()->lt($tanggalMulai)) {
+            return response()->json([
+                'error' => 'Belum waktunya. WO dijadwalkan mulai pada ' . $tanggalMulai->format('d-m-Y H:i') . '.'
+            ], 422);
+        }
+        return null;
+    }
+
+    /**
+     * Aturan #2 — Cutoff jam upload laporan > 16:00 (HANYA WO reguler / non-lembur),
+     * dikecualikan untuk prioritas 'Urgent'. WO lembur ditangani aturan #3.
+     */
+    private function rejectIfLewatCutoffReguler(Workorder $workorder): ?\Illuminate\Http\JsonResponse
+    {
+        if ($workorder->lembur_spl_id !== null || $workorder->prioritas === 'Urgent') {
+            return null;
+        }
+        if (now()->format('H:i') > '16:00') {
+            return response()->json([
+                'error' => 'Upload laporan hanya dapat dilakukan sampai pukul 16:00.'
+            ], 422);
+        }
+        return null;
+    }
+
+    /**
+     * Aturan #3 — Cutoff tengah malam upload laporan lembur (HANYA WO lembur).
+     * Cutoff = 00:00 hari berikutnya dari tanggal jadwal mulai; tolak bila now() >= cutoff.
+     * Tanpa tanggal_mulai / WO non-lembur: dilewati.
+     */
+    private function rejectIfLewatCutoffLembur(Workorder $workorder): ?\Illuminate\Http\JsonResponse
+    {
+        if ($workorder->lembur_spl_id === null) {
+            return null;
+        }
+        $tanggalMulai = $this->assignmentTanggalMulai($workorder);
+        if ($tanggalMulai === null) {
+            return null;
+        }
+        $cutoff = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay()->addDay();
+        if (now()->gte($cutoff)) {
+            return response()->json([
+                'error' => 'Batas upload laporan lembur adalah pukul 00:00 (tengah malam). Waktu sudah terlewat.'
+            ], 422);
+        }
+        return null;
+    }
+
     /** Apakah pegawai ini anggota tim WO. */
     private function isMember(Workorder $workorder, ?int $pegawaiId): bool
     {
@@ -269,6 +337,14 @@ class ProgressWorkorderController extends Controller
             return $finalError;
         }
 
+        // Gate waktu lembur (self-gating; otomatis dilewati untuk WO non-lembur).
+        if ($waktuError = $this->rejectIfBelumWaktunyaMulai($workorder)) {   // aturan #1
+            return $waktuError;
+        }
+        if ($cutoffError = $this->rejectIfLewatCutoffLembur($workorder)) {   // aturan #3
+            return $cutoffError;
+        }
+
         // Wajib inspeksi sebelum mulai kerja (hanya saat belum pernah MULAI).
         $sudahMulai = ProgressWorkorder::where('workorder_id', $workorder->id)
             ->where('tipe_progress', 'mulai')->exists();
@@ -397,6 +473,20 @@ class ProgressWorkorderController extends Controller
 
         if ($finalError = $this->rejectIfWorkorderFinal($workorder)) {
             return $finalError;
+        }
+
+        // Aturan #1 (belum waktunya) — alur lembur memulai via INSPEKSI.
+        if ($tipeProgressKode === 'INSPEKSI') {
+            if ($waktuError = $this->rejectIfBelumWaktunyaMulai($workorder)) {
+                return $waktuError;
+            }
+        }
+        // Aturan #2 (cutoff 16:00 reguler) & #3 (cutoff tengah malam lembur) — self-gating per tipe WO.
+        if ($cutoffRegError = $this->rejectIfLewatCutoffReguler($workorder)) {
+            return $cutoffRegError;
+        }
+        if ($cutoffLemburError = $this->rejectIfLewatCutoffLembur($workorder)) {
+            return $cutoffLemburError;
         }
 
         if ($tipeProgressKode === 'INSPEKSI' && $workorder->status !== 'Proses') {
@@ -539,6 +629,14 @@ class ProgressWorkorderController extends Controller
 
         if ($finalError = $this->rejectIfWorkorderFinal($workorder)) {
             return $finalError;
+        }
+
+        // Resubmit = upload ulang laporan, tunduk pada cutoff yang sama (self-gating per tipe WO).
+        if ($cutoffRegError = $this->rejectIfLewatCutoffReguler($workorder)) {   // aturan #2
+            return $cutoffRegError;
+        }
+        if ($cutoffLemburError = $this->rejectIfLewatCutoffLembur($workorder)) { // aturan #3
+            return $cutoffLemburError;
         }
 
         // Hanya progress yang diminta revisi oleh SPV yang bisa diresubmit.
