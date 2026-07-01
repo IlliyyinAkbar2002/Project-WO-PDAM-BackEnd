@@ -1,0 +1,631 @@
+// =====================================================================
+// ERD Physical — Work Order Management PDAM  (AS-BUILT)
+// =====================================================================
+// Format   : DBML (https://dbml.dbdiagram.io) — copy seluruh isi ke
+//            https://dbdiagram.io untuk render diagram.
+//
+// Status   : File ini menggambarkan skema NYATA sesuai migration di
+//            database/migrations/ pada branch MergerManual (bukan rencana /
+//            target state). Setiap tabel, kolom, enum, FK, dan index = persis
+//            seperti yang dibuat migration. Sumber kebenaran = file migration.
+//
+// Konvensi :
+//   - Mayoritas master table berprefiks `m_` (m_pegawai, m_jenis_workorder, dst).
+//     Pengecualian historis: `master_kpi` (tanpa prefiks).
+//   - Tabel transaksional tanpa prefiks (workorder, progress_workorder, dst).
+//   - Tabel inti dinamai singular: `workorder` (bukan workorders).
+//   - Status & tipe progress = kolom ENUM inline (TIDAK ada master table status).
+//   - Assignment & pelaksana kerja mereferensi `m_pegawai`; pembuat/peninjau/
+//     approver mereferensi `users`.
+//
+// Dialek DB: PostgreSQL (jsonb untuk snapshot laporan).
+// =====================================================================
+
+Project pdam_workorder {
+  database_type: 'PostgreSQL'
+  Note: '''
+    # Work Order Management — PDAM (as-built)
+
+    Alur: Pengaduan → Superadmin buat WO (pilih SPV via assigned_to) →
+    SPV isi form kategori (wo_meter/wo_jaringan/wo_infrastruktur) + assign tim
+    (workorder_assignment + wo_assignment_member) → Staff submit progres
+    (progress_workorder) → SPV review per progres (progress_detail) →
+    terbit Laporan resmi (laporan_workorder).
+
+    Catatan skema penting:
+      - status WO/pengaduan/lembur = kolom ENUM (bukan FK ke tabel status).
+      - tipe progres = ENUM di progress_workorder.tipe_progress.
+      - assignment pakai m_pegawai (assigned_to, spv_pegawai_id, pegawai_id,
+        submitted_by_pegawai_id, diajukan_oleh, diverifikasi_oleh).
+      - link WO ↔ pengaduan lewat kolom string workorder.kode_pengaduan
+        (UNIQUE) → pengaduan.kode_pengaduan (PK string). Tidak ada FK numerik.
+  '''
+}
+
+// =====================================================================
+// ENUM (didefinisikan inline di migration sebagai $table->enum(...))
+// =====================================================================
+
+Enum workorder_prioritas {
+  Rendah
+  Sedang
+  Tinggi
+  Urgent
+}
+
+Enum workorder_status {
+  Pending
+  Proses
+  Selesai
+  Tutup
+}
+
+Enum pengaduan_status {
+  Pending
+  Proses
+  Selesai
+  Ditutup
+}
+
+Enum lembur_status {
+  pending
+  approved
+  rejected
+}
+
+Enum progress_tipe {
+  inpeksi    // catatan: ejaan apa adanya di migration (typo belum diperbaiki di skema)
+  mulai
+  progress
+  selesai
+}
+
+Enum pegawai_jenis_kelamin {
+  "Laki-laki"
+  Perempuan
+}
+
+Enum jenis_workorder_kategori {
+  meter
+  jaringan
+  infrastruktur
+}
+
+// =====================================================================
+// GROUP 1 — MASTER ORGANISASI & USER
+// =====================================================================
+
+Table m_departemen {
+  id               bigint       [pk, increment]
+  nama             varchar(255) [not null]
+  created_at       timestamp
+  updated_at       timestamp
+}
+
+Table m_jabatan {
+  id               bigint       [pk, increment]
+  nama             varchar(255) [not null]
+  created_at       timestamp
+  updated_at       timestamp
+}
+
+Table m_role {
+  id               bigint       [pk, increment]
+  nama             varchar(255) [not null]
+  created_at       timestamp
+  updated_at       timestamp
+
+  Note: 'Role otorisasi API (Sanctum). Model Role meng-set $timestamps=false meski migration membuat created_at/updated_at.'
+}
+
+Table m_pegawai {
+  id               bigint                 [pk, increment]
+  nama             varchar(255)           [not null]
+  nip              varchar(255)           [not null]
+  jenis_kelamin    pegawai_jenis_kelamin
+  tanggal_lahir    date
+  alamat           varchar(255)
+  telepon          varchar(255)
+  departemen_id    bigint                 [not null, ref: > m_departemen.id]
+  jabatan_id       bigint                 [not null, ref: > m_jabatan.id]
+  created_at       timestamp
+  updated_at       timestamp
+
+  indexes {
+    departemen_id
+    jabatan_id
+  }
+
+  Note: 'Identitas pegawai PDAM. 1 pegawai = 1 user (users.pegawai_id).'
+}
+
+Table users {
+  id               bigint        [pk, increment]
+  pegawai_id       bigint        [not null, ref: > m_pegawai.id]
+  role_id          bigint        [not null, ref: > m_role.id]
+  email            varchar(255)  [not null, unique]
+  password         varchar(255)  [not null, note: 'bcrypt hash']
+  is_active        boolean       [not null, default: true]
+  created_at       timestamp
+  updated_at       timestamp
+
+  indexes {
+    email [unique]
+    role_id
+  }
+
+  Note: 'Akun login. Auth via Laravel Sanctum. FK pegawai_id/role_id constrained (tidak ditandai unique di migration).'
+}
+
+// =====================================================================
+// GROUP 2 — MASTER REFERENSI
+// =====================================================================
+
+Table m_jenis_workorder {
+  id               bigint                    [pk, increment]
+  nama             varchar(255)              [not null]
+  kategori         jenis_workorder_kategori  [not null, note: 'Menentukan tabel kategori form: wo_meter/wo_jaringan/wo_infrastruktur']
+  is_active        boolean                   [not null, default: true]
+  created_at       timestamp
+  updated_at       timestamp
+}
+
+Table m_location {
+  id               bigint        [pk, increment]
+  nama             varchar(255)  [not null]
+  latitude         decimal(10,7) [not null]
+  longitude        decimal(10,7) [not null]
+  radius_meter     integer       [default: 100]
+  created_at       timestamp
+  updated_at       timestamp
+
+  Note: 'Titik lokasi + radius untuk geofencing.'
+}
+
+Table m_action {
+  id               bigint       [pk, increment]
+  nama             varchar(255) [not null]
+  keterangan       varchar(255) [not null]
+  created_at       timestamp
+  updated_at       timestamp
+
+  Note: 'Master aksi audit trail (dipakai workorder_action.action_id).'
+}
+
+Table master_kpi {
+  id               bigint       [pk, increment]
+  nama             varchar(255) [not null]
+  created_at       timestamp
+  updated_at       timestamp
+
+  Note: 'Master KPI minimal (hanya id + nama). Tanpa prefiks m_ (penamaan historis).'
+}
+
+// =====================================================================
+// GROUP 3 — PENGADUAN
+// =====================================================================
+
+Table pengaduan {
+  kode_pengaduan   varchar(255)      [pk, note: 'PK string — kode pengaduan']
+  judul            varchar(255)      [not null]
+  deskripsi        text
+  lokasi           text              [not null]
+  status           pengaduan_status  [not null, default: 'Pending']
+  tanggal_pengaduan timestamp
+  created_at       timestamp
+  updated_at       timestamp
+
+  Note: 'Laporan keluhan. Tidak ada FK keluar. Terhubung ke WO lewat workorder.kode_pengaduan.'
+}
+
+// =====================================================================
+// GROUP 4 — WORKORDER CORE
+// =====================================================================
+
+Table workorder {
+  id                  bigint                [pk, increment]
+  nama_workorder      varchar(255)          [not null]
+  deskripsi           text
+  lokasi              varchar(255)          [not null]
+  prioritas           workorder_prioritas   [not null]
+  status              workorder_status      [not null, default: 'Pending']
+  is_active           boolean               [not null, default: true]
+  kode_pengaduan      varchar(255)          [not null, unique, ref: - pengaduan.kode_pengaduan, note: 'Link ke pengaduan. UNIQUE. Index only — tidak ada FK constraint di DB.']
+  lembur_spl_id       bigint                [ref: > lembur_spl.id, note: 'Nullable — terisi kalau WO lembur']
+  departemen_id       bigint                [not null, ref: > m_departemen.id, note: 'restrictOnDelete + cascadeOnUpdate']
+  jenis_workorder_id  bigint                [not null, ref: > m_jenis_workorder.id, note: 'restrictOnDelete + cascadeOnUpdate']
+  assigned_to         bigint                [not null, ref: > m_pegawai.id, note: 'SPV/PIC penerima WO (pegawai, bukan user). restrictOnDelete + cascadeOnUpdate']
+  created_by          bigint                [not null, ref: > users.id, note: 'User pembuat WO. restrictOnDelete + cascadeOnUpdate']
+  created_at          timestamp
+  updated_at          timestamp
+
+  Note: 'Inti perintah kerja. Tabel singular `workorder`.'
+}
+
+// workorder_petugas — [DROP] tidak ada di MergerManual. Multi-petugas via
+// workorder_assignment + wo_assignment_member.
+
+Table workorder_assignment {
+  id                bigint        [pk, increment]
+  workorder_id      bigint        [not null, unique, ref: - workorder.id, note: '1:1 ke workorder. cascadeOnDelete.']
+  spv_pegawai_id    bigint        [not null, ref: > m_pegawai.id, note: 'SPV yang melakukan assign (pegawai)']
+  assigned_at       timestamp     [not null]
+  deskripsi         text
+  tanggal_mulai     timestamp
+  tanggal_selesai   timestamp
+  estimasi_selesai  timestamp
+  latitude          decimal(10,7)
+  longitude         decimal(10,7)
+  location_id       bigint        [ref: > m_location.id]
+  created_at        timestamp
+  updated_at        timestamp
+
+  indexes {
+    workorder_id [unique]
+    spv_pegawai_id
+    assigned_at
+  }
+
+  Note: 'Event assign WO oleh SPV. 1 row per WO. Anggota tim di wo_assignment_member. Tidak ada kolom accuracy.'
+}
+
+Table wo_assignment_member {
+  id               bigint    [pk, increment]
+  assignment_id    bigint    [not null, ref: > workorder_assignment.id, note: 'cascadeOnDelete']
+  pegawai_id       bigint    [not null, ref: > m_pegawai.id, note: 'Pegawai yang ditugaskan']
+  is_pic           boolean   [not null, default: false, note: 'true = Penanggung Jawab / Koordinator Tim']
+  created_at       timestamp
+  updated_at       timestamp
+
+  indexes {
+    (assignment_id, pegawai_id) [unique]
+    pegawai_id
+  }
+
+  Note: 'Anggota tim per WO. cascadeOnDelete dari workorder_assignment.'
+}
+
+// ── Tabel kategori form (Class Table Inheritance) — diisi SPV saat assign ──
+
+Table wo_meter {
+  id                  bigint        [pk, increment]
+  workorder_id        bigint        [not null, ref: > workorder.id, note: 'cascadeOnDelete (tidak ditandai unique di migration)']
+  nomor_meter         varchar(255)
+  kondisi_meter_awal  text
+  kondisi_meter_akhir text
+  hasil_kalibrasi     text
+  created_at          timestamp
+  updated_at          timestamp
+
+  Note: 'Form kategori Meter.'
+}
+
+Table wo_jaringan {
+  id                  bigint        [pk, increment]
+  workorder_id        bigint        [not null, ref: > workorder.id, note: 'cascadeOnDelete']
+  jenis_pipa          varchar(255)
+  diameter_pipa       varchar(255)  [note: 'string di migration (bukan numerik)']
+  panjang_pipa        float
+  tingkat_kerusakan   varchar(255)
+  tindakan_perbaikan  text
+  hasil_inspeksi      text
+  created_at          timestamp
+  updated_at          timestamp
+
+  Note: 'Form kategori Jaringan (pipa & saluran).'
+}
+
+Table wo_infrastruktur {
+  id                   bigint        [pk, increment]
+  workorder_id         bigint        [not null, ref: > workorder.id, note: 'cascadeOnDelete']
+  nama_aset            varchar(255)
+  jenis_aset           varchar(255)
+  kapasitas            varchar(255)
+  kondisi_awal         text
+  kondisi_akhir        text
+  jadwal_pemeliharaan  date
+  tindakan             text
+  created_at           timestamp
+  updated_at           timestamp
+
+  Note: 'Form kategori Infrastruktur (aset fisik).'
+}
+
+Table lembur_spl {
+  id                bigint         [pk, increment]
+  workorder_id      bigint         [ref: > workorder.id, note: 'Nullable. Index only — tanpa FK constraint.']
+  pemohon_id        bigint         [ref: > users.id]
+  verifikator_id    bigint         [ref: > users.id]
+  status            lembur_status  [not null, default: 'pending']
+  waktu_pengajuan   datetime       [not null]
+  waktu_verifikasi  datetime
+  alasan_ditolak    varchar(255)
+  jenis_pekerjaan   varchar(255)
+  judul_pekerjaan   varchar(255)
+  tanggal_lembur    date
+  jam_mulai         time
+  estimasi_jam      smallint       [note: 'unsigned smallint']
+  alasan_lembur     text
+  latitude          decimal(10,7)
+  longitude         decimal(10,7)
+  location_id       bigint         [ref: > m_location.id, note: 'Index only — tanpa FK constraint.']
+  created_at        timestamp
+  updated_at        timestamp
+
+  indexes {
+    workorder_id
+    location_id
+  }
+
+  Note: 'Surat Perintah Lembur. Anggota lembur di lembur_spl_member.'
+}
+
+Table lembur_spl_member {
+  id               bigint    [pk, increment]
+  lembur_spl_id    bigint    [not null, ref: > lembur_spl.id, note: 'cascadeOnDelete']
+  user_id          bigint    [not null, ref: > users.id, note: 'restrictOnDelete']
+  created_at       timestamp
+  updated_at       timestamp
+
+  indexes {
+    (lembur_spl_id, user_id) [unique]
+    user_id
+  }
+}
+
+// =====================================================================
+// GROUP 5 — PROGRESS & DOKUMENTASI
+// =====================================================================
+
+Table progress_workorder {
+  id                       bigint         [pk, increment]
+  workorder_id             bigint         [not null, ref: > workorder.id, note: 'cascadeOnDelete']
+  tipe_progress            progress_tipe  [not null]
+  hasil_pengerjaan         varchar(255)
+  order                    integer        [not null, note: 'Urutan progres ke-N dalam satu WO']
+  waktu_submit             datetime
+  latitude                 decimal(10,7)  [note: 'Ditambah migration 2026_05_09']
+  longitude                decimal(10,7)  [note: 'Ditambah migration 2026_05_09']
+  accuracy                 float          [note: 'GPS accuracy (meter). Ditambah migration 2026_05_09']
+  tahapan                  smallint       [note: 'unsigned tinyint. Ditambah migration 2026_06_17']
+  submitted_by_pegawai_id  bigint         [ref: > m_pegawai.id, note: 'nullOnDelete. Ditambah migration 2026_06_17']
+  created_at               timestamp
+  updated_at               timestamp
+
+  Note: 'Log eksekusi WO (gabungan create + 3 alter). Review SPV ada di progress_detail.'
+}
+
+Table progress_detail {
+  id                       bigint        [pk, increment]
+  progress_workorder_id    bigint        [not null, ref: > progress_workorder.id, note: 'cascadeOnDelete']
+  status                   varchar(32)   [not null, default: 'pending']
+  reviewed_by_user_id      bigint        [ref: > users.id, note: 'SPV peninjau (nullable)']
+  reviewed_at              timestamp
+  alasan_revisi            varchar(255)
+  created_at               timestamp
+  updated_at               timestamp
+
+  indexes {
+    status
+    reviewed_at
+    (progress_workorder_id, status)
+  }
+
+  Note: 'Detail/review per progres (status review SPV, alasan revisi).'
+}
+
+Table dokumentasi_progress {
+  id                       bigint       [pk, increment]
+  progress_workorder_id    bigint       [not null, ref: > progress_workorder.id, note: 'cascadeOnDelete']
+  url                      varchar(255) [note: 'URL foto/lampiran']
+  jenis                    varchar(32)  [note: 'Ditambah migration 2026_06_18']
+  created_at               timestamp
+  updated_at               timestamp
+
+  Note: 'Foto/lampiran progres.'
+}
+
+// =====================================================================
+// GROUP 6 — AUDIT TRAIL
+// =====================================================================
+
+Table workorder_action {
+  id                    bigint       [pk, increment]
+  workorder_id          bigint       [not null, ref: > workorder.id, note: 'cascadeOnDelete']
+  action_id             bigint       [not null, ref: > m_action.id]
+  keterangan            varchar(255)
+  waktu_mulai           datetime     [not null]
+  sisa_durasi_menit     integer      [note: 'Untuk FREEZE/EXTEND']
+  estimasi_selesai      datetime
+  status_workorder      integer      [note: 'Snapshot status saat aksi (integer tanpa FK)']
+  created_at            timestamp
+  updated_at            timestamp
+
+  Note: 'Audit trail event-level. Tidak ada kolom actor_id di migration.'
+}
+
+// =====================================================================
+// GROUP 7 — LAPORAN
+// =====================================================================
+
+Table laporan_workorder {
+  id                       bigint       [pk, increment]
+  workorder_id             bigint       [not null, unique, ref: - workorder.id, note: '1:1. cascadeOnDelete.']
+  nomor_laporan            varchar(64)  [not null, unique]
+  tanggal_terbit           timestamp    [not null]
+  ringkasan_pekerjaan      text         [not null]
+  hasil_akhir_snapshot     json         [not null, note: 'jsonb — snapshot row wo_{kategori}']
+  petugas_snapshot         json         [not null, note: 'jsonb — array petugas']
+  catatan_spv              text
+  issued_by_user_id        bigint       [not null, ref: > users.id, note: 'SPV yang finalisasi']
+  approved_by_user_id      bigint       [ref: > users.id, note: 'Nullable']
+  approved_at              timestamp
+  created_at               timestamp
+  updated_at               timestamp
+
+  indexes {
+    workorder_id [unique]
+    nomor_laporan [unique]
+    approved_by_user_id
+  }
+
+  Note: 'Dokumen resmi hasil WO. Tidak ada kolom pdf_url / catatan_manager.'
+}
+
+// =====================================================================
+// GROUP 8 — MATERIAL
+// =====================================================================
+
+Table m_material {
+  kode_material    varchar(255)  [pk, note: 'PK string (kode manual)']
+  nama             varchar(255)  [not null]
+  jumlah_stok      integer       [not null]
+  rusak            integer       [not null, default: 0]
+  pegawai_id       bigint        [not null, ref: > m_pegawai.id, note: 'PIC gudang']
+  created_at       timestamp
+  updated_at       timestamp
+
+  Note: 'Master material. Terhubung ke WO via wo_peminjaman_material.'
+}
+
+Table wo_peminjaman_material {
+  id                  bigint        [pk, increment]
+  workorder_id        bigint        [not null, ref: > workorder.id, note: 'cascadeOnDelete']
+  material_kode       varchar(255)  [not null, ref: > m_material.kode_material, note: 'restrictOnDelete']
+  jumlah_pinjam       integer       [not null]
+  catatan             text
+  diajukan_oleh       bigint        [not null, ref: > m_pegawai.id, note: 'Pegawai pengaju. restrictOnDelete']
+  diajukan_at         timestamp     [not null]
+  status              varchar(32)   [not null, default: 'DIPINJAM', note: 'DIPINJAM | DIKEMBALIKAN']
+  jumlah_kembali      integer
+  jumlah_rusak        integer
+  kondisi_kembali     varchar(64)
+  dikembalikan_at     timestamp
+  diverifikasi_oleh   bigint        [ref: > m_pegawai.id, note: 'Pegawai verifikator (nullable). restrictOnDelete']
+  diverifikasi_at     timestamp
+  catatan_verifikator text
+  created_at          timestamp
+  updated_at          timestamp
+
+  indexes {
+    workorder_id
+    material_kode
+    status
+  }
+
+  Note: 'Peminjaman material untuk WO (opsional).'
+}
+
+// =====================================================================
+// GROUP 9 — NOTIFIKASI & INFRA LARAVEL
+// =====================================================================
+
+Table notifications {
+  id               uuid         [pk]
+  type             varchar(255) [not null]
+  notifiable_type  varchar(255) [not null, note: 'morphs(notifiable)']
+  notifiable_id    bigint       [not null, note: 'morphs(notifiable)']
+  data             text         [not null]
+  read_at          timestamp
+  created_at       timestamp
+  updated_at       timestamp
+
+  indexes {
+    (notifiable_type, notifiable_id)
+  }
+
+  Note: 'Laravel database notifications (polymorphic notifiable).'
+}
+
+Table personal_access_tokens {
+  id               bigint       [pk, increment]
+  tokenable_type   varchar(255) [not null, note: 'morphs(tokenable)']
+  tokenable_id     bigint       [not null, note: 'morphs(tokenable)']
+  name             varchar(255) [not null]
+  token            varchar(64)  [not null, unique]
+  abilities        text
+  last_used_at     timestamp
+  created_at       timestamp
+  updated_at       timestamp
+
+  indexes {
+    (tokenable_type, tokenable_id)
+    token [unique]
+  }
+
+  Note: 'Sanctum token standar (polymorphic — TIDAK di-override jadi hard FK ke users di branch ini).'
+}
+
+Table sessions {
+  id               varchar(255) [pk]
+  user_id          bigint       [ref: > users.id, note: 'Nullable, index only']
+  ip_address       varchar(45)
+  user_agent       text
+  payload          text         [not null]
+  last_activity    integer      [not null]
+
+  indexes {
+    user_id
+    last_activity
+  }
+
+  Note: 'Laravel session (web).'
+}
+
+Table password_resets {
+  email            varchar(255) [not null, note: 'di-index']
+  token            varchar(255) [not null]
+  created_at       timestamp
+
+  indexes {
+    email
+  }
+
+  Note: 'Laravel password reset token. Tidak ada kolom user_id di branch ini.'
+}
+
+Table failed_jobs {
+  id               bigint       [pk, increment]
+  uuid             varchar(255) [not null, unique]
+  connection       text         [not null]
+  queue            text         [not null]
+  payload          text         [not null]
+  exception        text         [not null]
+  failed_at        timestamp    [not null, default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    uuid [unique]
+  }
+}
+
+// =====================================================================
+// CATATAN AS-BUILT
+// =====================================================================
+// 1. STATUS = ENUM, bukan tabel. workorder/pengaduan/lembur_spl masing-masing
+//    punya kolom enum sendiri (lihat blok Enum di atas). progress_workorder.tipe_progress
+//    juga enum. Tidak ada m_status / m_tipe_progress / m_kpi (master_kpi minimal).
+//
+// 2. ASSIGNMENT BERBASIS PEGAWAI. Kolom yang mereferensi m_pegawai:
+//    workorder.assigned_to, workorder_assignment.spv_pegawai_id,
+//    wo_assignment_member.pegawai_id, progress_workorder.submitted_by_pegawai_id,
+//    wo_peminjaman_material.diajukan_oleh & diverifikasi_oleh, m_material.pegawai_id.
+//    Yang mereferensi users: workorder.created_by, progress_detail.reviewed_by_user_id,
+//    laporan_workorder.issued_by_user_id & approved_by_user_id,
+//    lembur_spl.pemohon_id & verifikator_id, lembur_spl_member.user_id, sessions.user_id.
+//
+// 3. LINK LOGIS TANPA FK CONSTRAINT (hanya unique/index di migration):
+//    workorder.kode_pengaduan → pengaduan.kode_pengaduan,
+//    lembur_spl.workorder_id → workorder.id, lembur_spl.location_id → m_location.id.
+//
+// 4. JSONB: laporan_workorder.hasil_akhir_snapshot & petugas_snapshot (Postgres jsonb,
+//    cast 'array' di model).
+//
+// 5. ON DELETE CASCADE: workorder_assignment, wo_assignment_member (dari assignment),
+//    progress_workorder, progress_detail, dokumentasi_progress, workorder_action,
+//    wo_meter, wo_jaringan, wo_infrastruktur, wo_peminjaman_material, laporan_workorder,
+//    lembur_spl_member. nullOnDelete: progress_workorder.submitted_by_pegawai_id.
+//    restrictOnDelete: FK ke master & users lainnya.
+//
+// 6. TIDAK ADA di branch ini (sengaja dicatat): tabel user_locations (model
+//    App\Models\UserLocations yatim — tanpa migration); kolom workorder_petugas;
+//    override FK Sanctum/sessions/password_resets (migration 2025_12_* tidak ada).

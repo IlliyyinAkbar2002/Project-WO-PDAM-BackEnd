@@ -54,6 +54,7 @@ class AssignmentWorkorder extends Controller
             'latitude'          => 'nullable|numeric|between:-90,90',
             'longitude'         => 'nullable|numeric|between:-180,180',
             'nama_lokasi'       => 'nullable|string|max:255',
+            'radius_meter'      => 'nullable|integer|min:1',
             'deskripsi'         => 'nullable|string',
             'tanggal_mulai'     => 'nullable|date',
             'tanggal_selesai'   => 'nullable|date',

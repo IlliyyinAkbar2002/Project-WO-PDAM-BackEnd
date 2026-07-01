@@ -190,7 +190,7 @@ class AssignmentService
             'nama'         => $namaLokasi,
             'latitude'     => $data['latitude'],
             'longitude'    => $data['longitude'],
-            'radius_meter' => 100,
+            'radius_meter' => $data['radius_meter'] ?? 100,
         ]);
 
         return $location->id;
