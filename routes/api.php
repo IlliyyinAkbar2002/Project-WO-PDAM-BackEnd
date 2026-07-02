@@ -5,7 +5,6 @@ use App\Http\Controllers\JenisWorkorderController;
 use App\Http\Controllers\KpiController;
 use App\Http\Controllers\LemburSplController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\WorkorderActionController;
 use App\Http\Controllers\WorkorderController;
 use App\Http\Controllers\ProgressWorkorderController;
 use App\Http\Controllers\ProgressDetailController;
@@ -140,9 +139,6 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('jenis-workorder', JenisWorkorderController::class);
         Route::get('jenis-workorder/{id}', [JenisWorkorderController::class, 'show']);
         Route::patch('jenis-workorder/{id}/status', [JenisWorkorderController::class, 'updateStatus']);
-
-        // Workorder actions
-        Route::get('workorder-action', [WorkorderActionController::class, 'index']);
 
         // Peminjaman Material per WO — Flutter Mobile
         Route::get('log-peminjaman-material', [WoPeminjamanMaterialController::class, 'index']);

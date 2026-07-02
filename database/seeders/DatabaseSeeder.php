@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Departemen;
 use App\Models\Jabatan;
 use App\Models\JenisWorkorder;
-use App\Models\MasterAction;
 use App\Models\MasterKpi;
 use App\Models\MasterLocation;
 use App\Models\Pegawai;
@@ -88,7 +87,6 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
         ]);
         JenisWorkorder::factory(9)->create();
-        MasterAction::factory(4)->create();
 
         // Pengaduan (kode PGD-001..010) — diperlukan saat membuat Work Order.
         $this->call(PengaduanSeeder::class);

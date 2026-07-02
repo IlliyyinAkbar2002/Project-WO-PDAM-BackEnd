@@ -182,16 +182,6 @@ Table m_location {
   Note: 'Titik lokasi + radius untuk geofencing.'
 }
 
-Table m_action {
-  id               bigint       [pk, increment]
-  nama             varchar(255) [not null]
-  keterangan       varchar(255) [not null]
-  created_at       timestamp
-  updated_at       timestamp
-
-  Note: 'Master aksi audit trail (dipakai workorder_action.action_id).'
-}
-
 Table master_kpi {
   id               bigint       [pk, increment]
   nama             varchar(255) [not null]
@@ -426,25 +416,6 @@ Table dokumentasi_progress {
 }
 
 // =====================================================================
-// GROUP 6 — AUDIT TRAIL
-// =====================================================================
-
-Table workorder_action {
-  id                    bigint       [pk, increment]
-  workorder_id          bigint       [not null, ref: > workorder.id, note: 'cascadeOnDelete']
-  action_id             bigint       [not null, ref: > m_action.id]
-  keterangan            varchar(255)
-  waktu_mulai           datetime     [not null]
-  sisa_durasi_menit     integer      [note: 'Untuk FREEZE/EXTEND']
-  estimasi_selesai      datetime
-  status_workorder      integer      [note: 'Snapshot status saat aksi (integer tanpa FK)']
-  created_at            timestamp
-  updated_at            timestamp
-
-  Note: 'Audit trail event-level. Tidak ada kolom actor_id di migration.'
-}
-
-// =====================================================================
 // GROUP 7 — LAPORAN
 // =====================================================================
 
@@ -621,7 +592,7 @@ Table failed_jobs {
 //    cast 'array' di model).
 //
 // 5. ON DELETE CASCADE: workorder_assignment, wo_assignment_member (dari assignment),
-//    progress_workorder, progress_detail, dokumentasi_progress, workorder_action,
+//    progress_workorder, progress_detail, dokumentasi_progress,
 //    wo_meter, wo_jaringan, wo_infrastruktur, wo_peminjaman_material, laporan_workorder,
 //    lembur_spl_member. nullOnDelete: progress_workorder.submitted_by_pegawai_id.
 //    restrictOnDelete: FK ke master & users lainnya.
