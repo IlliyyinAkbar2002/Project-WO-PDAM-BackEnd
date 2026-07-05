@@ -42,6 +42,7 @@ return new class extends Migration
             // Pengembalian
             $table->integer('jumlah_kembali')->nullable();
             $table->integer('jumlah_rusak')->nullable();
+            $table->integer('jumlah_terpasang')->nullable();
             $table->string('kondisi_kembali', 64)->nullable();
             $table->timestamp('dikembalikan_at')->nullable();
 

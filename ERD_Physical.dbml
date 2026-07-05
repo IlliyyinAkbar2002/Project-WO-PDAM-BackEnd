@@ -11,7 +11,6 @@
 //
 // Konvensi :
 //   - Mayoritas master table berprefiks `m_` (m_pegawai, m_jenis_workorder, dst).
-//     Pengecualian historis: `master_kpi` (tanpa prefiks).
 //   - Tabel transaksional tanpa prefiks (workorder, progress_workorder, dst).
 //   - Tabel inti dinamai singular: `workorder` (bukan workorders).
 //   - Status & tipe progress = kolom ENUM inline (TIDAK ada master table status).
@@ -180,15 +179,6 @@ Table m_location {
   updated_at       timestamp
 
   Note: 'Titik lokasi + radius untuk geofencing.'
-}
-
-Table master_kpi {
-  id               bigint       [pk, increment]
-  nama             varchar(255) [not null]
-  created_at       timestamp
-  updated_at       timestamp
-
-  Note: 'Master KPI minimal (hanya id + nama). Tanpa prefiks m_ (penamaan historis).'
 }
 
 // =====================================================================
@@ -574,7 +564,7 @@ Table failed_jobs {
 // =====================================================================
 // 1. STATUS = ENUM, bukan tabel. workorder/pengaduan/lembur_spl masing-masing
 //    punya kolom enum sendiri (lihat blok Enum di atas). progress_workorder.tipe_progress
-//    juga enum. Tidak ada m_status / m_tipe_progress / m_kpi (master_kpi minimal).
+//    juga enum. Tidak ada m_status / m_tipe_progress / m_kpi.
 //
 // 2. ASSIGNMENT BERBASIS PEGAWAI. Kolom yang mereferensi m_pegawai:
 //    workorder.assigned_to, workorder_assignment.spv_pegawai_id,

@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Departemen;
 use App\Models\Jabatan;
 use App\Models\JenisWorkorder;
-use App\Models\MasterKpi;
 use App\Models\MasterLocation;
 use App\Models\Pegawai;
 use App\Models\Role;
@@ -92,9 +91,9 @@ class DatabaseSeeder extends Seeder
         $this->call(PengaduanSeeder::class);
 
         // Akun uji alur Mobile: 1 SPV + 1 senior (PIC) + 1 staff.
-        // $this->call(StaffTestSeeder::class);
+        $this->call(StaffTestSeeder::class);
 
         // Master material berstok untuk uji peminjaman material di FE Mobile.
-        // $this->call(MaterialSeeder::class);
+        $this->call(MaterialSeeder::class);
     }
 }

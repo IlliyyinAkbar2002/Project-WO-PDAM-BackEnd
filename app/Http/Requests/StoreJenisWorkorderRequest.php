@@ -27,7 +27,7 @@ class StoreJenisWorkorderRequest extends FormRequest
             'nama' => 'required|string|max:255|unique:m_jenis_workorder,nama',
             'form_workorder' => 'required|array|min:1',
             'form_workorder.*.id' => 'required|integer',
-            'form_workorder.*.kpi_id' => 'required|integer|exists:master_kpi,id',
+            'form_workorder.*.kpi_id' => 'required|integer',
             'form_workorder.*.nama_field' => 'required|string|max:255',
             'form_workorder.*.tipe_field' => 'required|string|in:text,dropdown,image,date',
             'form_workorder.*.tipe_data' => 'nullable|string|in:string,integer,float',
@@ -54,7 +54,6 @@ class StoreJenisWorkorderRequest extends FormRequest
             'nama.unique' => 'Nama jenis workorder sudah digunakan.',
             'form_workorder.required' => 'Form workorder wajib diisi.',
             'form_workorder.*.kpi_id.required' => 'KPI ID wajib diisi.',
-            'form_workorder.*.kpi_id.exists' => 'KPI ID tidak valid.',
             'form_workorder.*.nama_field.required' => 'Nama field wajib diisi.',
             'form_workorder.*.detail_form.*.nama_opsi.required' => 'Nama opsi wajib diisi.',
         ];
