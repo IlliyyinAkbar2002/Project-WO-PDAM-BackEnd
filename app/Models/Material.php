@@ -32,7 +32,7 @@ class Material extends Model
 
     public function getTerpakaiAttribute()
     {
-        return WoPeminjamanMaterial::where(
+        $aktif = WoPeminjamanMaterial::where(
             'material_kode',
             $this->kode_material
         )
@@ -41,6 +41,17 @@ class Material extends Model
                 'PENDING_KEMBALI'
             ])
             ->sum('jumlah_pinjam');
+
+        // Material yang terpasang/dikonsumsi permanen pada peminjaman yang
+        // sudah dikembalikan — ikut mengurangi stok tersedia.
+        $terpasang = WoPeminjamanMaterial::where(
+            'material_kode',
+            $this->kode_material
+        )
+            ->where('status', 'DIKEMBALIKAN')
+            ->sum('jumlah_terpasang');
+
+        return $aktif + $terpasang;
     }
 
     public function getTersediaAttribute()

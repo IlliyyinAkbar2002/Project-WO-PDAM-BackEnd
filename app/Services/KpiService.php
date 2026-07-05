@@ -77,7 +77,11 @@ class KpiService
                 'DIPINJAM',
                 'PENDING_KEMBALI',
             ]
-        )->sum('jumlah_pinjam');
+        )->sum('jumlah_pinjam')
+            // Tambahkan material terpasang/dikonsumsi permanen dari peminjaman
+            // yang sudah dikembalikan (konsisten dengan Material::getTerpakaiAttribute).
+            + WoPeminjamanMaterial::where('status', 'DIKEMBALIKAN')
+                ->sum('jumlah_terpasang');
 
         $materialTersedia =
             $materialTotal
