@@ -108,22 +108,36 @@ class ProgressWorkorderController extends Controller
     }
 
     /**
-     * Aturan #1 — Gate "belum waktunya mulai" (HANYA WO lembur).
-     * lembur_spl_id != null & tanggal_mulai != null: tolak bila now() < tanggal_mulai.
-     * WO non-lembur / tanpa jadwal: dilewati.
+     * Aturan #1 — Gate "belum waktunya mulai".
+     *  - Reguler (controller ini): gate per-TANGGAL (abaikan jam), semua prioritas
+     *    termasuk Urgent. Tolak bila hari ini masih SEBELUM tanggal_mulai.
+     *  - Lembur (defensif; normalnya ditangani ProgressLemburController): exact-datetime.
+     *  - Tanpa tanggal_mulai: dilewati.
      */
     private function rejectIfBelumWaktunyaMulai(Workorder $workorder): ?\Illuminate\Http\JsonResponse
     {
-        if ($workorder->lembur_spl_id === null) {
-            return null;
-        }
         $tanggalMulai = $this->assignmentTanggalMulai($workorder);
         if ($tanggalMulai === null) {
             return null;
         }
-        if (now()->lt($tanggalMulai)) {
+
+        // Lembur: pertahankan perilaku lama (exact-datetime).
+        if ($workorder->lembur_spl_id !== null) {
+            if (now()->lt($tanggalMulai)) {
+                return response()->json([
+                    'error' => 'Belum waktunya. WO dijadwalkan mulai pada '
+                        . \Illuminate\Support\Carbon::parse($tanggalMulai)->format('d-m-Y H:i') . '.'
+                ], 422);
+            }
+            return null;
+        }
+
+        // Reguler: gate per-TANGGAL (kalender), berlaku untuk semua prioritas.
+        $startDay = \Illuminate\Support\Carbon::parse($tanggalMulai)->startOfDay();
+        if (now()->startOfDay()->lt($startDay)) {
             return response()->json([
-                'error' => 'Belum waktunya. WO dijadwalkan mulai pada ' . $tanggalMulai->format('d-m-Y H:i') . '.'
+                'error' => 'Belum waktunya. WO dijadwalkan mulai pada '
+                    . $startDay->format('d-m-Y') . '.'
             ], 422);
         }
         return null;
