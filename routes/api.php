@@ -45,6 +45,7 @@ Route::prefix('v1')->group(function () {
         // Workorder resources Web NextJS and Flutter Mobile
         Route::get('workorder/history',[WorkorderController::class, 'history']);
         Route::get('workorder/history/{id}',[WorkorderController::class, 'historyDetail']);
+        Route::get('workorder/history/export-pdf', [WorkorderController::class, 'exportPdf']);
         Route::apiResource('workorder', WorkorderController::class);
         Route::post('workorder', [WorkorderController::class, 'store']);
         Route::patch('workorder/{id}/status', [WorkorderController::class, 'updateStatus']);

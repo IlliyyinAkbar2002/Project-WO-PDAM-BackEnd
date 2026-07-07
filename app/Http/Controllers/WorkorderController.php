@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\LemburSpl;
 use App\Models\JenisWorkorder;
+use App\Models\Pegawai;
 use App\Models\Pengaduan;
 use App\Models\User;
 use App\Models\Workorder;
@@ -14,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class WorkorderController extends Controller
 {
@@ -143,6 +145,40 @@ class WorkorderController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function exportPdf(Request $request)
+    {
+        $search = $request->search;
+        $sort = $request->sort ?? 'desc';
+        $workorders = Workorder::with([
+            'pengaduan',
+            'departemen',
+            'jenisWorkorder',
+            'workorderAssignment.location',
+            'workorderAssignment.spv',
+            'workorderAssignment.picMember.pegawai',
+            'assignmentMembers.pegawai',
+            'laporanWorkorder',
+        ])
+        ->where('status', 'Selesai')
+        ->when($search, function ($q) use ($search) {
+            $q->where(function ($query) use ($search) {
+                $query->where('nama_workorder', 'ILIKE', "%{$search}%")
+                    ->orWhere('kode_pengaduan', 'ILIKE', "%{$search}%");
+            });
+        })
+        ->orderBy('updated_at', $sort)
+        ->get();
+
+        $managerSenior = Pegawai::where('jabatan_id', 2)->first();
+        $manager = Pegawai::where('jabatan_id', 3)->first();
+
+        $pdf = Pdf::loadView(
+            'export-pdf.history-workorder',
+            compact('workorders', 'managerSenior', 'manager')
+        );
+        return $pdf->download('history-workorder.pdf');
     }
 
     /**
