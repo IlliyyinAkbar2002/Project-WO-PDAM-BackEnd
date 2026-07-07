@@ -147,38 +147,41 @@ class WorkorderController extends Controller
         }
     }
 
-    public function exportPdf(Request $request)
+    public function exportPdf($id)
     {
-        $search = $request->search;
-        $sort = $request->sort ?? 'desc';
-        $workorders = Workorder::with([
-            'pengaduan',
-            'departemen',
-            'jenisWorkorder',
-            'workorderAssignment.location',
-            'workorderAssignment.spv',
-            'workorderAssignment.picMember.pegawai',
-            'assignmentMembers.pegawai',
-            'laporanWorkorder',
-        ])
-        ->where('status', 'Selesai')
-        ->when($search, function ($q) use ($search) {
-            $q->where(function ($query) use ($search) {
-                $query->where('nama_workorder', 'ILIKE', "%{$search}%")
-                    ->orWhere('kode_pengaduan', 'ILIKE', "%{$search}%");
-            });
-        })
-        ->orderBy('updated_at', $sort)
-        ->get();
+        try {
+            $workorder = Workorder::with([
+                'pengaduan',
+                'departemen',
+                'jenisWorkorder',
+                'workorderAssignment.location',
+                'workorderAssignment.spv',
+                'workorderAssignment.picMember.pegawai',
+                'assignmentMembers.pegawai',
+                'laporanWorkorder',
+                'progressWorkorder',
+            ])->where('status', 'Selesai')
+            ->findOrFail($id);
 
-        $managerSenior = Pegawai::where('jabatan_id', 2)->first();
-        $manager = Pegawai::where('jabatan_id', 3)->first();
-
-        $pdf = Pdf::loadView(
-            'export-pdf.history-workorder',
-            compact('workorders', 'managerSenior', 'manager')
-        );
-        return $pdf->download('history-workorder.pdf');
+            $managerSenior = Pegawai::where('jabatan_id', 2)->first();
+            $manager = Pegawai::where('jabatan_id', 3)->first();
+            $pdf = Pdf::loadView(
+                'export-pdf.history-workorder',
+                compact(
+                    'workorder',
+                    'managerSenior',
+                    'manager'
+                )
+            );
+            return $pdf->download(
+                'history-workorder-' . $workorder->id . '.pdf'
+            );
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Gagal export PDF',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
