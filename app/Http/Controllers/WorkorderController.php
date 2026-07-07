@@ -175,7 +175,7 @@ class WorkorderController extends Controller
             )
         )->setPaper('a4', 'portrait');
 
-        return $pdf->download(
+        return $pdf->stream(
             'Laporan-'.$workorder->laporanWorkorder->nomor_laporan.'.pdf'
         );
     }
