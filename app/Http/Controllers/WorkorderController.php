@@ -149,39 +149,35 @@ class WorkorderController extends Controller
 
     public function exportPdf($id)
     {
-        try {
-            $workorder = Workorder::with([
-                'pengaduan',
-                'departemen',
-                'jenisWorkorder',
-                'workorderAssignment.location',
-                'workorderAssignment.spv',
-                'workorderAssignment.picMember.pegawai',
-                'assignmentMembers.pegawai',
-                'laporanWorkorder',
-                'progressWorkorder',
-            ])->where('status', 'Selesai')
-            ->findOrFail($id);
+        $workorder = Workorder::with([
+            'pengaduan',
+            'departemen',
+            'jenisWorkorder',
+            'assignedTo',
+            'createdBy',
+            'workorderAssignment.location',
+            'workorderAssignment.spv',
+            'workorderAssignment.members.pegawai',
+            'laporanWorkorder',
+        ])
+        ->where('status', 'Selesai')
+        ->findOrFail($id);
 
-            $managerSenior = Pegawai::where('jabatan_id', 2)->first();
-            $manager = Pegawai::where('jabatan_id', 3)->first();
-            $pdf = Pdf::loadView(
-                'export-pdf.history-workorder',
-                compact(
-                    'workorder',
-                    'managerSenior',
-                    'manager'
-                )
-            );
-            return $pdf->download(
-                'history-workorder-' . $workorder->id . '.pdf'
-            );
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Gagal export PDF',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        $managerSenior = Pegawai::where('jabatan_id', 2)->first();
+        $manager = Pegawai::where('jabatan_id', 3)->first();
+
+        $pdf = Pdf::loadView(
+            'export-pdf.history-workorder',
+            compact(
+                'workorder',
+                'managerSenior',
+                'manager'
+            )
+        )->setPaper('a4', 'portrait');
+
+        return $pdf->download(
+            'Laporan-'.$workorder->laporanWorkorder->nomor_laporan.'.pdf'
+        );
     }
 
     /**
