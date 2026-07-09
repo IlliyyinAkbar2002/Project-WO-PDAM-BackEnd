@@ -198,6 +198,13 @@ class AuthController extends Controller
                 ], 404);
             }
 
+            // if (!$user->is_active) {
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'Email tidak aktif',
+            //     ], 404);
+            // }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Email terdaftar. Silakan atur password baru.',
@@ -236,6 +243,13 @@ class AuthController extends Controller
                     'message' => 'Email tidak terdaftar',
                 ], 404);
             }
+
+            // if (!$user->is_active) {
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'Email tidak aktif',
+            //     ], 404);
+            // }
 
             $user->password = Hash::make($validated['new_password']);
             $user->save();

@@ -134,7 +134,10 @@ class LemburSplController extends Controller
                 'error' => "WO tidak pada status 'Pending', tidak bisa diajukan lembur (status saat ini: {$workorder->status}).",
             ], 422);
         }
-        if ($workorder->lembur_spl_id) {
+        $hasActiveLembur = LemburSpl::where('workorder_id', $workorder->id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->exists();
+        if ($hasActiveLembur) {
             return response()->json([
                 'error' => 'WO ini sudah memiliki pengajuan lembur.',
             ], 422);
@@ -191,9 +194,6 @@ class LemburSplController extends Controller
             if (! empty($rows)) {
                 LemburSplMember::insert($rows);
             }
-
-            // Link WO → pengajuan lembur. Inilah penanda "WO ini lembur".
-            $workorder->update(['lembur_spl_id' => $lemburSpl->id]);
 
             DB::commit();
 
@@ -279,10 +279,12 @@ class LemburSplController extends Controller
 
                 $workorder = $lemburSpl->workorder;
 
-                if ($workorder && $workorder->status === 'Pending') {
-                    $workorder->update([
-                        'status' => 'Proses'
-                    ]);
+                if ($workorder) {
+                    $updates = ['lembur_spl_id' => $lemburSpl->id];
+                    if ($workorder->status === 'Pending') {
+                        $updates['status'] = 'Proses';
+                    }
+                    $workorder->update($updates);
                 }
 
                 (new LemburApprovalService())

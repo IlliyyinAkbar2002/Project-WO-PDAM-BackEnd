@@ -64,57 +64,110 @@ class StaffTestSeeder extends Seeder
                 'jabatan_id'    => $jabStaff->id,
             ]
         );
+        $staff = Pegawai::updateOrCreate(
+            ['nip' => 'STF-003'],
+            [
+                'nama'          => 'Konan Ahmad',
+                'jenis_kelamin' => 'Laki-laki',
+                'tanggal_lahir' => '1995-07-20',
+                'alamat'        => 'Jl. Operasional No. 3, Surabaya',
+                'telepon'       => '081200000003',
+                'departemen_id' => $departemenOperasional->id,
+                'jabatan_id'    => $jabStaff->id,
+            ]
+        );
+        $staff = Pegawai::updateOrCreate(
+            ['nip' => 'STF-004'],
+            [
+                'nama'          => 'Naruto Ahmad',
+                'jenis_kelamin' => 'Laki-laki',
+                'tanggal_lahir' => '1995-07-25',
+                'alamat'        => 'Jl. Operasional No. 3, Surabaya',
+                'telepon'       => '081200000003',
+                'departemen_id' => $departemenOperasional->id,
+                'jabatan_id'    => $jabStaff->id,
+            ]
+        );
+        $staff = Pegawai::updateOrCreate(
+            ['nip' => 'STF-005'],
+            [
+                'nama'          => 'Sasuke Ahmad',
+                'jenis_kelamin' => 'Laki-laki',
+                'tanggal_lahir' => '1995-07-20',
+                'alamat'        => 'Jl. Operasional No. 3, Surabaya',
+                'telepon'       => '081200000003',
+                'departemen_id' => $departemenOperasional->id,
+                'jabatan_id'    => $jabStaff->id,
+            ]
+        );
+        $staff = Pegawai::updateOrCreate(
+            ['nip' => 'STF-006'],
+            [
+                'nama'          => 'Kakashi Ahmad',
+                'jenis_kelamin' => 'Laki-laki',
+                'tanggal_lahir' => '1995-07-20',
+                'alamat'        => 'Jl. Operasional No. 3, Surabaya',
+                'telepon'       => '081200000003',
+                'departemen_id' => $departemenOperasional->id,
+                'jabatan_id'    => $jabStaff->id,
+            ]
+        );
 
         $accounts = [
             ['email' => 'iyyin@gmail.com',    'pegawai' => $spv],
             ['email' => 'david123@gmail.com', 'pegawai' => $senior],
             ['email' => 'andi@gmail.com',  'pegawai' => $staff],
+            ['email' => 'Naruto@gmail.com',  'pegawai' => $staff],
+            ['email' => 'Sasuke@gmail.com',  'pegawai' => $staff],
+            ['email' => 'Kakashi@gmail.com',  'pegawai' => $staff],
+
+            
         ];
 
-        $spvPelayanan = Pegawai::updateOrCreate(
-            ['nip' => 'PLY-SPV-001'],
-            [
-                'nama'          => 'Aulya',
-                'jenis_kelamin' => 'Perempuan',
-                'tanggal_lahir' => '1987-04-12',
-                'alamat'        => 'Jl. Pelayanan No. 1, Surabaya',
-                'telepon'       => '081200000004',
-                'departemen_id' => $departemenPelayanan->id,
-                'jabatan_id'    => $jabSpv->id,
-            ]
-        );
+        // $spvPelayanan = Pegawai::updateOrCreate(
+        //     ['nip' => 'PLY-SPV-001'],
+        //     [
+        //         'nama'          => 'Aulya',
+        //         'jenis_kelamin' => 'Perempuan',
+        //         'tanggal_lahir' => '1987-04-12',
+        //         'alamat'        => 'Jl. Pelayanan No. 1, Surabaya',
+        //         'telepon'       => '081200000004',
+        //         'departemen_id' => $departemenPelayanan->id,
+        //         'jabatan_id'    => $jabSpv->id,
+        //     ]
+        // );
 
-        $seniorPelayanan = Pegawai::updateOrCreate(
-            ['nip' => 'PLY-STF-001'],
-            [
-                'nama'          => 'Dono Pelayanan',
-                'jenis_kelamin' => 'Laki-laki',
-                'tanggal_lahir' => '1991-06-18',
-                'alamat'        => 'Jl. Pelayanan No. 2, Surabaya',
-                'telepon'       => '081200000005',
-                'departemen_id' => $departemenPelayanan->id,
-                'jabatan_id'    => $jabSenior->id,
-            ]
-        );
+        // $seniorPelayanan = Pegawai::updateOrCreate(
+        //     ['nip' => 'PLY-STF-001'],
+        //     [
+        //         'nama'          => 'Dono Pelayanan',
+        //         'jenis_kelamin' => 'Laki-laki',
+        //         'tanggal_lahir' => '1991-06-18',
+        //         'alamat'        => 'Jl. Pelayanan No. 2, Surabaya',
+        //         'telepon'       => '081200000005',
+        //         'departemen_id' => $departemenPelayanan->id,
+        //         'jabatan_id'    => $jabSenior->id,
+        //     ]
+        // );
 
-        $staffPelayanan = Pegawai::updateOrCreate(
-            ['nip' => 'PLY-STF-002'],
-            [
-                'nama'          => 'Jokowi Pelayanan',
-                'jenis_kelamin' => 'Laki-laki',
-                'tanggal_lahir' => '1996-09-22',
-                'alamat'        => 'Jl. Pelayanan No. 3, Surabaya',
-                'telepon'       => '081200000006',
-                'departemen_id' => $departemenPelayanan->id,
-                'jabatan_id'    => $jabStaff->id,
-            ]
-        );
+        // $staffPelayanan = Pegawai::updateOrCreate(
+        //     ['nip' => 'PLY-STF-002'],
+        //     [
+        //         'nama'          => 'Jokowi Pelayanan',
+        //         'jenis_kelamin' => 'Laki-laki',
+        //         'tanggal_lahir' => '1996-09-22',
+        //         'alamat'        => 'Jl. Pelayanan No. 3, Surabaya',
+        //         'telepon'       => '081200000006',
+        //         'departemen_id' => $departemenPelayanan->id,
+        //         'jabatan_id'    => $jabStaff->id,
+        //     ]
+        // );
 
-        $accounts = array_merge($accounts, [
-            ['email' => 'aul@gmail.com',    'pegawai' => $spvPelayanan],
-            ['email' => 'dono@gmail.com', 'pegawai' => $seniorPelayanan],
-            ['email' => 'jokowi@gmail.com',  'pegawai' => $staffPelayanan],
-        ]);
+        // $accounts = array_merge($accounts, [
+        //     ['email' => 'aul@gmail.com',    'pegawai' => $spvPelayanan],
+        //     ['email' => 'dono@gmail.com', 'pegawai' => $seniorPelayanan],
+        //     ['email' => 'jokowi@gmail.com',  'pegawai' => $staffPelayanan],
+        // ]);
 
         foreach ($accounts as $acc) {
             User::updateOrCreate(
@@ -128,15 +181,15 @@ class StaffTestSeeder extends Seeder
             );
         }
 
-        $this->command->info('StaffTestSeeder selesai. Akun uji (password: "password"):');
-        $this->command->info('  Departemen Operasional:');
-        $this->command->info("    SPV          : iyyin@gmail.com    | pegawai_id={$spv->id}");
-        $this->command->info("    Staff Senior : david123@gmail.com | pegawai_id={$senior->id}");
-        $this->command->info("    Staff        : andi@gmail.com     | pegawai_id={$staff->id}");
+        // $this->command->info('StaffTestSeeder selesai. Akun uji (password: "password"):');
+        // $this->command->info('  Departemen Operasional:');
+        // $this->command->info("    SPV          : iyyin@gmail.com    | pegawai_id={$spv->id}");
+        // $this->command->info("    Staff Senior : david123@gmail.com | pegawai_id={$senior->id}");
+        // $this->command->info("    Staff        : andi@gmail.com     | pegawai_id={$staff->id}");
 
-        $this->command->info('  Departemen Pelayanan:');
-        $this->command->info("    SPV          : spv.pelayanan@wo.test    | pegawai_id={$spvPelayanan->id}");
-        $this->command->info("    Staff Senior : senior.pelayanan@wo.test | pegawai_id={$seniorPelayanan->id}");
-        $this->command->info("    Staff        : staff.pelayanan@wo.test  | pegawai_id={$staffPelayanan->id}");
+        // $this->command->info('  Departemen Pelayanan:');
+        // $this->command->info("    SPV          : spv.pelayanan@wo.test    | pegawai_id={$spvPelayanan->id}");
+        // $this->command->info("    Staff Senior : senior.pelayanan@wo.test | pegawai_id={$seniorPelayanan->id}");
+        // $this->command->info("    Staff        : staff.pelayanan@wo.test  | pegawai_id={$staffPelayanan->id}");
     }
 }
