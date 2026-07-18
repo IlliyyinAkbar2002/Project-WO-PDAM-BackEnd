@@ -15,7 +15,6 @@ class StaffTestSeeder extends Seeder
     public function run(): void
     {
         $departemenOperasional = Departemen::firstOrCreate(['nama' => 'Operasional']);
-        $departemenPelayanan   = Departemen::firstOrCreate(['nama' => 'Pelayanan']);
 
         $jabSpv    = Jabatan::firstOrCreate(['nama' => 'Supervisor']);
         $jabSenior = Jabatan::firstOrCreate(['nama' => 'Staff Senior']);
@@ -23,171 +22,104 @@ class StaffTestSeeder extends Seeder
 
         $role = Role::firstOrCreate(['nama' => 'employee']);
 
-        // 1 SPV — pegawai inilah yang dipakai sebagai workorder.assigned_to.
-        $spv = Pegawai::updateOrCreate(
-            ['nip' => 'SPV-001'],
+        // SPV-001 dipakai sebagai workorder.assigned_to.
+        // Staff Senior di-assign dengan peran "koordinator" => is_pic = true (boleh submit SELESAI).
+        // Staff biasa di-assign dengan peran "anggota".
+        $pegawaiList = [
             [
+                'nip'           => 'SPV-001',
                 'nama'          => 'Illiyin Akbar',
                 'jenis_kelamin' => 'Laki-laki',
                 'tanggal_lahir' => '1985-05-10',
-                'alamat'        => 'Jl. Operasional No. 1, Surabaya',
                 'telepon'       => '081200000001',
-                'departemen_id' => $departemenOperasional->id,
                 'jabatan_id'    => $jabSpv->id,
-            ]
-        );
-
-        // Senior staff — di-assign dengan peran "koordinator" => is_pic = true (boleh submit SELESAI).
-        $senior = Pegawai::updateOrCreate(
-            ['nip' => 'STF-001'],
+                'email'         => 'iyyin@gmail.com',
+            ],
             [
+                'nip'           => 'STF-001',
                 'nama'          => 'David Jakeior',
                 'jenis_kelamin' => 'Laki-laki',
                 'tanggal_lahir' => '1990-03-15',
-                'alamat'        => 'Jl. Operasional No. 2, Surabaya',
                 'telepon'       => '081200000002',
-                'departemen_id' => $departemenOperasional->id,
                 'jabatan_id'    => $jabSenior->id,
-            ]
-        );
-
-        // Staff biasa — di-assign dengan peran "anggota".
-        $staff = Pegawai::updateOrCreate(
-            ['nip' => 'STF-002'],
+                'email'         => 'david123@gmail.com',
+            ],
             [
+                'nip'           => 'STF-002',
                 'nama'          => 'Andi Ahmad',
                 'jenis_kelamin' => 'Laki-laki',
                 'tanggal_lahir' => '1995-07-20',
-                'alamat'        => 'Jl. Operasional No. 3, Surabaya',
                 'telepon'       => '081200000003',
-                'departemen_id' => $departemenOperasional->id,
                 'jabatan_id'    => $jabStaff->id,
-            ]
-        // );
-        // $staff = Pegawai::updateOrCreate(
-        //     ['nip' => 'STF-003'],
-        //     [
-        //         'nama'          => 'Konan Ahmad',
-        //         'jenis_kelamin' => 'Laki-laki',
-        //         'tanggal_lahir' => '1995-07-20',
-        //         'alamat'        => 'Jl. Operasional No. 3, Surabaya',
-        //         'telepon'       => '081200000003',
-        //         'departemen_id' => $departemenOperasional->id,
-        //         'jabatan_id'    => $jabStaff->id,
-        //     ]
-        // );
-        // $staff = Pegawai::updateOrCreate(
-        //     ['nip' => 'STF-004'],
-        //     [
-        //         'nama'          => 'Naruto Ahmad',
-        //         'jenis_kelamin' => 'Laki-laki',
-        //         'tanggal_lahir' => '1995-07-25',
-        //         'alamat'        => 'Jl. Operasional No. 3, Surabaya',
-        //         'telepon'       => '081200000003',
-        //         'departemen_id' => $departemenOperasional->id,
-        //         'jabatan_id'    => $jabStaff->id,
-        //     ]
-        // );
-        // $staff = Pegawai::updateOrCreate(
-        //     ['nip' => 'STF-005'],
-        //     [
-        //         'nama'          => 'Sasuke Ahmad',
-        //         'jenis_kelamin' => 'Laki-laki',
-        //         'tanggal_lahir' => '1995-07-20',
-        //         'alamat'        => 'Jl. Operasional No. 3, Surabaya',
-        //         'telepon'       => '081200000003',
-        //         'departemen_id' => $departemenOperasional->id,
-        //         'jabatan_id'    => $jabStaff->id,
-        //     ]
-        // );
-        // $staff = Pegawai::updateOrCreate(
-        //     ['nip' => 'STF-006'],
-        //     [
-        //         'nama'          => 'Kakashi Ahmad',
-        //         'jenis_kelamin' => 'Laki-laki',
-        //         'tanggal_lahir' => '1995-07-20',
-        //         'alamat'        => 'Jl. Operasional No. 3, Surabaya',
-        //         'telepon'       => '081200000003',
-        //         'departemen_id' => $departemenOperasional->id,
-        //         'jabatan_id'    => $jabStaff->id,
-        //     ]
-        );
-
-        $accounts = [
-            ['email' => 'iyyin@gmail.com',    'pegawai' => $spv],
-            ['email' => 'david123@gmail.com', 'pegawai' => $senior],
-            ['email' => 'andi@gmail.com',  'pegawai' => $staff]
-            // ['email' => 'Naruto@gmail.com',  'pegawai' => $staff],
-            // ['email' => 'Sasuke@gmail.com',  'pegawai' => $staff],
-            // ['email' => 'Kakashi@gmail.com',  'pegawai' => $staff],
+                'email'         => 'andi@gmail.com',
+            ],
+            [
+                'nip'           => 'STF-003',
+                'nama'          => 'Konan Ahmad',
+                'jenis_kelamin' => 'Perempuan',
+                'tanggal_lahir' => '1996-01-12',
+                'telepon'       => '081200000004',
+                'jabatan_id'    => $jabStaff->id,
+                'email'         => 'konan@gmail.com',
+            ],
+            [
+                'nip'           => 'STF-004',
+                'nama'          => 'Naruto Ahmad',
+                'jenis_kelamin' => 'Laki-laki',
+                'tanggal_lahir' => '1995-07-25',
+                'telepon'       => '081200000005',
+                'jabatan_id'    => $jabStaff->id,
+                'email'         => 'naruto@gmail.com',
+            ],
+            [
+                'nip'           => 'STF-005',
+                'nama'          => 'Sasuke Ahmad',
+                'jenis_kelamin' => 'Laki-laki',
+                'tanggal_lahir' => '1995-11-03',
+                'telepon'       => '081200000006',
+                'jabatan_id'    => $jabStaff->id,
+                'email'         => 'sasuke@gmail.com',
+            ],
+            [
+                'nip'           => 'STF-006',
+                'nama'          => 'Kakashi Ahmad',
+                'jenis_kelamin' => 'Laki-laki',
+                'tanggal_lahir' => '1988-09-15',
+                'telepon'       => '081200000007',
+                'jabatan_id'    => $jabStaff->id,
+                'email'         => 'kakashi@gmail.com',
+            ],
         ];
 
-        // $spvPelayanan = Pegawai::updateOrCreate(
-        //     ['nip' => 'PLY-SPV-001'],
-        //     [
-        //         'nama'          => 'Aulya',
-        //         'jenis_kelamin' => 'Perempuan',
-        //         'tanggal_lahir' => '1987-04-12',
-        //         'alamat'        => 'Jl. Pelayanan No. 1, Surabaya',
-        //         'telepon'       => '081200000004',
-        //         'departemen_id' => $departemenPelayanan->id,
-        //         'jabatan_id'    => $jabSpv->id,
-        //     ]
-        // );
-
-        // $seniorPelayanan = Pegawai::updateOrCreate(
-        //     ['nip' => 'PLY-STF-001'],
-        //     [
-        //         'nama'          => 'Dono Pelayanan',
-        //         'jenis_kelamin' => 'Laki-laki',
-        //         'tanggal_lahir' => '1991-06-18',
-        //         'alamat'        => 'Jl. Pelayanan No. 2, Surabaya',
-        //         'telepon'       => '081200000005',
-        //         'departemen_id' => $departemenPelayanan->id,
-        //         'jabatan_id'    => $jabSenior->id,
-        //     ]
-        // );
-
-        // $staffPelayanan = Pegawai::updateOrCreate(
-        //     ['nip' => 'PLY-STF-002'],
-        //     [
-        //         'nama'          => 'Jokowi Pelayanan',
-        //         'jenis_kelamin' => 'Laki-laki',
-        //         'tanggal_lahir' => '1996-09-22',
-        //         'alamat'        => 'Jl. Pelayanan No. 3, Surabaya',
-        //         'telepon'       => '081200000006',
-        //         'departemen_id' => $departemenPelayanan->id,
-        //         'jabatan_id'    => $jabStaff->id,
-        //     ]
-        // );
-
-        // $accounts = array_merge($accounts, [
-        //     ['email' => 'aul@gmail.com',    'pegawai' => $spvPelayanan],
-        //     ['email' => 'dono@gmail.com', 'pegawai' => $seniorPelayanan],
-        //     ['email' => 'jokowi@gmail.com',  'pegawai' => $staffPelayanan],
-        // ]);
-
-        foreach ($accounts as $acc) {
-            User::updateOrCreate(
-                ['email' => $acc['email']],
+        foreach ($pegawaiList as $i => $data) {
+            $pegawai = Pegawai::updateOrCreate(
+                ['nip' => $data['nip']],
                 [
-                    'pegawai_id' => $acc['pegawai']->id,
-                    'role_id'    => $role->id,
-                    'password'   => bcrypt('password'),
-                    'is_active'  => true,
+                    'nama'          => $data['nama'],
+                    'jenis_kelamin' => $data['jenis_kelamin'],
+                    'tanggal_lahir' => $data['tanggal_lahir'],
+                    'alamat'        => 'Jl. Operasional No. ' . ($i + 1) . ', Surabaya',
+                    'telepon'       => $data['telepon'],
+                    'departemen_id' => $departemenOperasional->id,
+                    'jabatan_id'    => $data['jabatan_id'],
                 ]
             );
+
+            $user = User::updateOrCreate(
+                ['email' => $data['email']],
+                [
+                    'pegawai_id' => $pegawai->id,
+                    'role_id'    => $role->id,
+                    'password'   => bcrypt('password'),
+                ]
+            );
+
+            // is_active tidak masuk User::$fillable, jadi harus di-set di luar mass assignment
+            // supaya akun yang pernah dinonaktifkan ikut hidup lagi saat re-seed.
+            $user->is_active = true;
+            $user->save();
         }
 
-        // $this->command->info('StaffTestSeeder selesai. Akun uji (password: "password"):');
-        // $this->command->info('  Departemen Operasional:');
-        // $this->command->info("    SPV          : iyyin@gmail.com    | pegawai_id={$spv->id}");
-        // $this->command->info("    Staff Senior : david123@gmail.com | pegawai_id={$senior->id}");
-        // $this->command->info("    Staff        : andi@gmail.com     | pegawai_id={$staff->id}");
-
-        // $this->command->info('  Departemen Pelayanan:');
-        // $this->command->info("    SPV          : spv.pelayanan@wo.test    | pegawai_id={$spvPelayanan->id}");
-        // $this->command->info("    Staff Senior : senior.pelayanan@wo.test | pegawai_id={$seniorPelayanan->id}");
-        // $this->command->info("    Staff        : staff.pelayanan@wo.test  | pegawai_id={$staffPelayanan->id}");
+        $this->command->info('StaffTestSeeder selesai. 7 akun uji (password: "password"), departemen Operasional.');
     }
 }

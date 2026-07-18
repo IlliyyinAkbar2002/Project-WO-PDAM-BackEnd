@@ -47,6 +47,7 @@ class WorkorderController extends Controller
                 'jenisWorkorder',
                 'assignedTo',
                 'createdBy',
+                'workorderAssignment.members.user',
             ]);
             // Filter pencarian
             if ($search) {
