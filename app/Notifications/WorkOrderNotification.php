@@ -12,7 +12,7 @@ use Illuminate\Notifications\Notification;
  *   - title         : judul notifikasi (string)
  *   - message       : pesan body (string)
  *   - work_order_id : ID WO terkait (int)
- *   - type          : "wo_created" | "wo_assigned" | "wo_completed"
+ *   - type          : "wo_created" | "wo_assigned" | "wo_completed" | "wo_lembur_approved"
  *   - sender_name   : nama pengirim untuk avatar/initial di UI
  */
 class WorkOrderNotification extends Notification

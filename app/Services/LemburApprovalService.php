@@ -14,15 +14,6 @@ class LemburApprovalService
     /**
      * Approve pengajuan lembur → tugaskan anggota lembur sebagai staff WO.
      *
-     * Adaptasi versi golden ke skema target (ENUM + m_pegawai), acuan AssignmentService:
-     * - spv_pegawai_id = workorder.assigned_to (FK m_pegawai), BUKAN pemohon_id (users.id).
-     * - wo_assignment_member.pegawai_id: anggota lembur tersimpan sebagai users.id di
-     *   lembur_spl_member.user_id → dipetakan ke pegawai_id lewat users.pegawai_id.
-     * - TIDAK menyentuh status WO (gate Pending→Proses ditangani controller) dan
-     *   TIDAK mencatat WorkorderAction (di-drop, mengikuti pola AssignmentService).
-     * - Notifikasi staff TIDAK dikirim di sini (controller sudah emit wo_lembur_approved
-     *   ke anggota saat approve) untuk menghindari notifikasi ganda.
-     *
      * Idempoten: kalau WO sudah punya assignment beranggota, kembalikan apa adanya.
      *
      * @param  LemburSpl  $lembur  Idealnya sudah ter-load relasi `workorder` & `members`.

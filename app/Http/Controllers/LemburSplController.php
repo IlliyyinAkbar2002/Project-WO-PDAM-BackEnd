@@ -293,6 +293,40 @@ class LemburSplController extends Controller
 
             DB::commit();
 
+            // Notifikasi ke anggota lembur hanya pada transisi baru ke approved,
+            // setelah commit supaya kegagalan notify tidak membatalkan approval.
+            // lembur_spl_member.user_id sudah berisi users.id (dipetakan saat store()).
+            if ($isNewApproval) {
+                try {
+                    $senderName = optional($request->user()->pegawai)->nama
+                        ?? $request->user()->name
+                        ?? 'Verifikator';
+
+                    $namaWorkorder = $lemburSpl->workorder?->nama_workorder ?? '-';
+
+                    $memberUsers = User::whereIn(
+                        'id',
+                        $lemburSpl->members->pluck('user_id')->filter()->unique()
+                    )->get();
+
+                    foreach ($memberUsers as $member) {
+                        $member->notify(new WorkOrderNotification(
+                            'Lembur Disetujui',
+                            "{$senderName} menyetujui pengajuan lembur \"{$lemburSpl->judul_pekerjaan}\". Anda ditugaskan pada WO #{$namaWorkorder}.",
+                            (int) $lemburSpl->workorder_id,
+                            'wo_lembur_approved',
+                            $senderName
+                        ));
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('notifyLemburApproved failed', [
+                        'lembur_spl_id' => $lemburSpl->id,
+                        'workorder_id'  => $lemburSpl->workorder_id,
+                        'error'         => $e->getMessage(),
+                    ]);
+                }
+            }
+
             $lemburSpl->load([
                 'workorder',
                 'pemohon.pegawai',
