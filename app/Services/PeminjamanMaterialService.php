@@ -39,12 +39,11 @@ class PeminjamanMaterialService
     public function pinjam(Workorder $workorder, int $pegawaiId, array $data): WoPeminjamanMaterial
     {
         return DB::transaction(function () use ($workorder, $pegawaiId, $data) {
+            $this->applyLockTimeout();
             $this->assertWorkorderBorrowable($workorder);
             $this->assertMemberOfWorkorder($workorder, $pegawaiId);
 
-            $material = Material::where('kode_material', $data['material_kode'])
-                ->lockForUpdate()
-                ->first();
+            $material = $this->lockMaterial($data['material_kode']);
 
             if (! $material) {
                 throw new \LogicException('Material tidak ditemukan.');
@@ -77,7 +76,8 @@ class PeminjamanMaterialService
     public function submitReturn(WoPeminjamanMaterial $pinjaman, int $pegawaiId, array $data): WoPeminjamanMaterial
     {
         return DB::transaction(function () use ($pinjaman, $pegawaiId, $data) {
-            $pinjaman = WoPeminjamanMaterial::lockForUpdate()->find($pinjaman->id);
+            $this->applyLockTimeout();
+            $pinjaman = $this->lockPeminjaman($pinjaman->id);
 
             if ($pinjaman->status === 'PENDING_KEMBALI') {
                 throw new \LogicException('Pengembalian sudah diajukan, menunggu verifikasi supervisor.');
@@ -124,7 +124,8 @@ class PeminjamanMaterialService
     public function verify(WoPeminjamanMaterial $pinjaman, int $spvPegawaiId, array $data): WoPeminjamanMaterial
     {
         return DB::transaction(function () use ($pinjaman, $spvPegawaiId, $data) {
-            $pinjaman = WoPeminjamanMaterial::lockForUpdate()->find($pinjaman->id);
+            $this->applyLockTimeout();
+            $pinjaman = $this->lockPeminjaman($pinjaman->id);
 
             if ($pinjaman->status !== 'PENDING_KEMBALI') {
                 throw new \LogicException(
@@ -148,9 +149,7 @@ class PeminjamanMaterialService
             $pinjaman->catatan_verifikator  = $data['catatan_verifikator'] ?? null;
 
             if ($statusInput === 'APPROVED') {
-                $material = Material::where('kode_material', $pinjaman->material_kode)
-                    ->lockForUpdate()
-                    ->first();
+                $material = $this->lockMaterial($pinjaman->material_kode);
                 if ($material) {
                     // Bagian yang rusak tidak balik ke stok tersedia: parkir di kolom rusak.
                     $jumlahRusak = (int) ($pinjaman->jumlah_rusak ?? 0);
@@ -179,6 +178,68 @@ class PeminjamanMaterialService
 
             return $pinjaman->load(['material:kode_material,nama,jumlah_stok,rusak']);
         });
+    }
+
+    // ------------------------------------------------------------------
+    // CONCURRENCY
+    // ------------------------------------------------------------------
+
+    /**
+     * Batasi waktu tunggu lock untuk transaksi berjalan agar request
+     * gagal-cepat (bukan menggantung sampai timeout klien) saat baris
+     * sedang dikunci transaksi lain. Khusus pgsql; driver lain diabaikan.
+     */
+    private function applyLockTimeout(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::statement("SET LOCAL lock_timeout = '5s'");
+        }
+    }
+
+    /**
+     * True bila exception adalah lock timeout Postgres (SQLSTATE 55P03).
+     */
+    private function isLockTimeout(\Throwable $e): bool
+    {
+        return $e instanceof \Illuminate\Database\QueryException
+            && ((string) $e->getCode() === '55P03'
+                || str_contains($e->getMessage(), 'lock timeout')
+                || str_contains($e->getMessage(), 'lock_timeout'));
+    }
+
+    /**
+     * Ambil baris material dengan FOR UPDATE. Bila terkunci transaksi lain
+     * melebihi lock_timeout, lempar pesan ramah (dipetakan ke HTTP 400)
+     * alih-alih membiarkan request menggantung.
+     */
+    private function lockMaterial(string $kodeMaterial): ?Material
+    {
+        try {
+            return Material::where('kode_material', $kodeMaterial)
+                ->lockForUpdate()
+                ->first();
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($this->isLockTimeout($e)) {
+                throw new \LogicException('Material sedang diproses transaksi lain. Coba lagi sebentar.');
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Ambil baris peminjaman dengan FOR UPDATE. Sama seperti lockMaterial:
+     * gagal-cepat saat baris sedang dikunci transaksi lain.
+     */
+    private function lockPeminjaman(int $id): ?WoPeminjamanMaterial
+    {
+        try {
+            return WoPeminjamanMaterial::lockForUpdate()->find($id);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($this->isLockTimeout($e)) {
+                throw new \LogicException('Data peminjaman sedang diproses transaksi lain. Coba lagi sebentar.');
+            }
+            throw $e;
+        }
     }
 
     // ------------------------------------------------------------------

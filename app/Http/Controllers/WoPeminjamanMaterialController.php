@@ -7,6 +7,7 @@ use App\Models\Workorder;
 use App\Services\PeminjamanMaterialService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class WoPeminjamanMaterialController extends Controller
 {
@@ -37,12 +38,21 @@ class WoPeminjamanMaterialController extends Controller
 
     public function show($workorder_id)
     {
+        $pegawaiId = $this->actorPegawaiId();
+
+        // SPV WO (workorder.assigned_to) melihat seluruh peminjaman tim; staff biasa
+        // hanya peminjaman miliknya (diajukan_oleh). Enforcement berbasis identitas
+        // server (pegawai_id user login), BUKAN parameter klien.
+        $isSpv = $pegawaiId !== null
+            && (int) optional(Workorder::find($workorder_id))->assigned_to === $pegawaiId;
+
         $peminjaman = WoPeminjamanMaterial::with([
             'material:kode_material,nama,jumlah_stok,rusak',
             'pengaju:id,nama,nip',
             'verifier:id,nama,nip',
         ])
             ->where('workorder_id', $workorder_id)
+            ->when(! $isSpv, fn ($q) => $q->where('diajukan_oleh', $pegawaiId))
             ->orderByDesc('diajukan_at')
             ->get();
 
@@ -87,10 +97,9 @@ class WoPeminjamanMaterialController extends Controller
         } catch (\LogicException $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         } catch (\Throwable $e) {
-            return response()->json([
-                'message' => 'Terjadi kesalahan saat memproses peminjaman material.',
-                'error'   => $e->getMessage(),
-            ], 500);
+            $this->logFailure('pinjam', $e, ['workorder_id' => $workorder_id, 'pegawai_id' => $pegawaiId]);
+
+            return $this->serverError('Terjadi kesalahan saat memproses peminjaman material.', $e);
         }
     }
 
@@ -128,10 +137,9 @@ class WoPeminjamanMaterialController extends Controller
         } catch (\LogicException $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         } catch (\Throwable $e) {
-            return response()->json([
-                'message' => 'Terjadi kesalahan saat memproses pengembalian material.',
-                'error'   => $e->getMessage(),
-            ], 500);
+            $this->logFailure('kembalikan', $e, ['peminjaman_id' => $id, 'pegawai_id' => $pegawaiId]);
+
+            return $this->serverError('Terjadi kesalahan saat memproses pengembalian material.', $e);
         }
     }
 
@@ -169,10 +177,9 @@ class WoPeminjamanMaterialController extends Controller
         } catch (\LogicException $e) {
             return response()->json(['message' => $e->getMessage()], 400);
         } catch (\Throwable $e) {
-            return response()->json([
-                'message' => 'Terjadi kesalahan saat memverifikasi pengembalian material.',
-                'error'   => $e->getMessage(),
-            ], 500);
+            $this->logFailure('verify', $e, ['peminjaman_id' => $id, 'pegawai_id' => $pegawaiId]);
+
+            return $this->serverError('Terjadi kesalahan saat memverifikasi pengembalian material.', $e);
         }
     }
 
@@ -184,5 +191,28 @@ class WoPeminjamanMaterialController extends Controller
         $pegawaiId = optional(Auth::user())->pegawai_id;
 
         return $pegawaiId ? (int) $pegawaiId : null;
+    }
+
+    /**
+     * Catat kegagalan 500 ke log dengan konteks agar bisa didiagnosa
+     * (sebelumnya error ditelan tanpa jejak).
+     */
+    private function logFailure(string $action, \Throwable $e, array $context = []): void
+    {
+        Log::error("peminjaman-material.{$action} gagal", array_merge($context, [
+            'sqlstate' => $e instanceof \Illuminate\Database\QueryException ? $e->getCode() : null,
+            'message'  => $e->getMessage(),
+        ]));
+    }
+
+    /**
+     * Respons 500 seragam. Pesan mentah exception hanya dibocorkan saat APP_DEBUG.
+     */
+    private function serverError(string $message, \Throwable $e)
+    {
+        return response()->json(array_merge(
+            ['message' => $message],
+            config('app.debug') ? ['error' => $e->getMessage()] : []
+        ), 500);
     }
 }
