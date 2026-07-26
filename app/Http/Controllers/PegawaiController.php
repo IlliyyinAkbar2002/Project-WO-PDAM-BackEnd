@@ -7,6 +7,7 @@ use App\Models\Jabatan;
 use App\Models\Pegawai;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\StaffAvailabilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -147,8 +148,17 @@ class PegawaiController extends Controller
 
             $pegawaiList = $query->get();
 
+            // Status sibuk dihitung SATU query agregat untuk semua pegawai hasil
+            // filter — jangan query di dalam map() (endpoint ini mengisi picker
+            // petugas, akan jadi N+1).
+            $busyMap = (new StaffAvailabilityService())->busyMap(
+                $pegawaiList->pluck('id')->all()
+            );
+
             // Transform to consistent format
-            $transformedData = $pegawaiList->map(function ($pegawai) {
+            $transformedData = $pegawaiList->map(function ($pegawai) use ($busyMap) {
+                $busy = $busyMap->get($pegawai->id);
+
                 return [
                     'id' => $pegawai->id,
                     'pegawai_id' => $pegawai->id,
@@ -159,6 +169,11 @@ class PegawaiController extends Controller
                     'updated_at' => $pegawai->updated_at,
                     'departemen_id' => $pegawai->departemen_id,
                     'jabatan_id' => $pegawai->jabatan_id,
+                    // Pegawai yang masih memegang WO belum selesai (status != 'Selesai'
+                    // dan is_active) tidak bisa di-assign ke WO lain.
+                    'is_busy' => $busy !== null,
+                    'busy_workorder_id' => $busy['workorder_id'] ?? null,
+                    'busy_workorder_name' => $busy['workorder_nama'] ?? null,
                     'pegawai' => [
                         'id' => $pegawai->id,
                         'nama' => $pegawai->nama,

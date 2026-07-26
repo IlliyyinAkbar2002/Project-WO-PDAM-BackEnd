@@ -18,12 +18,16 @@ class AssignmentService
 {
     // Pengganti status_id referensi (DITUGASKAN_KE_STAFF) → enum current.
     private const STATUS_AFTER_ASSIGN = 'Proses';
+
+    // Status WO yang sedang di-assign yang menutup pintu assign.
+    // CATATAN: ini BEDA dari definisi "pegawai sibuk" di StaffAvailabilityService
+    // (di sana hanya 'Selesai' yang membebaskan pegawai) — jangan disamakan.
     private const STATUS_CLOSED = ['Selesai', 'Tutup'];
 
     public function assignStaff(Workorder $workorder, array $data, User $actor): WorkorderAssignment
     {
         return DB::transaction(function () use ($workorder, $data, $actor) {
-            $this->guardAssignability($workorder, $actor);
+            $this->guardAssignability($workorder, $actor, $data['petugas'] ?? []);
 
             // Prioritas: payload FE (kategori_form) > kolom jenis_workorder.
             // Kolom yang ada di skema target adalah `kategori` (bukan kategori_form),
@@ -101,7 +105,7 @@ class AssignmentService
         }
     }
 
-    private function guardAssignability(Workorder $workorder, User $actor): void
+    private function guardAssignability(Workorder $workorder, User $actor, array $petugasList): void
     {
         // SPV = user yang pegawai_id-nya == workorder.assigned_to (m_pegawai).
         if ((int) $actor->pegawai_id !== (int) $workorder->assigned_to) {
@@ -115,6 +119,13 @@ class AssignmentService
         if ($workorder->workorderAssignment && $workorder->workorderAssignment->members()->exists()) {
             throw new \LogicException('WO sudah pernah di-assign ke staff');
         }
+
+        // Hard block: petugas yang masih memegang WO belum selesai tidak boleh
+        // di-assign ke WO lain. Tanpa override, tanpa pengecualian 'Urgent'.
+        (new StaffAvailabilityService())->assertAllFree(
+            collect($petugasList)->pluck('pegawai_id')->all(),
+            (int) $workorder->id
+        );
     }
 
     private function createKategoriForm(string $kategori, int $workorderId, array $payload): void

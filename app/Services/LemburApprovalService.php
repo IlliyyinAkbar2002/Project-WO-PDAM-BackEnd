@@ -35,6 +35,13 @@ class LemburApprovalService
                 return $workorder->workorderAssignment;
             }
 
+            // Anggota SPL → pegawai_id, dipetakan sekali lalu dipakai guard & attachMembers.
+            $memberPegawaiIds = $this->resolveMemberPegawaiIds($lembur);
+
+            // Hard block yang sama seperti jalur assign manual: anggota yang masih
+            // memegang WO belum selesai membatalkan approval (422).
+            (new StaffAvailabilityService())->assertAllFree($memberPegawaiIds, (int) $workorder->id);
+
             [$tanggalMulai, $estimasiSelesai] = $this->resolveTimeline($lembur);
 
             if (!$workorder->assigned_to) {
@@ -58,7 +65,7 @@ class LemburApprovalService
                 ]
             );
 
-            $this->attachMembers($assignment, $lembur);
+            $this->attachMembers($assignment, $memberPegawaiIds);
 
             return $assignment;
         });
@@ -88,24 +95,44 @@ class LemburApprovalService
     }
 
     /**
-     * Salin anggota lembur → wo_assignment_member.
+     * Anggota lembur → daftar pegawai_id (m_pegawai), urut anggota pertama dulu.
      *
-     * lembur_spl_member.user_id (users.id) dipetakan ke pegawai_id (m_pegawai)
-     * via users.pegawai_id. Anggota pertama (urut id) jadi PIC/koordinator.
+     * lembur_spl_member.user_id (users.id) dipetakan ke pegawai_id via
+     * users.pegawai_id. Urutan dipertahankan: index 0 = PIC/koordinator.
+     *
+     * @return int[]
+     *
+     * @throws \LogicException  Jika ada anggota tanpa data pegawai.
      */
-    private function attachMembers(WorkorderAssignment $assignment, LemburSpl $lembur): void
+    private function resolveMemberPegawaiIds(LemburSpl $lembur): array
     {
         $members = $lembur->members->sortBy('id')->values();
 
         $userIds    = $members->pluck('user_id')->filter()->unique();
         $pegawaiMap = User::whereIn('id', $userIds)->pluck('pegawai_id', 'id');
 
-        foreach ($members as $index => $member) {
-            $pegawaiId = $pegawaiMap[$member->user_id] ?? null;
-            if (! $pegawaiId) {
-                throw new \LogicException("Anggota lembur (user #{$member->user_id}) tidak terhubung ke data pegawai.");
-            }
+        return $members
+            ->map(function ($member) use ($pegawaiMap) {
+                $pegawaiId = $pegawaiMap[$member->user_id] ?? null;
+                if (! $pegawaiId) {
+                    throw new \LogicException("Anggota lembur (user #{$member->user_id}) tidak terhubung ke data pegawai.");
+                }
 
+                return (int) $pegawaiId;
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Salin anggota lembur → wo_assignment_member.
+     *
+     * @param  int[]  $pegawaiIds  Hasil resolveMemberPegawaiIds(); index 0 jadi PIC.
+     */
+    private function attachMembers(WorkorderAssignment $assignment, array $pegawaiIds): void
+    {
+        foreach ($pegawaiIds as $index => $pegawaiId) {
             WoAssignmentMember::updateOrCreate(
                 [
                     'assignment_id' => $assignment->id,
