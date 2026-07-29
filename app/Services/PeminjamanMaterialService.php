@@ -109,6 +109,7 @@ class PeminjamanMaterialService
             // Sisa yang tidak dikembalikan = terpasang/dikonsumsi permanen di lapangan.
             $pinjaman->jumlah_terpasang = $pinjaman->jumlah_pinjam - $data['jumlah_kembali'];
             $pinjaman->kondisi_kembali = $data['kondisi_kembali'] ?? null;
+            $pinjaman->foto_kerusakan  = $data['foto_kerusakan'] ?? null;
             $pinjaman->status          = 'PENDING_KEMBALI';
             $pinjaman->save();
 
@@ -169,6 +170,7 @@ class PeminjamanMaterialService
                 $pinjaman->jumlah_rusak    = null;
                 $pinjaman->jumlah_terpasang = null;
                 $pinjaman->kondisi_kembali = null;
+                $pinjaman->foto_kerusakan  = null;
                 $pinjaman->dikembalikan_at = null;
             }
 

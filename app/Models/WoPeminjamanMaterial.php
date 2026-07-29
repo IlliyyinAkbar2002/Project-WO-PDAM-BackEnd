@@ -14,6 +14,7 @@ class WoPeminjamanMaterial extends Model
     protected $guarded = [];
 
     protected $casts = [
+        'foto_kerusakan'  => 'array',
         'diajukan_at'     => 'datetime',
         'dikembalikan_at' => 'datetime',
         'diverifikasi_at' => 'datetime',

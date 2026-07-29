@@ -8,6 +8,7 @@ use App\Services\PeminjamanMaterialService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class WoPeminjamanMaterialController extends Controller
 {
@@ -110,9 +111,17 @@ class WoPeminjamanMaterialController extends Controller
     public function kembalikan(Request $request, $id)
     {
         $data = $request->validate([
-            'jumlah_kembali'  => 'required|integer|min:0',
-            'jumlah_rusak'    => 'nullable|integer|min:0',
-            'kondisi_kembali' => 'nullable|string',
+            'jumlah_kembali'   => 'required|integer|min:0',
+            'jumlah_rusak'     => 'nullable|integer|min:0',
+            'kondisi_kembali'  => 'nullable|string',
+            'foto_kerusakan'   => [
+                'nullable',
+                'array',
+                Rule::requiredIf(fn () => (int) $request->input('jumlah_rusak', 0) > 0),
+            ],
+            'foto_kerusakan.*' => 'image|max:5120',
+        ], [
+            'foto_kerusakan.required' => 'Foto kerusakan wajib diunggah bila ada barang rusak.',
         ]);
 
         $pinjaman = WoPeminjamanMaterial::find($id);
@@ -123,6 +132,16 @@ class WoPeminjamanMaterialController extends Controller
         $pegawaiId = $this->actorPegawaiId();
         if (! $pegawaiId) {
             return response()->json(['message' => 'Akun Anda tidak terhubung dengan data pegawai.'], 403);
+        }
+
+        // Simpan berkas setelah guard 404/403 agar tidak meninggalkan file yatim.
+        // Hasil validate() berisi objek UploadedFile, jadi harus ditimpa dengan path.
+        if ($request->hasFile('foto_kerusakan')) {
+            $paths = [];
+            foreach ($request->file('foto_kerusakan') as $file) {
+                $paths[] = $file->store('material_rusak', 'public');
+            }
+            $data['foto_kerusakan'] = $paths;
         }
 
         try {
