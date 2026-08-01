@@ -48,6 +48,10 @@ class WorkorderController extends Controller
                 'assignedTo',
                 'createdBy',
                 'workorderAssignment.members.user',
+                // Titik geofence (assignment.latitude/longitude) tidak berguna tanpa
+                // radius_meter, yang hanya ada di m_location. Keduanya harus selalu
+                // dikirim berpasangan supaya klien tidak menebak radius.
+                'workorderAssignment.location',
             ]);
             // Filter pencarian
             if ($search) {
