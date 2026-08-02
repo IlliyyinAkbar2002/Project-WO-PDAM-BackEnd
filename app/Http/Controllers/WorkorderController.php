@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Constants\TahapanWorkorder;
 use App\Models\LemburSpl;
 use App\Models\JenisWorkorder;
 use App\Models\Pegawai;
@@ -348,7 +349,10 @@ class WorkorderController extends Controller
                 'progressWorkorder' => function ($q) {
                     $q->with([
                         'dokumentasiProgress',
-                        'latestDetail'
+                        'latestDetail',
+                        // Dipakai untuk label "diambil oleh" di galeri evidence.
+                        // Tanpa ini foreach di bawah memicu N+1.
+                        'submitter',
                     ])->orderBy('created_at', 'desc');
                 },
                 'laporanWorkorder',
@@ -356,12 +360,17 @@ class WorkorderController extends Controller
             ->where('id', $id)
             ->where('status', 'Selesai')
             ->firstOrFail();
+
+            $dokumentasi = $this->galeriDokumentasi($workorder);
+
             return response()->json([
                 'success' => true,
                 'workorder' => $workorder,
                 'assignment' => $workorder->workorderAssignment,
                 'progress' => $workorder->progressWorkorder,
                 'laporan' => $workorder->laporanWorkorder,
+                'dokumentasi' => $dokumentasi,
+                'total_dokumentasi' => array_sum(array_map('count', $dokumentasi)),
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -370,6 +379,51 @@ class WorkorderController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Ratakan foto dokumentasi dari seluruh progress jadi galeri evidence
+     * per jenis, supaya FE Web tidak perlu menelusuri array progress sendiri.
+     *
+     * Bucket `lainnya` menampung baris ber-`jenis` NULL: kolom itu baru
+     * ditambahkan belakangan (migrasi 2026_06_18_090000) dan
+     * ProgressWorkorderController::update() masih membuat dokumentasi tanpa
+     * mengisinya — tanpa bucket ini foto-foto tersebut hilang diam-diam.
+     */
+    private function galeriDokumentasi(Workorder $workorder): array
+    {
+        $dokumentasi = ['inspeksi' => [], 'hasil_kerja' => [], 'lainnya' => []];
+
+        foreach ($workorder->progressWorkorder as $progress) {
+            foreach ($progress->dokumentasiProgress as $doc) {
+                $bucket = match ($doc->jenis) {
+                    'INSPEKSI'    => 'inspeksi',
+                    'HASIL_KERJA' => 'hasil_kerja',
+                    default       => 'lainnya',
+                };
+
+                $dokumentasi[$bucket][] = [
+                    'id'                    => $doc->id,
+                    'progress_workorder_id' => $progress->id,
+                    'tipe_progress'         => $progress->tipe_progress,
+                    'tahapan'               => $progress->tahapan,
+                    'tahapan_label'         => TahapanWorkorder::LABELS[$progress->tahapan] ?? null,
+                    'jenis'                 => $doc->jenis,
+                    'url'                   => $doc->url,
+                    'url_lengkap'           => $doc->url_lengkap,
+                    'diambil_pada'          => $progress->waktu_submit ?? $doc->created_at,
+                    'diambil_oleh'          => optional($progress->submitter)->nama,
+                ];
+            }
+        }
+
+        // Galeri dibaca kronologis (before -> after). Array `progress` sengaja
+        // tetap desc supaya kontrak lama tidak berubah.
+        foreach ($dokumentasi as $key => $items) {
+            $dokumentasi[$key] = collect($items)->sortBy('diambil_pada')->values()->all();
+        }
+
+        return $dokumentasi;
     }
 
     /**
